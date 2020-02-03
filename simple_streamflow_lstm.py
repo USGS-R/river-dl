@@ -1,10 +1,18 @@
 import random
 from random import seed
 import numpy as np
+import matplotlib.pyplot as plt
 import tensorflow as tf
 import pandas as pd
 from sklearn import preprocessing
 
+def plot_pred(x, true):
+    pred = simple_lstm_model.predict(x)
+    pred = [p[0] for p in pred]
+    df = pd.DataFrame([true, pred]).T
+    df.columns=['true', 'predicted']
+    df.plot()
+    plt.show()
 
 def select_data(df):
     unwanted_cols = ['seg_id_nat', 'model_idx', 'date'] 
@@ -50,6 +58,7 @@ trn = tf.data.Dataset.from_tensor_slices((x_trn, y_trn))
 trn = trn.batch(365).shuffle(365)
 
 x_tst = scale(predictors_tst)[0]
+x_tst = np.expand_dims(x_tst, axis=1)
 y_tst = scale(target_tst)[0]
 tst = tf.data.Dataset.from_tensor_slices((x_tst, y_tst))
 
@@ -57,4 +66,7 @@ simple_lstm_model = tf.keras.models.Sequential([tf.keras.layers.LSTM(10),
                                                 tf.keras.layers.Dense(1)])
 
 simple_lstm_model.compile(optimizer='adam', loss='mae')
-simple_lstm_model.fit(trn, epochs=10)
+simple_lstm_model.fit(trn, epochs=40)
+
+plot_pred(x_tst, y_tst)
+plot_pred(x_trn, y_trn)

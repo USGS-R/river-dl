@@ -1,11 +1,11 @@
 import random
 from random import seed
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras import models, layers
 import pandas as pd
-from sklearn import preprocessing
+from sklearn import preprocessing, metrics
 
 def plot_pred(pred, true):
     df = pd.DataFrame([true, pred]).T
@@ -16,14 +16,15 @@ def plot_pred(pred, true):
     plt.show()
 
 def select_data(df):
-    unwanted_cols = ['seg_id_nat', 'model_idx', 'date', 'seg_upstream_inflow', 'seginc_gwflow', 'seg_width'] 
-    wanted_cols=None
-    # wanted_cols = ['seg_tave_air', 'seg_rain', 'seg_tave_water', 'seg_width']#, 'seg_upstream_inflow']
+    unwanted_cols = None
+    # unwanted_cols = ['seg_id_nat', 'model_idx', 'date', 'seg_upstream_inflow', 'seginc_gwflow', 'seg_width'] 
+    # wanted_cols=None
+    wanted_cols = ['seg_tave_air', 'seg_rain']#, 'seg_upstream_inflow']
     target_col = 'seg_outflow'
     if unwanted_cols and not wanted_cols:
         predictor_cols = [c for c in df.columns if c not in unwanted_cols and
                           c != target_col]
-    elif not wanted_cols:
+    elif wanted_cols:
         predictor_cols = [c for c in df.columns if c in wanted_cols and
                           c != target_col]
 
@@ -88,6 +89,9 @@ def get_format_preds(model, x, unscale=False, y_std=None, y_mean=None):
 def read_process_data(trn_ratio=0.8):
     # read in data
     df = pd.read_feather('data/sntemp_input_output_subset.feather')
+    df['date'] = pd.to_datetime(df['date'])
+    df = df.sort_values(['seg_id_nat', 'date'])
+    seg_id, df = get_df_for_rand_seg(df)
 
     # separate trn_tst
     df_trn, df_tst = separate_trn_tst(df)
@@ -117,8 +121,10 @@ model = train_lstm(train_data, hidden_units=20)
 # test data
 tst_preds = get_format_preds(model, x_test, True, y_tr_std, y_tr_mean)
 plot_pred(tst_preds, y_test.reset_index(drop=True))
+print('rmse test: ', metrics.mean_squared_error(y_test.values, tst_preds.values))
 
 # train data
 trn_preds = get_format_preds(model, x_trn, True, y_tr_std, y_tr_mean)
 y_trn_unscaled = unscale_data(y_trn, y_tr_std, y_tr_mean)
 plot_pred(trn_preds, y_trn_unscaled.reset_index(drop=True))
+print('rmse train: ', metrics.mean_squared_error(y_trn_unscaled.values, trn_preds.values))

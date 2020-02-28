@@ -4,29 +4,92 @@ import RGCN_tf2 as rgcn_tf2
 from sklearn import preprocessing
 
 
-def select_data(df):
-    unwanted_cols = None
-    # unwanted_cols = ['seg_id_nat', 'model_idx', 'date', 'seg_upstream_inflow', 'seginc_gwflow', 'seg_width'] 
-    # wanted_cols=None
-    wanted_cols = ['seg_tave_air', 'seg_rain']#, 'seg_upstream_inflow']
-    target_col = 'seg_outflow'
-    if unwanted_cols and not wanted_cols:
-        predictor_cols = [c for c in df.columns if c not in unwanted_cols and
-                          c != target_col]
-    elif wanted_cols:
-        predictor_cols = [c for c in df.columns if c in wanted_cols and
-                          c != target_col]
+def get_non_varying_cols(df, std_thresh=1e-5):
+    """
+    get columns that don't vary at all
+    :param df: [dataframe] dataframe of input/output data
+    :param std_thresh: [float] when a variable (column) has a std deviation
+    below the std_thresh it will be counted as "non-varying" 
+    :return: index of columns (like a list of column names) that have a std
+    below the threshold
+    """
+    st_dev = df.std()
+    sml_std = st_dev[st_dev < std_thresh]
+    print(f"the {sml_std.index} columns were removed b/c they had small std\
+            deviations")
+    return sml_std.index.to_list()
 
 
-    return df[predictor_cols], df[target_col]
+def get_unwanted_cols(df):
+    """
+    get the columns that should be removed in the input data including
+    1) columns that don't vary at all, 2) columns that are for the model but
+    aren't actually predictors like seg_id_nat and 3) columns that are too
+    strong of predictors?
+    """
+    non_varying_cols = get_non_varying_cols(df)
+    sntemp_cols = ['model_idx', 'date']
+    unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width'] 
+    # first lets just try taking the flow and temp out since that is what
+    # xiaowei did 
+    unwanted_cols = []
+    non_varying_cols = []
+    unwanted_cols.extend(non_varying_cols)
+    unwanted_cols.extend(sntemp_cols)
+    return unwanted_cols
 
 
-def scale(df, std=None, mean=None):
-    if not isinstance(std, pd.Series) and not isinstance(mean, pd.Series):
-        std = df.std()
-        mean = df.mean()
-    scaled = (df - mean)/std
-    scaled = scaled.fillna(0)
+def convert_to_np_arr(df):
+    """
+    convert dataframe to numpy arrays with dimensions [nseg, ndate, nfeat]
+    :param df: [dataframe] input or output data
+    :return: numpy array
+    """
+    seg_id_groups = pd.groupby('seg_id_nat')
+    data_by_seg_id = seg_id_groups.apply(pd.DataFrame.as_matrix)
+    array_by_seg_id = np.array(list(data_by_seg_id))
+    return array_by_seg_id
+
+
+def sep_x_y(df):
+    """
+    filter data and separate into input and output, then convert to numpy arrays
+    divided by seg_id
+    :param df: [dataframe] the raw input and output data
+    """
+    unwanted_cols = get_unwanted_cols(df)
+    target_cols = ['seg_outflow', 'seg_tave_water']
+    predictor_cols = [c for c in df.columns if c not in unwanted_cols and
+                      c != target_cols]
+    pred_arr = convert_to_np_arr(df[predictor_cols])
+    target_arr = convert_to_np_arr(df[target_cols])
+    return pred_arr, target_arr
+
+
+def get_df_for_rand_seg(df, seg_id):
+    df_seg = df[df['seg_id_nat'] == seg_id]
+    return df_seg
+
+
+def scale(data_arr, std=None, mean=None):
+    """
+    scale the data so it has a standard deviation of 1 and a mean of zero
+    :param data_arr: [numpy array] input or output data with dims
+    [nseg, ndates, nfeats]
+    :param std: [numpy array] standard deviation if scaling test data with dims
+    [nfeats]
+    :param mean: [numpy array] mean if scaling test data with dims [nfeats]
+    :return: scaled data with original dims
+    """
+    nseg = data_arr.shape[0]
+    ndates = data_arr.shape[1]
+    nfeats = data_arr.shape[2]
+    all_segs = np.reshape(nseg*ndates, nfeats)
+    if not std or not mean:
+        std = np.std(all_segs, axis=1)
+        mean = np.mean(all_segs, axis=1)
+    # adding small number in case there is a std of zero
+    scaled = (all_segs - mean)/(std + 1e-10)
     return scaled, std, mean
 
 
@@ -43,32 +106,48 @@ def unscale_data(df, std, mean):
     return (df * std) + mean
 
 
-def separate_trn_tst(df, train_per=0.8):
-    nrows = df.shape[0]
-    sep_idx = int(nrows * train_per)
-    df_trn = df.iloc[:sep_idx, :]
-    df_tst = df.iloc[sep_idx:, :]
-    return df_trn, df_tst
+def separate_trn_tst(data_arr, trn_ratio=0.8):
+    """
+    separate the train data from the test data according to the trn_ratio along
+    the date axis
+    :param data_arr: [numpy array] input or output data with dims
+    [nseg, ndates, nfeat]
+    :param trn_ratio: the amount of data to take for training. it will be taken
+    from the beginning of the dataset
+    """
+    sep_idx = int(data_arr.shape[1] * trn_ratio)
+    trn = data_arr[:, :sep_idx, :]
+    tst = data_arr[:, sep_idx:, :]
+    return trn, tst
 
-def read_process_data(trn_ratio=0.8):
+
+def read_process_data(trn_ratio=0.8, seg_id=None):
+    """
+    read in and process data into training and testing datasets. the training 
+    and testing data are scaled to have a std of 1 and a mean of zero
+    :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
+    would mean that 80% of the data would be for training and the rest for test
+    :param seg_id: [int] if you want just data for one segment id, this
+    argument is that national segment id. Default is that all are given
+    :returns: training and testing data along with the means and standard
+    deviations of the training input and output data
+    """
     # read in data
     df = pd.read_feather('data/sntemp_input_output_subset.feather')
     df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values(['seg_id_nat', 'date'])
-    seg_id, df = get_df_for_rand_seg(df)
+    df = df.sort_values(['date'])
+
+    x, y = sep_x_y(df)
 
     # separate trn_tst
-    df_trn, df_tst = separate_trn_tst(df)
-
-    # separate the predictors from the targets
-    predictors_trn, target_trn = select_data(df_trn)
-    predictors_tst, target_tst = select_data(df_tst)
+    x_trn, x_tst = separate_trn_tst(x, trn_ratio)
+    y_trn, y_tst = separate_trn_tst(y, trn_ratio)
 
     # scale the data
-    x_trn, x_trn_std, x_trn_mean = scale(predictors_trn)
+    x_trn_scl, x_trn_std, x_trn_mean = scale(x_trn)
     # add a dimension for the timesteps (just using 1)
     x_trn = np.expand_dims(x_trn, axis=1)
-    y_trn, y_trn_std, y_trn_mean = scale(target_trn)
+    y_trn_scl, y_trn_std, y_trn_mean = scale(y_trn)
 
     trn = tf.data.Dataset.from_tensor_slices((x_trn, y_trn))
     trn = trn.batch(365).shuffle(365)
@@ -107,6 +186,7 @@ def process_adj_matrix():
     return A_hat
 
 ''' Load data '''
+read_process_data()
 feat = np.load('processed_features.npy')
 label = np.load('sim_temp.npy')  # np.load('obs_temp.npy')
 obs = np.load('obs_temp.npy')  # np.load('obs_temp.npy')

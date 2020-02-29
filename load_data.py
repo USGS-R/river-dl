@@ -28,7 +28,7 @@ def get_unwanted_cols(df):
     strong of predictors?
     """
     non_varying_cols = get_non_varying_cols(df)
-    sntemp_cols = ['model_idx', 'date']
+    sntemp_cols = ['model_idx', 'date', 'seg_id_nat']
     unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width'] 
     # first lets just try taking the flow and temp out since that is what
     # xiaowei did 
@@ -45,10 +45,15 @@ def convert_to_np_arr(df):
     :param df: [dataframe] input or output data
     :return: numpy array
     """
-    seg_id_groups = pd.groupby('seg_id_nat')
-    data_by_seg_id = seg_id_groups.apply(pd.DataFrame.as_matrix)
-    array_by_seg_id = np.array(list(data_by_seg_id))
-    return array_by_seg_id
+    seg_id_groups = df.groupby('seg_id_nat')
+    # this should work, but it raises an error
+    # data_by_seg_id = seg_id_groups.apply(pd.DataFrame.to_numpy)
+    seg_id_arrays = []
+    for seg_id, seg_id_df in seg_id_groups:
+        del seg_id_df['seg_id_nat']
+        seg_id_arrays.append(seg_id_df.to_numpy())
+    array_for_all_seg_ids = np.array(seg_id_arrays)
+    return array_for_all_seg_ids
 
 
 def sep_x_y(df):
@@ -60,7 +65,10 @@ def sep_x_y(df):
     unwanted_cols = get_unwanted_cols(df)
     target_cols = ['seg_outflow', 'seg_tave_water']
     predictor_cols = [c for c in df.columns if c not in unwanted_cols and
-                      c != target_cols]
+                      c not in target_cols]
+    # add seg_id_nat here so we can df them into numpy arrays by segment
+    target_cols.append('seg_id_nat')
+    predictor_cols.append('seg_id_nat')
     pred_arr = convert_to_np_arr(df[predictor_cols])
     target_arr = convert_to_np_arr(df[target_cols])
     return pred_arr, target_arr
@@ -84,10 +92,10 @@ def scale(data_arr, std=None, mean=None):
     nseg = data_arr.shape[0]
     ndates = data_arr.shape[1]
     nfeats = data_arr.shape[2]
-    all_segs = np.reshape(nseg*ndates, nfeats)
+    all_segs = np.reshape(data_arr, [nseg*ndates, nfeats])
     if not std or not mean:
-        std = np.std(all_segs, axis=1)
-        mean = np.mean(all_segs, axis=1)
+        std = np.std(all_segs, axis=0)
+        mean = np.mean(all_segs, axis=0)
     # adding small number in case there is a std of zero
     scaled = (all_segs - mean)/(std + 1e-10)
     return scaled, std, mean
@@ -146,17 +154,19 @@ def read_process_data(trn_ratio=0.8, seg_id=None):
     # scale the data
     x_trn_scl, x_trn_std, x_trn_mean = scale(x_trn)
     # add a dimension for the timesteps (just using 1)
-    x_trn = np.expand_dims(x_trn, axis=1)
     y_trn_scl, y_trn_std, y_trn_mean = scale(y_trn)
 
-    trn = tf.data.Dataset.from_tensor_slices((x_trn, y_trn))
-    trn = trn.batch(365).shuffle(365)
-
-    x_tst = scale(predictors_tst, x_trn_std, x_trn_mean)[0]
-    x_tst = np.expand_dims(x_tst, axis=1)
-    y_tst = target_tst
-    tst = tf.data.Dataset.from_tensor_slices((x_tst, y_tst))
-    return trn, x_trn, y_trn, x_tst, y_tst, y_trn_std, y_trn_mean
+    x_tst_scl = scale(x_tst, x_trn_std, x_trn_mean)[0]
+    data = {'x_trn': x_trn_scl,
+            'x_std': x_trn_std,
+            'x_mean': x_trn_mean,
+            'x_tst': x_trn_scl,
+            'y_trn': y_trn_scl,
+            'y_std': y_trn_std,
+            'y_mean': y_trn_mean,
+            'y_tst': y_tst,
+            }
+    return data
 
 
 

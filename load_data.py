@@ -93,11 +93,12 @@ def scale(data_arr, std=None, mean=None):
     ndates = data_arr.shape[1]
     nfeats = data_arr.shape[2]
     all_segs = np.reshape(data_arr, [nseg*ndates, nfeats])
-    if not std or not mean:
+    if not isinstance(std, np.ndarray) or not isinstance(mean, np.ndarray):
         std = np.std(all_segs, axis=0)
         mean = np.mean(all_segs, axis=0)
     # adding small number in case there is a std of zero
     scaled = (all_segs - mean)/(std + 1e-10)
+    scaled = np.reshape(scaled, [nseg, ndates, nfeats])
     return scaled, std, mean
 
 
@@ -129,14 +130,35 @@ def separate_trn_tst(data_arr, trn_ratio=0.8):
     return trn, tst
 
 
-def read_process_data(trn_ratio=0.8, seg_id=None):
+def split_into_batches(data_array, batch_size=365, offset=0.5):
+    """
+    split training data into batches with size of batch_size
+    :param data_array: [numpy array] array of training data with dims [nseg,
+    ndates, nfeat]
+    :param batch_size: [int] number of batches
+    :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
+    the first batch will be 0-365 and the second will be 182-547)
+    :return: [numpy array] batched data with dims [nbatches, nseg, ndates
+    (batch_size), nfeat]
+    """
+    combined = []
+    for i in range(int(1/offset)):
+        start = int(i * offset * batch_size)
+        idx = np.arange(start=start, stop=data_array.shape[1],
+                        step=batch_size)
+        split = np.split(data_array, indices_or_sections=idx, axis=1)
+        # add all but the first and last batch since they will be smaller
+        combined.extend(split[1:-1])
+    combined = np.asarray(combined)
+    return combined
+
+
+def read_process_data(trn_ratio=0.8, batch_offset=0.5):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
     :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
     would mean that 80% of the data would be for training and the rest for test
-    :param seg_id: [int] if you want just data for one segment id, this
-    argument is that national segment id. Default is that all are given
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
@@ -157,17 +179,21 @@ def read_process_data(trn_ratio=0.8, seg_id=None):
     y_trn_scl, y_trn_std, y_trn_mean = scale(y_trn)
 
     x_tst_scl = scale(x_tst, x_trn_std, x_trn_mean)[0]
-    data = {'x_trn': x_trn_scl,
+
+    # batch the training data
+    x_trn_batch = split_into_batches(x_trn_scl, offset=batch_offset)
+    y_trn_batch = split_into_batches(y_trn_scl, offset=batch_offset)
+
+    data = {'x_trn': x_trn_batch,
             'x_std': x_trn_std,
             'x_mean': x_trn_mean,
-            'x_tst': x_trn_scl,
-            'y_trn': y_trn_scl,
+            'x_tst': x_tst_scl,
+            'y_trn': y_trn_batch,
             'y_std': y_trn_std,
             'y_mean': y_trn_mean,
             'y_tst': y_tst,
             }
     return data
-
 
 
 def process_adj_matrix():
@@ -196,22 +222,22 @@ def process_adj_matrix():
     return A_hat
 
 ''' Load data '''
-read_process_data()
-feat = np.load('processed_features.npy')
-label = np.load('sim_temp.npy')  # np.load('obs_temp.npy')
-obs = np.load('obs_temp.npy')  # np.load('obs_temp.npy')
-mask = (label != -11).astype(int)
-maso = (obs != -11).astype(int)
-
-flow = np.load('sim_flow.npy')
-phy = np.concatenate([np.expand_dims(label, 2), np.expand_dims(flow, 2)],
-                     axis=2)
-phy = np.reshape(phy, [-1, rgcn_tf2.n_phys_vars])
-
-
-phy = preprocessing.scale(phy)
-phy = np.reshape(phy, [rgcn_tf2.n_seg, -1, rgcn_tf2.n_phys_vars])
-
-# delete the features we don't need in training (temp and flow)
-feat = np.delete(feat, [9, 10], 2)
+d = read_process_data(trn_ratio=0.667, batch_offset=1)
+# feat = np.load('processed_features.npy')
+# label = np.load('sim_temp.npy')  # np.load('obs_temp.npy')
+# obs = np.load('obs_temp.npy')  # np.load('obs_temp.npy')
+# mask = (label != -11).astype(int)
+# maso = (obs != -11).astype(int)
+#
+# flow = np.load('sim_flow.npy')
+# phy = np.concatenate([np.expand_dims(label, 2), np.expand_dims(flow, 2)],
+#                      axis=2)
+# phy = np.reshape(phy, [-1, rgcn_tf2.n_phys_vars])
+#
+#
+# phy = preprocessing.scale(phy)
+# phy = np.reshape(phy, [rgcn_tf2.n_seg, -1, rgcn_tf2.n_phys_vars])
+#
+# # delete the features we don't need in training (temp and flow)
+# feat = np.delete(feat, [9, 10], 2)
 

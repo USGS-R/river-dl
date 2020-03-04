@@ -8,12 +8,14 @@ based off code by Xiaowei Jia
 from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
+import datetime
 from tensorflow.keras import layers
 import random
 from load_data import read_process_data, process_adj_matrix
 from tensorflow.keras.losses import MSE
 
 
+# tf.compat.v1.disable_eager_execution()
 ###### build model ######
 
 class rgcn(layers.Layer):
@@ -134,7 +136,42 @@ class rgcn_model(tf.keras.Model):
         return output
 
 
+@tf.function
+def train_model():
+    A = process_adj_matrix()
 
+    data = read_process_data(trn_ratio=0.67, batch_offset=1)
+    # iterate over epochs
+    model = rgcn_model(hidden_size, 1, 2)
+
+    epochs = 3
+    optimizer = tf.optimizers.Adam()
+
+    for epoch in range(epochs):
+        print(f'start of epoch {epoch}')
+
+        # iterate over batches
+        n_batches = data['x_trn'].shape[0]
+        epoch_loss = 0
+        for i in range(n_batches):
+            start_time = datetime.datetime.now()
+            x_trn_batch = data['x_trn'][i]
+            print(f'x_trn_batch shape: {x_trn_batch.shape}')
+            y_trn_batch = data['y_trn'][i, :, :, :]
+            y_trn_batch = np.reshape(y_trn_batch,
+                                     [n_seg * batch_size, n_phys_vars])
+            with tf.GradientTape() as tape:
+                output = model(x_trn_batch, A, pretrain=True)
+                loss = MSE(y_trn_batch, output)
+            grads = tape.gradient(loss, model.trainable_weights)
+            optimizer.apply_gradients(zip(grads, model.trainable_weights))
+            batch_loss = train_model(model, x_trn_batch, y_trn_batch)
+            batch_loss_ave = tf.reduce_mean(batch_loss)
+            epoch_loss += batch_loss_ave
+            end_time = datetime.datetime.now()
+            print(f'batch {i}; loss: {batch_loss_ave}'
+                  f'time_elapsed:{end_time - start_time}')
+        print(f'epoch {epoch} loss: {epoch_loss / n_batches}')
 
 
 ###### Declare constants ######
@@ -169,26 +206,4 @@ n_classes = 1
 
 kb = 1.0
 
-A = process_adj_matrix()
-
-data = read_process_data(trn_ratio=0.67, batch_offset=1)
-# iterate over epochs
-model = rgcn_model(hidden_size, 1, 2)
-
-epochs = 1
-optimizer = tf.optimizers.Adam()
-for epoch in range(epochs):
-    print(f'start of epoch {epoch}')
-
-    # iterate over batches
-    n_batches = data['x_trn'].shape[0]
-    for i in range(n_batches):
-        with tf.GradientTape() as tape:
-            output = model(data['x_trn'][i], A, pretrain=True)
-            # output = np.reshape(output, [n_seg * batch_size * n_phys_vars])
-            y_trn_batch = data['y_trn'][i, :, :, :]
-            y_trn_batch = np.reshape(y_trn_batch, [n_seg * batch_size , n_phys_vars])
-            loss = MSE(y_trn_batch, output)
-        grads = tape.gradient(loss, model.trainable_weights)
-        optimizer.apply_gradients(zip(grads, model.trainable_weights))
-        print(f'batch {i}; loss: {tf.reduce_mean(loss)}')
+train_model()

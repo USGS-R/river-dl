@@ -18,18 +18,30 @@ from tensorflow.keras.losses import MSE
 ###### build model ######
 
 class rgcn(layers.Layer):
+    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A,
+                 pretrain=False):
+        """
 
-    def __init__(self, hidden_size, pred_out_size, n_phys_vars):
+        :param hidden_size: [int] the number of hidden units
+        :param pred_out_size: [int] the number of outputs to produce in
+        fine-tuning
+        :param n_phys_vars: [int] the number of outputs to produce in
+        pre-training
+        :param A: [numpy array] adjacency matrix
+        :param pretrain: [bool] whether you are pretraining or not
+        """
         super().__init__()
         self.hidden_size = hidden_size
         self.n_phys_vars = n_phys_vars
+        self.A = A
+        self.pretrain = pretrain
 
         ### set up the weights ###
 
         # todo: does this make it so all of the weights are initialized to the same values?
         w_initializer = tf.random_normal_initializer(stddev=0.02)
         # was W2
-        self.W_out = self.add_weight(shape=[hidden_size, n_classes],
+        self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
                                      initializer=w_initializer, name='W_out')
         # was b2
         self.b_out = self.add_weight(shape=[n_classes], initializer='zeros',
@@ -82,14 +94,14 @@ class rgcn(layers.Layer):
                                       name='b_phys')
 
     # todo: add tf.function?
-    def call(self, inputs, A, pretrain=False):
+    def call(self, inputs, **kwargs):
         lstm = tf.keras.layers.LSTMCell(hidden_size)
         # todo: read in the dimensions from A for first dim
         hidden_state_prev, cell_state_prev = (tf.zeros([42, self.hidden_size]),
                                               tf.zeros([42, self.hidden_size]))
         out = []
         n_steps = inputs.shape[1]
-        A = A.astype('float32')
+        A = self.A.astype('float32')
         for t in range(n_steps):
             h_graph = tf.nn.tanh(tf.matmul(A, tf.matmul(hidden_state_prev,
                                                         self.W_graph_h)
@@ -111,7 +123,7 @@ class rgcn(layers.Layer):
                                      + tf.matmul(c_graph, self.W_c_prev)
                                      + self.b_c)
 
-            if pretrain:
+            if self.pretrain:
                 out_phys = tf.matmul(h_update, self.W_phys) + self.b_phys
                 out.append(out_phys)
             else:
@@ -126,17 +138,24 @@ class rgcn(layers.Layer):
 
 
 class rgcn_model(tf.keras.Model):
-    def __init__(self, hidden_size, pred_out_size, n_phys_vars):
+    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A,
+                 pretrain=False):
+        """
+        :param hidden_size: [int] the number of hidden units
+        :param pred_out_size: [int] the number of outputs to produce in
+        fine-tuning
+        :param n_phys_vars: [int] the number of outputs to produce in
+        pre-training
+        :param A: [numpy array] adjacency matrix
+        :param pretrain: [bool] whether you are pretraining or not
+        """
         super().__init__()
-        self.rgcn_layer = rgcn(hidden_size, pred_out_size, n_phys_vars)
+        self.rgcn_layer = rgcn(hidden_size, pred_out_size, n_phys_vars, A,
+                               pretrain)
 
-    def call(self, inputs, A, pretrain=False):
-        output = self.rgcn_layer(inputs, A, pretrain)
+    def call(self, inputs, **kwargs):
+        output = self.rgcn_layer(inputs)
         return output
-
-
-
-
 
 ###### Declare constants ######
 learning_rate = 0.01

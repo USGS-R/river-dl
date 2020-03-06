@@ -9,6 +9,7 @@ from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
+import datetime
 import random
 from load_data import read_process_data, process_adj_matrix
 from tensorflow.keras.losses import MSE
@@ -25,6 +26,7 @@ class rgcn(layers.Layer):
 
         ### set up the weights ###
 
+        # todo: does this make it so all of the weights are initialized to the same values?
         w_initializer = tf.random_normal_initializer(stddev=0.02)
         # was W2
         self.W_out = self.add_weight(shape=[hidden_size, n_classes],
@@ -79,9 +81,12 @@ class rgcn(layers.Layer):
         self.b_phys = self.add_weight(shape=[n_phys_vars], initializer='zeros',
                                       name='b_phys')
 
+    # todo: add tf.function?
     def call(self, inputs, A, pretrain=False):
-        lstm = tf.keras.layers.LSTM(hidden_size, return_state=True)
-        hidden_state_prev, cell_state_prev = (tf.zeros([42, 20]), tf.zeros([42, 20]))
+        lstm = tf.keras.layers.LSTMCell(hidden_size)
+        # todo: read in the dimensions from A for first dim
+        hidden_state_prev, cell_state_prev = (tf.zeros([42, self.hidden_size]),
+                                              tf.zeros([42, self.hidden_size]))
         out = []
         n_steps = inputs.shape[1]
         A = A.astype('float32')
@@ -93,10 +98,11 @@ class rgcn(layers.Layer):
                                                         self.W_graph_c)
                                            + self.b_graph_c))
 
-            seq, hidden_state_cur, cell_state_cur = lstm(inputs[:, t:t+1, :],
-                                                         initial_state=[
-                                                            hidden_state_prev,
-                                                            cell_state_prev])
+            # todo: is LSTMStateTuple in jia's code the same thing?
+            # todo: cell vs layer?
+            seq, state = lstm(inputs[:, t, :], states=[hidden_state_prev,
+                                                       cell_state_prev])
+            hidden_state_cur, cell_state_cur = state
 
             h_update = tf.nn.sigmoid(tf.matmul(hidden_state_cur, self.W_h_cur)
                                      + tf.matmul(h_graph, self.W_h_prev)
@@ -175,20 +181,29 @@ data = read_process_data(trn_ratio=0.67, batch_offset=1)
 # iterate over epochs
 model = rgcn_model(hidden_size, 1, 2)
 
-epochs = 1
-optimizer = tf.optimizers.Adam()
+epochs = 3
+optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 for epoch in range(epochs):
     print(f'start of epoch {epoch}')
 
     # iterate over batches
     n_batches = data['x_trn'].shape[0]
+    epoch_loss = 0
     for i in range(n_batches):
+        start_time = datetime.datetime.now()
         with tf.GradientTape() as tape:
             output = model(data['x_trn'][i], A, pretrain=True)
-            # output = np.reshape(output, [n_seg * batch_size * n_phys_vars])
+            output = np.reshape(output, [n_seg * batch_size * n_phys_vars, 1])
             y_trn_batch = data['y_trn'][i, :, :, :]
-            y_trn_batch = np.reshape(y_trn_batch, [n_seg * batch_size , n_phys_vars])
+            # todo: change batch_size to seq_size
+            y_trn_batch = np.reshape(y_trn_batch, [n_seg * batch_size * n_phys_vars, 1])
+            # todo: this is mse, xiaowei uses rmse
             loss = MSE(y_trn_batch, output)
         grads = tape.gradient(loss, model.trainable_weights)
+        batch_loss = tf.reduce_mean(loss)
+        epoch_loss += batch_loss
         optimizer.apply_gradients(zip(grads, model.trainable_weights))
-        print(f'batch {i}; loss: {tf.reduce_mean(loss)}')
+        end_time = datetime.datetime.now()
+        print(f'batch {i}; loss: {batch_loss}; '
+              f'elapsed_time:{end_time-start_time}')
+    print(f'epoch {epoch}; loss: {epoch_loss/n_batches}')

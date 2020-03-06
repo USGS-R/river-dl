@@ -9,10 +9,7 @@ from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras import layers
-import datetime
-import random
 from load_data import read_process_data, process_adj_matrix
-from tensorflow.keras.losses import MSE
 
 
 ###### build model ######
@@ -33,12 +30,13 @@ class rgcn(layers.Layer):
         super().__init__()
         self.hidden_size = hidden_size
         self.n_phys_vars = n_phys_vars
-        self.A = A
+        self.A = A.astype('float32')
         self.pretrain = pretrain
 
-        ### set up the weights ###
+        # set up the layer
+        self.lstm = tf.keras.layers.LSTMCell(hidden_size)
 
-        # todo: does this make it so all of the weights are initialized to the same values?
+        ### set up the weights ###
         w_initializer = tf.random_normal_initializer(stddev=0.02)
 
         # was Wg1
@@ -79,7 +77,6 @@ class rgcn(layers.Layer):
         # was bc
         self.b_c = self.add_weight(shape=[hidden_size], initializer='zeros',
                                    name='b_c')
-        self.lstm = tf.keras.layers.LSTMCell(hidden_size)
 
         if self.pretrain:
             # was Wp
@@ -101,18 +98,19 @@ class rgcn(layers.Layer):
 
     @tf.function
     def call(self, inputs, **kwargs):
-        # todo: read in the dimensions from A for first dim
-        hidden_state_prev, cell_state_prev = (tf.zeros([42, self.hidden_size]),
-                                              tf.zeros([42, self.hidden_size]))
+        graph_size = self.A.shape[0]
+        hidden_state_prev, cell_state_prev = (tf.zeros([graph_size,
+                                                        self.hidden_size]),
+                                              tf.zeros([graph_size,
+                                                        self.hidden_size]))
         out = []
         n_steps = inputs.shape[1]
-        A = self.A.astype('float32')
         for t in range(n_steps):
-            h_graph = tf.nn.tanh(tf.matmul(A, tf.matmul(hidden_state_prev,
-                                                        self.W_graph_h)
+            h_graph = tf.nn.tanh(tf.matmul(self.A, tf.matmul(hidden_state_prev,
+                                                             self.W_graph_h)
                                            + self.b_graph_h))
-            c_graph = tf.nn.tanh(tf.matmul(A, tf.matmul(cell_state_prev,
-                                                        self.W_graph_c)
+            c_graph = tf.nn.tanh(tf.matmul(self.A, tf.matmul(cell_state_prev,
+                                                             self.W_graph_c)
                                            + self.b_graph_c))
 
             seq, state = self.lstm(inputs[:, t, :], states=[hidden_state_prev,
@@ -160,13 +158,14 @@ class rgcn_model(tf.keras.Model):
         output = self.rgcn_layer(inputs)
         return output
 
+
 ###### Declare constants ######
 learning_rate = 0.01
 learning_rate_pre = 0.005
 epochs = 100
 epochs_pre = 200  # 70
 batch_size = 365  # days
-batch_offset = 0.5 # for the batches, offset half the year
+batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
 input_size = 20 - 2
 
@@ -175,14 +174,14 @@ n_phys_vars = 2
 # the number of river segments
 n_seg = 42
 n_total_sample = 13149
-n_years = int(n_total_sample)/365
+n_years = int(n_total_sample) / 365
 # the number of sections to divide the total samples in
 cv_divisions = 3
 # the cross-validation index
 cv_idx = 2
 # number of samples in each division
 n_samp_per_div = n_total_sample / cv_divisions
-n_trn_yrs = int(2 * n_years/cv_divisions) # twice as much training as testing
+n_trn_yrs = int(2 * n_years / cv_divisions)  # twice as much training as testing
 # number of time steps per batch or sequence that the model will be trained on
 # one year of daily data
 n_step = 365

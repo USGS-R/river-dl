@@ -18,6 +18,7 @@ from tensorflow.keras.losses import MSE
 # tf.compat.v1.disable_eager_execution()
 ###### build model ######
 
+A = process_adj_matrix()
 class rgcn(layers.Layer):
 
     def __init__(self, hidden_size, pred_out_size, n_phys_vars):
@@ -131,47 +132,10 @@ class rgcn_model(tf.keras.Model):
         super().__init__()
         self.rgcn_layer = rgcn(hidden_size, pred_out_size, n_phys_vars)
 
-    def call(self, inputs, A, pretrain=False):
-        output = self.rgcn_layer(inputs, A, pretrain)
+    def call(self, inputs):
+        output = self.rgcn_layer(inputs, A, pretrain=True)
         return output
 
-
-@tf.function
-def train_model():
-    A = process_adj_matrix()
-
-    data = read_process_data(trn_ratio=0.67, batch_offset=1)
-    # iterate over epochs
-    model = rgcn_model(hidden_size, 1, 2)
-
-    epochs = 3
-    optimizer = tf.optimizers.Adam()
-
-    for epoch in range(epochs):
-        print(f'start of epoch {epoch}')
-
-        # iterate over batches
-        n_batches = data['x_trn'].shape[0]
-        epoch_loss = 0
-        for i in range(n_batches):
-            start_time = datetime.datetime.now()
-            x_trn_batch = data['x_trn'][i]
-            print(f'x_trn_batch shape: {x_trn_batch.shape}')
-            y_trn_batch = data['y_trn'][i, :, :, :]
-            y_trn_batch = np.reshape(y_trn_batch,
-                                     [n_seg * batch_size, n_phys_vars])
-            with tf.GradientTape() as tape:
-                output = model(x_trn_batch, A, pretrain=True)
-                loss = MSE(y_trn_batch, output)
-            grads = tape.gradient(loss, model.trainable_weights)
-            optimizer.apply_gradients(zip(grads, model.trainable_weights))
-            batch_loss = train_model(model, x_trn_batch, y_trn_batch)
-            batch_loss_ave = tf.reduce_mean(batch_loss)
-            epoch_loss += batch_loss_ave
-            end_time = datetime.datetime.now()
-            print(f'batch {i}; loss: {batch_loss_ave}'
-                  f'time_elapsed:{end_time - start_time}')
-        print(f'epoch {epoch} loss: {epoch_loss / n_batches}')
 
 
 ###### Declare constants ######
@@ -206,4 +170,19 @@ n_classes = 1
 
 kb = 1.0
 
-train_model()
+
+data = read_process_data(trn_ratio=0.67, batch_offset=1)
+# iterate over epochs
+model = rgcn_model(hidden_size, 1, 2)
+
+epochs = 3
+optimizer = tf.optimizers.Adam()
+
+x_trn = data['x_trn']
+n_batch, n_seg, n_day, n_feat = x_trn.shape
+x_trn = np.reshape(x_trn, [n_batch * n_seg, n_day, n_feat])
+y_trn = data['y_trn']
+y_trn = np.reshape(y_trn, [n_batch * n_seg, n_day, 2])
+model.compile(optimizer, loss=tf.keras.losses.MeanSquaredError())
+model.fit(x=x_trn, y=y_trn, epochs=epochs, batch_size=42)
+

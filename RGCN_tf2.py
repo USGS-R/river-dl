@@ -111,23 +111,18 @@ class rgcn(layers.Layer):
                                      + tf.matmul(c_graph, self.W_c_prev)
                                      + self.b_c)
 
-            out.append(h_update)
+            if pretrain:
+                out_phys = tf.matmul(h_update, self.W_phys) + self.b_phys
+                out.append(out_phys)
+            else:
+                out_pred = tf.matmul(h_update, self.W_out) + self.b_out
+                out.append(out_pred)
+
             hidden_state_prev = h_update
             cell_state_prev = c_update
-
-        out = tf.reshape(out, [-1, self.hidden_size])
-        if pretrain:
-            out_phys = tf.matmul(out, self.W_phys) + self.b_phys
-            # out_phys = tf.stack(out_phys, axis=1)
-            # out_phys = out_phys[:, :, :self.n_phys_vars]
-            # out_phys = tf.reshape(out_phys, [-1])
-            return out_phys
-        else:
-            out_pred = tf.matmul(out, self.W_out) + self.b_out
-            # out_pred.append(h_update)
-            # out_pred = tf.stack(out_pred, axis=1)
-            # out_pred = tf.reshape(out_pred, [-1, self.hidden_size])
-            return out_pred
+        out = np.asarray(out)
+        out = np.swapaxes(out, 0, 1)
+        return out
 
 
 class rgcn_model(tf.keras.Model):

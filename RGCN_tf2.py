@@ -8,12 +8,15 @@ based off code by Xiaowei Jia
 from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
+import datetime
 from tensorflow.keras import layers
 from load_data import read_process_data, process_adj_matrix
 
 
+# tf.compat.v1.disable_eager_execution()
 ###### build model ######
 
+A = process_adj_matrix()
 class rgcn(layers.Layer):
     def __init__(self, hidden_size, pred_out_size, n_phys_vars, A,
                  pretrain=False):
@@ -159,6 +162,7 @@ class rgcn_model(tf.keras.Model):
         return output
 
 
+
 ###### Declare constants ######
 learning_rate = 0.01
 learning_rate_pre = 0.005
@@ -191,10 +195,10 @@ n_classes = 1
 
 kb = 1.0
 
-A = process_adj_matrix()
 
 data = read_process_data(trn_ratio=0.67, batch_offset=1)
 # iterate over epochs
+
 model = rgcn_model(hidden_size, 1, 2, A=A, pretrain=True)
 
 epochs = 3
@@ -203,6 +207,7 @@ optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 tf.random.set_seed(23)
 x_trn = data['x_trn']
 model(x_trn[0, :, :, :])
+
 n_batch, n_seg, n_day, n_feat = x_trn.shape
 x_trn = np.reshape(x_trn, [n_batch * n_seg, n_day, n_feat])
 y_trn = data['y_trn']

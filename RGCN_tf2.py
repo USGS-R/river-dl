@@ -40,12 +40,6 @@ class rgcn(layers.Layer):
 
         # todo: does this make it so all of the weights are initialized to the same values?
         w_initializer = tf.random_normal_initializer(stddev=0.02)
-        # was W2
-        self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
-                                     initializer=w_initializer, name='W_out')
-        # was b2
-        self.b_out = self.add_weight(shape=[n_classes], initializer='zeros',
-                                     name='b_out')
 
         # was Wg1
         self.W_graph_h = self.add_weight(shape=[hidden_size, hidden_size],
@@ -85,17 +79,28 @@ class rgcn(layers.Layer):
         # was bc
         self.b_c = self.add_weight(shape=[hidden_size], initializer='zeros',
                                    name='b_c')
+        self.lstm = tf.keras.layers.LSTMCell(hidden_size)
 
-        # was Wp
-        self.W_phys = self.add_weight(shape=[hidden_size, n_phys_vars],
-                                      initializer=w_initializer, name='W_phys')
-        # was bp
-        self.b_phys = self.add_weight(shape=[n_phys_vars], initializer='zeros',
-                                      name='b_phys')
+        if self.pretrain:
+            # was Wp
+            self.W_phys = self.add_weight(shape=[hidden_size, n_phys_vars],
+                                          initializer=w_initializer,
+                                          name='W_phys')
+            # was bp
+            self.b_phys = self.add_weight(shape=[n_phys_vars],
+                                          initializer='zeros',
+                                          name='b_phys')
+        else:
+            # was W2
+            self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
+                                         initializer=w_initializer,
+                                         name='W_out')
+            # was b2
+            self.b_out = self.add_weight(shape=[n_classes], initializer='zeros',
+                                         name='b_out')
 
-    # todo: add tf.function?
+    @tf.function
     def call(self, inputs, **kwargs):
-        lstm = tf.keras.layers.LSTMCell(hidden_size)
         # todo: read in the dimensions from A for first dim
         hidden_state_prev, cell_state_prev = (tf.zeros([42, self.hidden_size]),
                                               tf.zeros([42, self.hidden_size]))
@@ -110,10 +115,8 @@ class rgcn(layers.Layer):
                                                         self.W_graph_c)
                                            + self.b_graph_c))
 
-            # todo: is LSTMStateTuple in jia's code the same thing?
-            # todo: cell vs layer?
-            seq, state = lstm(inputs[:, t, :], states=[hidden_state_prev,
-                                                       cell_state_prev])
+            seq, state = self.lstm(inputs[:, t, :], states=[hidden_state_prev,
+                                                            cell_state_prev])
             hidden_state_cur, cell_state_cur = state
 
             h_update = tf.nn.sigmoid(tf.matmul(hidden_state_cur, self.W_h_cur)
@@ -132,8 +135,8 @@ class rgcn(layers.Layer):
 
             hidden_state_prev = h_update
             cell_state_prev = c_update
-        out = np.asarray(out)
-        out = np.swapaxes(out, 0, 1)
+        out = tf.stack(out)
+        out = tf.transpose(out, [1, 0, 2])
         return out
 
 
@@ -193,31 +196,17 @@ A = process_adj_matrix()
 
 data = read_process_data(trn_ratio=0.67, batch_offset=1)
 # iterate over epochs
-model = rgcn_model(hidden_size, 1, 2)
+model = rgcn_model(hidden_size, 1, 2, A=A, pretrain=True)
 
 epochs = 3
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
-for epoch in range(epochs):
-    print(f'start of epoch {epoch}')
 
-    # iterate over batches
-    n_batches = data['x_trn'].shape[0]
-    epoch_loss = 0
-    for i in range(n_batches):
-        start_time = datetime.datetime.now()
-        with tf.GradientTape() as tape:
-            output = model(data['x_trn'][i], A, pretrain=True)
-            output = np.reshape(output, [n_seg * batch_size * n_phys_vars, 1])
-            y_trn_batch = data['y_trn'][i, :, :, :]
-            # todo: change batch_size to seq_size
-            y_trn_batch = np.reshape(y_trn_batch, [n_seg * batch_size * n_phys_vars, 1])
-            # todo: this is mse, xiaowei uses rmse
-            loss = MSE(y_trn_batch, output)
-        grads = tape.gradient(loss, model.trainable_weights)
-        batch_loss = tf.reduce_mean(loss)
-        epoch_loss += batch_loss
-        optimizer.apply_gradients(zip(grads, model.trainable_weights))
-        end_time = datetime.datetime.now()
-        print(f'batch {i}; loss: {batch_loss}; '
-              f'elapsed_time:{end_time-start_time}')
-    print(f'epoch {epoch}; loss: {epoch_loss/n_batches}')
+tf.random.set_seed(23)
+x_trn = data['x_trn']
+model(x_trn[0, :, :, :])
+n_batch, n_seg, n_day, n_feat = x_trn.shape
+x_trn = np.reshape(x_trn, [n_batch * n_seg, n_day, n_feat])
+y_trn = data['y_trn']
+y_trn = np.reshape(y_trn, [n_batch * n_seg, n_day, 2])
+model.compile(optimizer, loss=tf.keras.losses.MeanSquaredError())
+model.fit(x=x_trn, y=y_trn, epochs=epochs, batch_size=42)

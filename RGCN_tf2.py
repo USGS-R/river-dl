@@ -12,11 +12,12 @@ import datetime
 from tensorflow.keras import layers
 from load_data import read_process_data, process_adj_matrix
 
+start_time = datetime.datetime.now()
+
 
 # tf.compat.v1.disable_eager_execution()
 ###### build model ######
 
-A = process_adj_matrix()
 class rgcn(layers.Layer):
     def __init__(self, hidden_size, pred_out_size, n_phys_vars, A,
                  pretrain=False):
@@ -81,23 +82,13 @@ class rgcn(layers.Layer):
         self.b_c = self.add_weight(shape=[hidden_size], initializer='zeros',
                                    name='b_c')
 
-        if self.pretrain:
-            # was Wp
-            self.W_phys = self.add_weight(shape=[hidden_size, n_phys_vars],
-                                          initializer=w_initializer,
-                                          name='W_phys')
-            # was bp
-            self.b_phys = self.add_weight(shape=[n_phys_vars],
-                                          initializer='zeros',
-                                          name='b_phys')
-        else:
-            # was W2
-            self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
-                                         initializer=w_initializer,
-                                         name='W_out')
-            # was b2
-            self.b_out = self.add_weight(shape=[n_classes], initializer='zeros',
-                                         name='b_out')
+        # was W2
+        self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
+                                     initializer=w_initializer,
+                                     name='W_out')
+        # was b2
+        self.b_out = self.add_weight(shape=[n_classes], initializer='zeros',
+                                     name='b_out')
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -127,12 +118,8 @@ class rgcn(layers.Layer):
                                      + tf.matmul(c_graph, self.W_c_prev)
                                      + self.b_c)
 
-            if self.pretrain:
-                out_phys = tf.matmul(h_update, self.W_phys) + self.b_phys
-                out.append(out_phys)
-            else:
-                out_pred = tf.matmul(h_update, self.W_out) + self.b_out
-                out.append(out_pred)
+            out_pred = tf.matmul(h_update, self.W_out) + self.b_out
+            out.append(out_pred)
 
             hidden_state_prev = h_update
             cell_state_prev = c_update
@@ -162,55 +149,28 @@ class rgcn_model(tf.keras.Model):
         return output
 
 
-
-###### Declare constants ######
+# Declare constants ######
+tf.random.set_seed(23)
 learning_rate = 0.01
 learning_rate_pre = 0.005
-epochs = 100
-epochs_pre = 200  # 70
-batch_size = 365  # days
+epochs_finetune = 100
+epochs_pre = 200
 batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
-input_size = 20 - 2
 
-# number of physical variables
-n_phys_vars = 2
-# the number of river segments
-n_seg = 42
-n_total_sample = 13149
-n_years = int(n_total_sample) / 365
-# the number of sections to divide the total samples in
-cv_divisions = 3
-# the cross-validation index
-cv_idx = 2
-# number of samples in each division
-n_samp_per_div = n_total_sample / cv_divisions
-n_trn_yrs = int(2 * n_years / cv_divisions)  # twice as much training as testing
-# number of time steps per batch or sequence that the model will be trained on
-# one year of daily data
-n_step = 365
-n_batch = (n_years * 2) - 1
-
-n_classes = 1
-
-kb = 1.0
-
-
+# set up model/read in data
 data = read_process_data(trn_ratio=0.67, batch_offset=1)
-# iterate over epochs
-
+A = process_adj_matrix()
 model = rgcn_model(hidden_size, 1, 2, A=A, pretrain=True)
-
-epochs = 3
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
-
-tf.random.set_seed(23)
 x_trn = data['x_trn']
-model(x_trn[0, :, :, :])
-
 n_batch, n_seg, n_day, n_feat = x_trn.shape
 x_trn = np.reshape(x_trn, [n_batch * n_seg, n_day, n_feat])
+
+# pretrain
 y_trn = data['y_trn']
 y_trn = np.reshape(y_trn, [n_batch * n_seg, n_day, 2])
 model.compile(optimizer, loss=tf.keras.losses.MeanSquaredError())
-model.fit(x=x_trn, y=y_trn, epochs=epochs, batch_size=42)
+model.fit(x=x_trn, y=y_trn, epochs=epochs_pre, batch_size=42)
+pre_train_time = datetime.datetime.now()
+print('elapsed time:', pre_train_time - start_time)

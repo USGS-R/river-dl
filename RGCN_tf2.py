@@ -19,8 +19,7 @@ start_time = datetime.datetime.now()
 ###### build model ######
 
 class rgcn(layers.Layer):
-    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A,
-                 pretrain=False):
+    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A):
         """
 
         :param hidden_size: [int] the number of hidden units
@@ -29,13 +28,11 @@ class rgcn(layers.Layer):
         :param n_phys_vars: [int] the number of outputs to produce in
         pre-training
         :param A: [numpy array] adjacency matrix
-        :param pretrain: [bool] whether you are pretraining or not
         """
         super().__init__()
         self.hidden_size = hidden_size
         self.n_phys_vars = n_phys_vars
         self.A = A.astype('float32')
-        self.pretrain = pretrain
 
         # set up the layer
         self.lstm = tf.keras.layers.LSTMCell(hidden_size)
@@ -87,7 +84,7 @@ class rgcn(layers.Layer):
                                      initializer=w_initializer,
                                      name='W_out')
         # was b2
-        self.b_out = self.add_weight(shape=[n_classes], initializer='zeros',
+        self.b_out = self.add_weight(shape=[pred_out_size], initializer='zeros',
                                      name='b_out')
 
     @tf.function
@@ -129,8 +126,7 @@ class rgcn(layers.Layer):
 
 
 class rgcn_model(tf.keras.Model):
-    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A,
-                 pretrain=False):
+    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A):
         """
         :param hidden_size: [int] the number of hidden units
         :param pred_out_size: [int] the number of outputs to produce in
@@ -138,11 +134,9 @@ class rgcn_model(tf.keras.Model):
         :param n_phys_vars: [int] the number of outputs to produce in
         pre-training
         :param A: [numpy array] adjacency matrix
-        :param pretrain: [bool] whether you are pretraining or not
         """
         super().__init__()
-        self.rgcn_layer = rgcn(hidden_size, pred_out_size, n_phys_vars, A,
-                               pretrain)
+        self.rgcn_layer = rgcn(hidden_size, pred_out_size, n_phys_vars, A)
 
     def call(self, inputs, **kwargs):
         output = self.rgcn_layer(inputs)
@@ -161,7 +155,7 @@ hidden_size = 20
 # set up model/read in data
 data = read_process_data(trn_ratio=0.67, batch_offset=1)
 A = process_adj_matrix()
-model = rgcn_model(hidden_size, 1, 2, A=A, pretrain=True)
+model = rgcn_model(hidden_size, 1, 2, A=A)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 x_trn = data['x_trn']
 n_batch, n_seg, n_day, n_feat = x_trn.shape

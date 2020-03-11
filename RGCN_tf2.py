@@ -19,7 +19,7 @@ start_time = datetime.datetime.now()
 ###### build model ######
 
 class rgcn(layers.Layer):
-    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A):
+    def __init__(self, hidden_size, pred_out_size, A):
         """
 
         :param hidden_size: [int] the number of hidden units
@@ -31,7 +31,6 @@ class rgcn(layers.Layer):
         """
         super().__init__()
         self.hidden_size = hidden_size
-        self.n_phys_vars = n_phys_vars
         self.A = A.astype('float32')
 
         # set up the layer
@@ -126,7 +125,7 @@ class rgcn(layers.Layer):
 
 
 class rgcn_model(tf.keras.Model):
-    def __init__(self, hidden_size, pred_out_size, n_phys_vars, A):
+    def __init__(self, hidden_size, pred_out_size, A):
         """
         :param hidden_size: [int] the number of hidden units
         :param pred_out_size: [int] the number of outputs to produce in
@@ -136,7 +135,7 @@ class rgcn_model(tf.keras.Model):
         :param A: [numpy array] adjacency matrix
         """
         super().__init__()
-        self.rgcn_layer = rgcn(hidden_size, pred_out_size, n_phys_vars, A)
+        self.rgcn_layer = rgcn(hidden_size, pred_out_size, A)
 
     def call(self, inputs, **kwargs):
         output = self.rgcn_layer(inputs)
@@ -148,22 +147,23 @@ tf.random.set_seed(23)
 learning_rate = 0.01
 learning_rate_pre = 0.005
 epochs_finetune = 100
-epochs_pre = 200
+epochs_pre = 3
 batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
 
 # set up model/read in data
 data = read_process_data(trn_ratio=0.67, batch_offset=1)
 A = process_adj_matrix()
-model = rgcn_model(hidden_size, 1, 2, A=A)
+model = rgcn_model(hidden_size, 2, A=A)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 x_trn = data['x_trn']
 n_batch, n_seg, n_day, n_feat = x_trn.shape
 x_trn = np.reshape(x_trn, [n_batch * n_seg, n_day, n_feat])
 
 # pretrain
-y_trn = data['y_trn']
-y_trn = np.reshape(y_trn, [n_batch * n_seg, n_day, 2])
+y_trn = data['y_trn_pre']
+n_batch, n_seg, n_day, n_phys = y_trn.shape
+y_trn = np.reshape(y_trn, [n_batch * n_seg, n_day, n_phys])
 model.compile(optimizer, loss=tf.keras.losses.MeanSquaredError())
 model.fit(x=x_trn, y=y_trn, epochs=epochs_pre, batch_size=42)
 pre_train_time = datetime.datetime.now()

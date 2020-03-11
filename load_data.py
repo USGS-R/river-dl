@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import RGCN_tf2 as rgcn_tf2
+# import RGCN_tf2 as rgcn_tf2
 from sklearn import preprocessing
 
 
@@ -28,8 +28,8 @@ def get_unwanted_cols(df):
     strong of predictors?
     """
     non_varying_cols = get_non_varying_cols(df)
-    sntemp_cols = ['model_idx', 'date', 'seg_id_nat']
-    unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width'] 
+    sntemp_cols = ['model_idx', 'date']
+    # unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width']
     # first lets just try taking the flow and temp out since that is what
     # xiaowei did 
     unwanted_cols = []
@@ -45,6 +45,7 @@ def convert_to_np_arr(df):
     :param df: [dataframe] input or output data
     :return: numpy array
     """
+    df = df.reset_index()
     seg_id_groups = df.groupby('seg_id_nat')
     # this should work, but it raises an error
     # data_by_seg_id = seg_id_groups.apply(pd.DataFrame.to_numpy)
@@ -56,22 +57,26 @@ def convert_to_np_arr(df):
     return array_for_all_seg_ids
 
 
-def sep_x_y(df):
+def filter_unwanted_cols(df):
     """
-    filter data and separate into input and output, then convert to numpy arrays
-    divided by seg_id
-    :param df: [dataframe] the raw input and output data
+    filter out unwanted columns
+    :param df: [dataframe] unfiltered data
+    :return: [dataframe] filtered data
     """
     unwanted_cols = get_unwanted_cols(df)
+    wanted_cols = [c for c in df.columns if c not in unwanted_cols]
+    return df[wanted_cols]
+
+
+def sep_x_y(df):
+    """
+    separate into input and output
+    :param df: [dataframe] the raw input and output data
+    :return: [tuple] df of predictors (x), df of targets (y)
+    """
     target_cols = ['seg_outflow', 'seg_tave_water']
-    predictor_cols = [c for c in df.columns if c not in unwanted_cols and
-                      c not in target_cols]
-    # add seg_id_nat here so we can df them into numpy arrays by segment
-    target_cols.append('seg_id_nat')
-    predictor_cols.append('seg_id_nat')
-    pred_arr = convert_to_np_arr(df[predictor_cols])
-    target_arr = convert_to_np_arr(df[target_cols])
-    return pred_arr, target_arr
+    predictor_cols = [c for c in df.columns if c not in target_cols]
+    return df[predictor_cols], df[target_cols]
 
 
 def get_df_for_rand_seg(df, seg_id):
@@ -153,6 +158,47 @@ def split_into_batches(data_array, batch_size=365, offset=0.5):
     return combined
 
 
+def read_format_data(filename):
+    """
+    read in data into a dataframe, then format the dates and sort
+    :param filename: [str] filename that has the data
+    :return: [dataframe] formatted/sorted data
+    """
+    # read in x, y_pretrain data
+    if filename.endswith('csv'):
+        df = pd.read_csv(filename)
+    elif filename.endswith('feather'):
+        df = pd.read_feather(filename)
+    else:
+        raise ValueError('file_format should be "feather" or "csv"')
+    df['date'] = pd.to_datetime(df['date'])
+    df['seg_id_nat'] = pd.to_numeric(df['seg_id_nat'])
+    df = df.sort_values(['date'])
+    df = df.set_index('seg_id_nat')
+    return df
+
+
+def read_formant_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
+    """
+    format obs data so it has the same dimensions as input data
+    :type obs_file: str
+    :param obs_file: file from which to read the observations
+    :type x_data: pandas DataFrame
+    :param x_data: input data
+    :rtype: pd.DataFrame
+    :return: formatted observation data
+    """
+    df_y_obs = read_format_data(obs_file)
+    df_y_obs = df_y_obs.reset_index()
+    x_data = x_data.reset_index()
+    x_data = x_data[['seg_id_nat', 'date']]
+    merged = pd.merge(x_data, df_y_obs, how='outer', on=['date', 'seg_id_nat'])
+    merged_filt = merged[(merged['date'] >= x_data.date.min()) &
+                         (merged['date'] <= x_data.date.max())]
+    merged_filt = merged_filt.set_index('seg_id_nat')
+    return merged_filt
+
+
 def read_process_data(trn_ratio=0.8, batch_offset=0.5):
     """
     read in and process data into training and testing datasets. the training 
@@ -162,43 +208,59 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5):
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
-    # read in data
-    df = pd.read_feather('data/sntemp_input_output_subset.feather')
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.sort_values(['date'])
+    # read, filter, separate x, y_pretrain
+    df_pre = read_format_data('data/sntemp_input_output_subset.feather')
+    df_pre_filt = filter_unwanted_cols(df_pre)
+    x, y_pre = sep_x_y(df_pre_filt)
 
-    x, y = sep_x_y(df)
+    # read, filter y for fine tuning
+    df_y_obs = read_formant_obs('data/obs_temp_subset.csv', df_pre)
+    df_y_obs_filt = filter_unwanted_cols(df_y_obs)
+    obs_mask = df_y_obs_filt.notna()
+
+    # convert x, y_pretrain, y_obs to numpy arrays
+    x = convert_to_np_arr(x)
+    y_pre = convert_to_np_arr(y_pre)
+    y_obs = convert_to_np_arr(df_y_obs_filt)
+    obs_mask = convert_to_np_arr(obs_mask)
 
     # separate trn_tst
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)
-    y_trn, y_tst = separate_trn_tst(y, trn_ratio)
+    y_trn_pre, y_tst_pre = separate_trn_tst(y_pre, trn_ratio)
+    y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
+    msk_trn, msk_tst = separate_trn_tst(obs_mask, trn_ratio)
 
     # scale the data
     x_trn_scl, x_trn_std, x_trn_mean = scale(x_trn)
-    # add a dimension for the timesteps (just using 1)
-    y_trn_scl, y_trn_std, y_trn_mean = scale(y_trn)
-
     x_tst_scl = scale(x_tst, x_trn_std, x_trn_mean)[0]
+    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_trn_pre)
+    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_trn_obs)
 
     # batch the training data
     x_trn_batch = split_into_batches(x_trn_scl, offset=batch_offset)
-    y_trn_batch = split_into_batches(y_trn_scl, offset=batch_offset)
+    y_trn_pre_batch = split_into_batches(y_trn_pre_scl, offset=batch_offset)
+    y_trn_obs_batch = split_into_batches(y_trn_obs_scl, offset=batch_offset)
+    msk_batch = split_into_batches(msk_trn, offset=batch_offset)
 
     data = {'x_trn': x_trn_batch,
-            'x_std': x_trn_std,
-            'x_mean': x_trn_mean,
             'x_tst': x_tst_scl,
-            'y_trn': y_trn_batch,
-            'y_std': y_trn_std,
-            'y_mean': y_trn_mean,
-            'y_tst': y_tst,
+            'y_trn_pre': y_trn_pre_batch,
+            'y_trn_pre_std': y_trn_pre_std,
+            'y_trn_pre_mean': y_trn_pre_mean,
+            'y_tst_pre': y_tst_pre,
+            'y_trn_obs': y_trn_obs_batch,
+            'y_trn_obs_std': y_trn_obs_std,
+            'y_trn_obs_mean': y_trn_obs_mean,
+            'y_trn_msk': msk_batch,
+            'y_tst_obs': y_tst_obs,
+            'y_tst_msk': msk_tst
             }
     return data
 
 
 def process_adj_matrix():
-    adj_up = np.load('up_full.npy')
-    adj_dn = np.load('dn_full.npy')
+    adj_up = np.load('data/up_full.npy')
+    adj_dn = np.load('data/dn_full.npy')
     adj = adj_up  # +adj_dn#adj_up #adj_up+adj_dn
     # adj/=5000
     # adj[adj!=0] = 1/adj[adj!=0]
@@ -222,7 +284,7 @@ def process_adj_matrix():
     return A_hat
 
 ''' Load data '''
-d = read_process_data(trn_ratio=0.667, batch_offset=1)
+# d = read_process_data(trn_ratio=0.667, batch_offset=1)
 # feat = np.load('processed_features.npy')
 # label = np.load('sim_temp.npy')  # np.load('obs_temp.npy')
 # obs = np.load('obs_temp.npy')  # np.load('obs_temp.npy')

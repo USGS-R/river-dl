@@ -156,15 +156,17 @@ data = read_process_data(trn_ratio=0.67, batch_offset=1)
 A = process_adj_matrix()
 model = rgcn_model(hidden_size, 2, A=A)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
+model.compile(optimizer, loss=tf.keras.losses.MeanSquaredError())
+
 x_trn = data['x_trn']
-n_batch, n_seg, n_day, n_feat = x_trn.shape
-x_trn = np.reshape(x_trn, [n_batch * n_seg, n_day, n_feat])
 
 # pretrain
 y_trn = data['y_trn_pre']
-n_batch, n_seg, n_day, n_phys = y_trn.shape
-y_trn = np.reshape(y_trn, [n_batch * n_seg, n_day, n_phys])
-model.compile(optimizer, loss=tf.keras.losses.MeanSquaredError())
 model.fit(x=x_trn, y=y_trn, epochs=epochs_pre, batch_size=42)
 pre_train_time = datetime.datetime.now()
 print('elapsed time:', pre_train_time - start_time)
+
+# finetune
+y_trn_obs = data['y_trn_obs']
+msk = data['y_trn_msk']
+model.fit(x=x_trn, y=y_trn_obs, sample_weight=msk)

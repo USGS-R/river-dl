@@ -214,6 +214,17 @@ def read_formant_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
     return merged_filt
 
 
+def reshape_for_training(data):
+    """
+    reshape the data for training
+    :param data: training data (either x or y or mask) dims: [nbatch, nseg,
+    len_seq, nfeat/nout]
+    :return: reshaped data [nbatch * nseg, len_seq, nfeat/nout]
+    """
+    n_batch, n_seg, seq_len, n_feat = data.shape
+    return np.reshape(data, n_batch*n_seg, seq_len, n_feat)
+
+
 def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     """
     read in and process data into training and testing datasets. the training 
@@ -235,7 +246,7 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     df_y_obs = read_multiple_obs(['data/obs_temp_subset.csv',
                                    'data/obs_flow_subset.csv'], df_pre)
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
-    obs_mask = df_y_obs_filt.notna()
+    obs_mask = df_y_obs_filt.notna().astype(int)
 
     # convert x, y_pretrain, y_obs to numpy arrays
     x = convert_to_np_arr(x)
@@ -262,6 +273,12 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     y_trn_pre_batch = split_into_batches(y_trn_pre_scl, offset=batch_offset)
     y_trn_obs_batch = split_into_batches(y_trn_obs_scl, offset=batch_offset)
     msk_batch = split_into_batches(msk_trn, offset=batch_offset)
+
+    # reshape data
+    x_trn_batch = reshape_for_training(x_trn_batch)
+    y_trn_pre_batch = reshape_for_training(y_trn_pre_batch)
+    y_trn_obs_batch = reshape_for_training(y_trn_obs_batch)
+    msk_batch = reshape_for_training(msk_batch)
 
     data = {'x_trn': x_trn_batch,
             'x_tst': x_tst_scl,

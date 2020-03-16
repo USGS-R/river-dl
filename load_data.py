@@ -1,7 +1,5 @@
 import pandas as pd
 import numpy as np
-# import RGCN_tf2 as rgcn_tf2
-from sklearn import preprocessing
 
 
 def get_non_varying_cols(df, std_thresh=1e-5):
@@ -178,6 +176,23 @@ def read_format_data(filename):
     return df
 
 
+def read_multiple_obs(obs_files, x_data):
+    """
+    read and format multiple observation files
+    :param obs_files: [list] list of filenames of observation files
+    :param x_data:
+    :return:
+    """
+    obs = []
+    for filename in obs_files:
+        df = read_formant_obs(filename, x_data)
+        df.set_index([df.index, 'date'], inplace=True)
+        obs.append(df)
+    obs = pd.concat(obs, axis=1)
+    obs.reset_index(level=1, inplace=True)
+    return obs
+
+
 def read_formant_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
     """
     format obs data so it has the same dimensions as input data
@@ -199,12 +214,15 @@ def read_formant_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
     return merged_filt
 
 
-def read_process_data(trn_ratio=0.8, batch_offset=0.5):
+def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
     :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
     would mean that 80% of the data would be for training and the rest for test
+    :param batch_offset:
+    :param incl_discharge: [bool] whether or not to include discharge
+    observations. if False, the mask for all discharge values will be False
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
@@ -214,7 +232,8 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5):
     x, y_pre = sep_x_y(df_pre_filt)
 
     # read, filter y for fine tuning
-    df_y_obs = read_formant_obs('data/obs_temp_subset.csv', df_pre)
+    df_y_obs = read_multiple_obs(['data/obs_temp_subset.csv',
+                                   'data/obs_flow_subset.csv'], df_pre)
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
     obs_mask = df_y_obs_filt.notna()
 
@@ -223,6 +242,8 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5):
     y_pre = convert_to_np_arr(y_pre)
     y_obs = convert_to_np_arr(df_y_obs_filt)
     obs_mask = convert_to_np_arr(obs_mask)
+    if not incl_discharge:
+        obs_mask[:, :, 1] = False
 
     # separate trn_tst
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)

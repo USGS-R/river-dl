@@ -185,7 +185,7 @@ def read_multiple_obs(obs_files, x_data):
     """
     obs = []
     for filename in obs_files:
-        df = read_formant_obs(filename, x_data)
+        df = read_format_obs(filename, x_data)
         df.set_index([df.index, 'date'], inplace=True)
         obs.append(df)
     obs = pd.concat(obs, axis=1)
@@ -193,7 +193,7 @@ def read_multiple_obs(obs_files, x_data):
     return obs
 
 
-def read_formant_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
+def read_format_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
     """
     format obs data so it has the same dimensions as input data
     :type obs_file: str
@@ -222,7 +222,7 @@ def reshape_for_training(data):
     :return: reshaped data [nbatch * nseg, len_seq, nfeat/nout]
     """
     n_batch, n_seg, seq_len, n_feat = data.shape
-    return np.reshape(data, n_batch*n_seg, seq_len, n_feat)
+    return np.reshape(data, [n_batch*n_seg, seq_len, n_feat])
 
 
 def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
@@ -248,13 +248,13 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
     obs_mask = df_y_obs_filt.notna().astype(int)
 
-    # convert x, y_pretrain, y_obs to numpy arrays
+    # convert to numpy arrays
     x = convert_to_np_arr(x)
     y_pre = convert_to_np_arr(y_pre)
     y_obs = convert_to_np_arr(df_y_obs_filt)
     obs_mask = convert_to_np_arr(obs_mask)
     if not incl_discharge:
-        obs_mask[:, :, 1] = False
+        obs_mask[:, :, 1] = 0
 
     # separate trn_tst
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)

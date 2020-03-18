@@ -92,9 +92,7 @@ def scale(data_arr, std=None, mean=None):
     :param mean: [numpy array] mean if scaling test data with dims [nfeats]
     :return: scaled data with original dims
     """
-    nseg = data_arr.shape[0]
-    ndates = data_arr.shape[1]
-    nfeats = data_arr.shape[2]
+    nseg, ndates, nfeats = data_arr.shape
     all_segs = np.reshape(data_arr, [nseg*ndates, nfeats])
     if not isinstance(std, np.ndarray) or not isinstance(mean, np.ndarray):
         std = np.nanstd(all_segs, axis=0)

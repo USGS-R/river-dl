@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-class rgcn(layers.Layer):
+class RGCN(layers.Layer):
     def __init__(self, hidden_size, pred_out_size, A):
         """
 
@@ -116,7 +116,7 @@ class rgcn(layers.Layer):
         return out
 
 
-class rgcn_model(tf.keras.Model):
+class RGCNModel(tf.keras.Model):
     def __init__(self, hidden_size, pred_out_size, A):
         """
         :param hidden_size: [int] the number of hidden units
@@ -127,7 +127,7 @@ class rgcn_model(tf.keras.Model):
         :param A: [numpy array] adjacency matrix
         """
         super().__init__()
-        self.rgcn_layer = rgcn(hidden_size, pred_out_size, A)
+        self.rgcn_layer = RGCN(hidden_size, pred_out_size, A)
 
     def call(self, inputs, **kwargs):
         output = self.rgcn_layer(inputs)

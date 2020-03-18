@@ -1,6 +1,6 @@
 import datetime
 import tensorflow as tf
-from RGCN_tf2 import rgcn_model, rmse_masked
+from RGCN_tf2 import RGCNModel, rmse_masked
 from load_data import read_process_data, process_adj_matrix
 
 start_time = datetime.datetime.now()
@@ -18,7 +18,7 @@ n_seg = 42
 # set up model/read in data
 data = read_process_data(trn_ratio=0.67, batch_offset=1)
 A = process_adj_matrix()
-model = rgcn_model(hidden_size, 2, A=A)
+model = RGCNModel(hidden_size, 2, A=A)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 model.compile(optimizer, loss=rmse_masked)
 

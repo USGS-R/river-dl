@@ -169,7 +169,7 @@ def rmse_masked(y_true, y_pred):
 tf.random.set_seed(23)
 learning_rate = 0.01
 learning_rate_pre = 0.005
-epochs_finetune = 100
+epochs_finetune = 3
 epochs_pre = 3
 batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
@@ -192,6 +192,6 @@ print('elapsed time:', pre_train_time - start_time)
 
 # finetune
 y_trn_obs = data['y_trn_obs']
-model.fit(x=x_trn, y=y_trn_obs, batch_size=n_seg)
+model.fit(x=x_trn, y=y_trn_obs, epochs=epochs_finetune, batch_size=n_seg)
 finetune_time = datetime.datetime.now()
 print('elapsed time:', finetune_time - pre_train_time)

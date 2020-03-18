@@ -155,13 +155,13 @@ def rmse_masked(y_true, y_pred):
     """
     y_true = tf.convert_to_tensor(y_true)
     y_true = tf.cast(y_true, y_pred.dtype)
-    num_y_s = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
+    n_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
                       tf.float32)
     zero_or_error = tf.where(tf.math.is_nan(y_true),
                              tf.zeros_like(y_true),
                              y_pred - y_true)
     sum_squared_errors = tf.reduce_sum(tf.square(zero_or_error))
-    rmse_loss = tf.sqrt(sum_squared_errors / num_y_s)
+    rmse_loss = tf.sqrt(sum_squared_errors / n_y_true)
     return rmse_loss
 
 

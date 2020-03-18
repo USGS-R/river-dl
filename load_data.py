@@ -97,8 +97,8 @@ def scale(data_arr, std=None, mean=None):
     nfeats = data_arr.shape[2]
     all_segs = np.reshape(data_arr, [nseg*ndates, nfeats])
     if not isinstance(std, np.ndarray) or not isinstance(mean, np.ndarray):
-        std = np.std(all_segs, axis=0)
-        mean = np.mean(all_segs, axis=0)
+        std = np.nanstd(all_segs, axis=0)
+        mean = np.nanmean(all_segs, axis=0)
     # adding small number in case there is a std of zero
     scaled = (all_segs - mean)/(std + 1e-10)
     scaled = np.reshape(scaled, [nseg, ndates, nfeats])

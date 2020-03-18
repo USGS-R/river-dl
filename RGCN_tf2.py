@@ -142,6 +142,29 @@ class rgcn_model(tf.keras.Model):
         return output
 
 
+def rmse_masked(y_true, y_pred):
+    """
+    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
+    with 0 when y_s is nan; num_y_s is a count of just those non-nan
+    observations) so we're only looking at predictions with corresponding
+    observations available
+    (credit: @aappling-usgs)
+    :param y_true: [tensor] true (observed) y values. these may have nans
+    :param y_pred: [tensor] predicted y values
+    :return: rmse (one value for each training sample)
+    """
+    y_true = tf.convert_to_tensor(y_true)
+    y_true = tf.cast(y_true, y_pred.dtype)
+    num_y_s = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
+                      tf.float32)
+    zero_or_error = tf.where(tf.math.is_nan(y_true),
+                             tf.zeros_like(y_true),
+                             y_pred - y_true)
+    sum_squared_errors = tf.reduce_sum(tf.square(zero_or_error))
+    rmse_loss = tf.sqrt(sum_squared_errors / num_y_s)
+    return rmse_loss
+
+
 # Declare constants ######
 tf.random.set_seed(23)
 learning_rate = 0.01

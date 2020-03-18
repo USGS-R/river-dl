@@ -244,21 +244,18 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     df_y_obs = read_multiple_obs(['data/obs_temp_subset.csv',
                                    'data/obs_flow_subset.csv'], df_pre)
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
-    obs_mask = df_y_obs_filt.notna().astype(int)
 
     # convert to numpy arrays
     x = convert_to_np_arr(x)
     y_pre = convert_to_np_arr(y_pre)
     y_obs = convert_to_np_arr(df_y_obs_filt)
-    obs_mask = convert_to_np_arr(obs_mask)
     if not incl_discharge:
-        obs_mask[:, :, 1] = 0
+        y_obs[:, :, 1] = np.nan
 
     # separate trn_tst
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)
     y_trn_pre, y_tst_pre = separate_trn_tst(y_pre, trn_ratio)
     y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
-    msk_trn, msk_tst = separate_trn_tst(obs_mask, trn_ratio)
 
     # scale the data
     x_trn_scl, x_trn_std, x_trn_mean = scale(x_trn)
@@ -270,13 +267,11 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     x_trn_batch = split_into_batches(x_trn_scl, offset=batch_offset)
     y_trn_pre_batch = split_into_batches(y_trn_pre_scl, offset=batch_offset)
     y_trn_obs_batch = split_into_batches(y_trn_obs_scl, offset=batch_offset)
-    msk_batch = split_into_batches(msk_trn, offset=batch_offset)
 
     # reshape data
     x_trn_batch = reshape_for_training(x_trn_batch)
     y_trn_pre_batch = reshape_for_training(y_trn_pre_batch)
     y_trn_obs_batch = reshape_for_training(y_trn_obs_batch)
-    msk_batch = reshape_for_training(msk_batch)
 
     data = {'x_trn': x_trn_batch,
             'x_tst': x_tst_scl,
@@ -287,9 +282,7 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
             'y_trn_obs': y_trn_obs_batch,
             'y_trn_obs_std': y_trn_obs_std,
             'y_trn_obs_mean': y_trn_obs_mean,
-            'y_trn_msk': msk_batch,
             'y_tst_obs': y_tst_obs,
-            'y_tst_msk': msk_tst
             }
     return data
 

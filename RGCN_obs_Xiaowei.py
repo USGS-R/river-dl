@@ -9,12 +9,14 @@ from __future__ import print_function, division
 import numpy as np
 import tensorflow as tf
 import random
+import datetime
+start_time = datetime.datetime.now()
 
 ''' Declare constants '''
 learning_rate = 0.01
 learning_rate_pre = 0.005
 epochs = 100
-epochs_pre = 200#70
+epochs_pre = 3#70
 batch_size = 2000
 hidden_size = 20 
 input_size = 20-2
@@ -128,7 +130,7 @@ for t in range(1,n_steps):
 o_sr = tf.stack(o_sr,axis=1) # N_seg - T - hidden_size
 oh = tf.reshape(o_sr,[-1,hidden_size])
 o_phy = tf.stack(o_phy,axis=1)
-o_phy = o_phy[:,:,:phy_size]
+o_phy = o_phy[:,:,:phy_size]  # I don't think I need this line. It doesn't change anything
 #o_phy = tf.reshape(o_phy,[-1,phy_size])
 o_phy = tf.reshape(o_phy,[-1])
 
@@ -169,16 +171,16 @@ train_op = optimizer.apply_gradients(gvs)
 
 
 ''' Load data '''
-feat = np.load('processed_features.npy')
-label = np.load('sim_temp.npy') #np.load('obs_temp.npy')
-obs = np.load('obs_temp.npy') #np.load('obs_temp.npy')
+feat = np.load('data/processed_features.npy')
+label = np.load('data/sim_temp.npy') #np.load('obs_temp.npy')
+obs = np.load('data/obs_temp.npy') #np.load('obs_temp.npy')
 mask = (label!=-11).astype(int)
 maso = (obs!=-11).astype(int)
 
 #seg_test = np.load('sel_test_id.npy')
 
-seg_test = np.load('sel_seg_hard.npy')
-flow = np.load('sim_flow.npy')
+# seg_test = np.load('sel_seg_hard.npy')
+flow = np.load('data/sim_flow.npy')
 phy = np.concatenate([np.expand_dims(label,2),np.expand_dims(flow,2)],axis=2)
 phy = np.reshape(phy,[-1,phy_size])
 
@@ -198,8 +200,8 @@ phy = np.reshape(phy,[N_seg,-1,phy_size])
 feat = np.delete(feat,[9,10],2)
 
 #adj = np.load('up_dist.npy') #
-adj_up = np.load('up_full.npy') 
-adj_dn = np.load('dn_full.npy')
+adj_up = np.load('data/up_full.npy')
+adj_dn = np.load('data/dn_full.npy')
 #adj_up = np.load('up_full.npy') 
 #adj_dn = np.load('dn_full.npy')
 adj = adj_up#+adj_dn#adj_up #adj_up+adj_dn
@@ -427,6 +429,9 @@ for epoch in range(epochs_pre): #range(epochs):
           +': loss_s '+"{:.4f}".format(alos_s/N_sec)\
           +': loss_p '+"{:.4f}".format(alos_p/N_sec) )
 
+end_time = datetime.datetime.now()
+print('elapsed time: ', end_time - start_time)
+raise Exception('stope')
 
 print('Fine-tuning starts')
 print('==================================')

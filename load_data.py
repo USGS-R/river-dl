@@ -291,8 +291,6 @@ def process_adj_matrix():
     adj_up = np.load('data/up_full.npy')
     adj_dn = np.load('data/dn_full.npy')
     adj = adj_up  # +adj_dn#adj_up #adj_up+adj_dn
-    # adj/=5000
-    # adj[adj!=0] = 1/adj[adj!=0]
     adj = -adj
     mean_adj = np.mean(adj[adj != 0])
     std_adj = np.std(adj[adj != 0])
@@ -302,33 +300,8 @@ def process_adj_matrix():
 
     I = np.eye(adj.shape[0])
     A_hat = adj.copy() + I
-    # D = np.sum(A_hat, axis=0)
-    # D_inv = D**-0.5
-    # D_inv = np.diag(D_inv)
-    # A_hat = np.matmul(np.matmul(D_inv,A_hat), D_inv)
     D = np.sum(A_hat, axis=1)
     D_inv = D ** -1.0
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
-
-''' Load data '''
-# d = read_process_data(trn_ratio=0.667, batch_offset=1)
-# feat = np.load('processed_features.npy')
-# label = np.load('sim_temp.npy')  # np.load('obs_temp.npy')
-# obs = np.load('obs_temp.npy')  # np.load('obs_temp.npy')
-# mask = (label != -11).astype(int)
-# maso = (obs != -11).astype(int)
-#
-# flow = np.load('sim_flow.npy')
-# phy = np.concatenate([np.expand_dims(label, 2), np.expand_dims(flow, 2)],
-#                      axis=2)
-# phy = np.reshape(phy, [-1, rgcn_tf2.n_phys_vars])
-#
-#
-# phy = preprocessing.scale(phy)
-# phy = np.reshape(phy, [rgcn_tf2.n_seg, -1, rgcn_tf2.n_phys_vars])
-#
-# # delete the features we don't need in training (temp and flow)
-# feat = np.delete(feat, [9, 10], 2)
-

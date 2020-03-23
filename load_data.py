@@ -246,15 +246,25 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
                          period of record of SNTemp [n_samples, seq_len, n_out]
             'y_trn_obs': batched, scaled, and centered output observation data
                          for the training period
-            'y_trn_obs_std': std deviation of the y observations data [n_out]
-            'y_trn_obs_mean': mean of the observation data [n_out]
-            'y_tst_obs': un-batched, unscaled, uncentered observation data for the test
-                         period [
+            'y_trn_obs_std': standard deviation of the y observations training
+                             data [n_out]
+            'y_trn_obs_mean': mean of the observation training data [n_out]
+            'y_tst_obs': un-batched, unscaled, uncentered observation data for
+                         the test period [n_yrs, n_seg, len_seq, n_out]
+            'dates_ids_trn: batched dates and national seg ids for training data
+                            [n_samples, seq_len, 2]
+            'dates_ids_tst: un-batched dates and national seg ids for testing
+                            data [n_yrs, n_seg, len_seq, 2]
     """
     # read, filter, separate x, y_pretrain
     df_pre = read_format_data('data/sntemp_input_output_subset.feather')
     df_pre_filt = filter_unwanted_cols(df_pre)
     x, y_pre = sep_x_y(df_pre_filt)
+    df_dates_ids = df_pre[['date']]
+    # have to have a seg_id column since it gets squashed in the processing code
+    # have to name it something other than seg_id_nat to avoid duplicate col ...
+    # names
+    df_dates_ids['seg_id_nat1'] = df_dates_ids.index
 
     # read, filter y for fine tuning
     df_y_obs = read_multiple_obs(['data/obs_temp_subset.csv',
@@ -265,12 +275,14 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     x = convert_to_np_arr(x)
     y_pre = convert_to_np_arr(y_pre)
     y_obs = convert_to_np_arr(df_y_obs_filt)
+    dates_ids = convert_to_np_arr(df_dates_ids)
     if not incl_discharge:
         y_obs[:, :, 1] = np.nan
 
     # separate trn_tst for fine-tuning;
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)
     y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
+    dates_ids_trn, dates_ids_tst = separate_trn_tst(dates_ids, trn_ratio)
 
     # scale on all x data
     x_scl, x_std, x_mean = scale(x)
@@ -284,19 +296,22 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre)
 
-    # batch the training data
+    # batch the data
     x_trn_batch = split_into_batches(x_trn_scl, offset=batch_offset)
     x_tst_batch = split_into_batches(x_tst_scl, offset=1)
     x_trn_pre_batch = split_into_batches(x_trn_pre_scl, offset=batch_offset)
     y_trn_pre_batch = split_into_batches(y_trn_pre_scl, offset=batch_offset)
     y_trn_obs_batch = split_into_batches(y_trn_obs_scl, offset=batch_offset)
     y_tst_batch = split_into_batches(y_tst_obs, offset=1)
+    dates_ids_trn_batch = split_into_batches(dates_ids_trn, offset=batch_offset)
+    dates_ids_tst_batch = split_into_batches(dates_ids_tst, offset=1)
 
     # reshape data
     x_trn_batch = reshape_for_training(x_trn_batch)
     x_trn_pre_batch = reshape_for_training(x_trn_pre_batch)
     y_trn_pre_batch = reshape_for_training(y_trn_pre_batch)
     y_trn_obs_batch = reshape_for_training(y_trn_obs_batch)
+    dates_ids_trn_batch = reshape_for_training(dates_ids_trn_batch)
 
     data = {'x_trn': x_trn_batch,
             'x_tst': x_tst_batch,
@@ -306,6 +321,8 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
             'y_trn_obs_std': y_trn_obs_std,
             'y_trn_obs_mean': y_trn_obs_mean,
             'y_tst_obs': y_tst_batch,
+            'dates_ids_trn': dates_ids_trn_batch,
+            'dates_ids_tst': dates_ids_tst_batch
             }
     return data
 

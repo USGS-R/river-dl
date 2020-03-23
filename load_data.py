@@ -169,7 +169,7 @@ def read_format_data(filename):
         raise ValueError('file_format should be "feather" or "csv"')
     df['date'] = pd.to_datetime(df['date'])
     df['seg_id_nat'] = pd.to_numeric(df['seg_id_nat'])
-    df = df.sort_values(['date'])
+    df = df.sort_values(['date', 'seg_id_nat'])
     df = df.set_index('seg_id_nat')
     return df
 
@@ -234,6 +234,22 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     observations. if False, the mask for all discharge values will be False
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
+            'x_trn': batched, input data for the training period scaled and
+                     centred using the std and mean from entire period of record
+                     [n_samples, seq_len, n_feat]
+            'x_tst': un-batched input data for the test period scaled and
+                     centered using the std and mean from entire period of
+                     record
+            'x_trn_pre': batched, scaled, centered input data for entire period
+                         of record of SNTemp
+            'y_trn_pre': batched, scaled, and centered output data for entire
+                         period of record of SNTemp [n_samples, seq_len, n_out]
+            'y_trn_obs': batched, scaled, and centered output observation data
+                         for the training period
+            'y_trn_obs_std': std deviation of the y observations data [n_out]
+            'y_trn_obs_mean': mean of the observation data [n_out]
+            'y_tst_obs': un-batched, unscaled, uncentered observation data for the test
+                         period [
     """
     # read, filter, separate x, y_pretrain
     df_pre = read_format_data('data/sntemp_input_output_subset.feather')
@@ -242,7 +258,7 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
 
     # read, filter y for fine tuning
     df_y_obs = read_multiple_obs(['data/obs_temp_subset.csv',
-                                   'data/obs_flow_subset.csv'], df_pre)
+                                  'data/obs_flow_subset.csv'], df_pre)
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
 
     # convert to numpy arrays
@@ -252,37 +268,44 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     if not incl_discharge:
         y_obs[:, :, 1] = np.nan
 
-    # separate trn_tst
+    # separate trn_tst for fine-tuning;
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)
-    y_trn_pre, y_tst_pre = separate_trn_tst(y_pre, trn_ratio)
     y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
 
-    # scale the data
-    x_trn_scl, x_trn_std, x_trn_mean = scale(x_trn)
-    x_tst_scl = scale(x_tst, x_trn_std, x_trn_mean)[0]
-    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_trn_pre)
+    # scale on all x data
+    x_scl, x_std, x_mean = scale(x)
+    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
+    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+    # for pre-training, keep everything together
+    x_trn_pre_scl = x_scl
+
+    # scale y training data and get the mean and std
     y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_trn_obs)
+    # for pre-training, keep everything together
+    y_trn_pre_scl, _, _ = scale(y_pre)
 
     # batch the training data
     x_trn_batch = split_into_batches(x_trn_scl, offset=batch_offset)
+    x_tst_batch = split_into_batches(x_tst_scl, offset=1)
+    x_trn_pre_batch = split_into_batches(x_trn_pre_scl, offset=batch_offset)
     y_trn_pre_batch = split_into_batches(y_trn_pre_scl, offset=batch_offset)
     y_trn_obs_batch = split_into_batches(y_trn_obs_scl, offset=batch_offset)
+    y_tst_batch = split_into_batches(y_tst_obs, offset=1)
 
     # reshape data
     x_trn_batch = reshape_for_training(x_trn_batch)
+    x_trn_pre_batch = reshape_for_training(x_trn_pre_batch)
     y_trn_pre_batch = reshape_for_training(y_trn_pre_batch)
     y_trn_obs_batch = reshape_for_training(y_trn_obs_batch)
 
     data = {'x_trn': x_trn_batch,
-            'x_tst': x_tst_scl,
+            'x_tst': x_tst_batch,
+            'x_trn_pre': x_trn_pre_batch,
             'y_trn_pre': y_trn_pre_batch,
-            'y_trn_pre_std': y_trn_pre_std,
-            'y_trn_pre_mean': y_trn_pre_mean,
-            'y_tst_pre': y_tst_pre,
             'y_trn_obs': y_trn_obs_batch,
             'y_trn_obs_std': y_trn_obs_std,
             'y_trn_obs_mean': y_trn_obs_mean,
-            'y_tst_obs': y_tst_obs,
+            'y_tst_obs': y_tst_batch,
             }
     return data
 
@@ -305,3 +328,7 @@ def process_adj_matrix():
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
+
+
+data = read_process_data(trn_ratio=0.67, batch_offset=0.5)
+print('off')

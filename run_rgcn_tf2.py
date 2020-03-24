@@ -16,7 +16,8 @@ hidden_size = 20
 n_seg = 42
 
 # set up model/read in data
-data = read_process_data(trn_ratio=0.67, batch_offset=1)
+data = read_process_data(trn_ratio=0.67, batch_offset=1,
+                         pretrain_out_vars='both', finetune_out_vars='temp')
 A = process_adj_matrix()
 model = RGCNModel(hidden_size, 2, A=A)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)

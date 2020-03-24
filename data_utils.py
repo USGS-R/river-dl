@@ -223,15 +223,35 @@ def reshape_for_training(data):
     return np.reshape(data, [n_batch*n_seg, seq_len, n_feat])
 
 
-def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
+def filter_output_var(y_data, out_cols):
+    """
+    filter out either flow, temperature, or neither in the pre-training and 
+    finetune y data
+    """
+    if out_cols == "both":
+        pass
+    elif out_cols == 'temp':
+        y_data[:, :, 1] = np.nan
+    elif out_cols == 'flow':
+        y_data[:, :, 0] = np.nan
+    else:
+        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
+    return y_data
+
+
+def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
+                      finetune_out_vars="both"):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
     :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
     would mean that 80% of the data would be for training and the rest for test
     :param batch_offset:
-    :param incl_discharge: [bool] whether or not to include discharge
     observations. if False, the mask for all discharge values will be False
+    :param pretrain_out_vars: [str] which parameters to fine tune on should be
+    "temp", "flow" or "both"
+    :param finetune_out_vars: [str] which parameters to fine tune on should be
+    "temp", "flow" or "both"
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             'x_trn': batched, input data for the training period scaled and
@@ -276,13 +296,15 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
     y_pre = convert_to_np_arr(y_pre)
     y_obs = convert_to_np_arr(df_y_obs_filt)
     dates_ids = convert_to_np_arr(df_dates_ids)
-    if not incl_discharge:
-        y_obs[:, :, 1] = np.nan
 
     # separate trn_tst for fine-tuning;
     x_trn, x_tst = separate_trn_tst(x, trn_ratio)
     y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
     dates_ids_trn, dates_ids_tst = separate_trn_tst(dates_ids, trn_ratio)
+
+    # filter pre-train/fine-tune
+    y_pre = filter_output_var(y_pre, pretrain_out_vars)
+    y_trn_obs = filter_output_var(y_trn_obs, finetune_out_vars)
 
     # scale on all x data
     x_scl, x_std, x_mean = scale(x)

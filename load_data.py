@@ -348,3 +348,17 @@ def process_adj_matrix():
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
+
+
+def post_process(y_pred, dates_ids, y_std, y_mean):
+    y_pred = np.reshape(y_pred, [y_pred.shape[0]*y_pred.shape[1],
+                                 y_pred.shape[2]])
+    # unscale
+    y_pred = (y_pred * y_std) + y_mean
+
+    dates_ids = np.reshape(dates_ids, [dates_ids.shape[0]*dates_ids.shape[1],
+                                       dates_ids.shape[2]])
+    df_preds = pd.DataFrame(y_pred, columns=['temperature', 'flow'])
+    df_dates = pd.DataFrame(dates_ids, columns=['date', 'seg_id_nat'])
+    df = pd.concat([df_dates, df_preds], axis=1)
+    return df

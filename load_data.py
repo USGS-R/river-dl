@@ -308,10 +308,13 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, incl_discharge=True):
 
     # reshape data
     x_trn_batch = reshape_for_training(x_trn_batch)
+    x_tst_batch = reshape_for_training(x_tst_batch)
     x_trn_pre_batch = reshape_for_training(x_trn_pre_batch)
     y_trn_pre_batch = reshape_for_training(y_trn_pre_batch)
     y_trn_obs_batch = reshape_for_training(y_trn_obs_batch)
+    y_tst_batch = reshape_for_training(y_tst_batch)
     dates_ids_trn_batch = reshape_for_training(dates_ids_trn_batch)
+    dates_ids_tst_batch = reshape_for_training(dates_ids_tst_batch)
 
     data = {'x_trn': x_trn_batch,
             'x_tst': x_tst_batch,
@@ -345,7 +348,3 @@ def process_adj_matrix():
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
-
-
-data = read_process_data(trn_ratio=0.67, batch_offset=0.5)
-print('off')

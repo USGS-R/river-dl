@@ -1,7 +1,7 @@
 import datetime
 import tensorflow as tf
 from RGCN_tf2 import RGCNModel, rmse_masked
-from load_data import read_process_data, process_adj_matrix
+from data_utils import read_process_data, process_adj_matrix
 
 start_time = datetime.datetime.now()
 
@@ -22,18 +22,20 @@ model = RGCNModel(hidden_size, 2, A=A)
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 model.compile(optimizer, loss=rmse_masked)
 
-x_trn = data['x_trn']
-
 # pretrain
-y_trn = data['y_trn_pre']
-model.fit(x=x_trn, y=y_trn, epochs=epochs_pre, batch_size=n_seg)
+x_trn_pre = data['x_trn_pre']
+y_trn_pre = data['y_trn_pre']
+model.fit(x=x_trn_pre, y=y_trn_pre, epochs=epochs_pre, batch_size=n_seg)
 pre_train_time = datetime.datetime.now()
 print('elapsed time pretrain (includes building graph):',
       pre_train_time - start_time)
 
 # finetune
+x_trn_obs = data['x_trn']
 y_trn_obs = data['y_trn_obs']
-model.fit(x=x_trn, y=y_trn_obs, epochs=epochs_finetune, batch_size=n_seg)
+model.fit(x=x_trn_obs, y=y_trn_obs, epochs=epochs_finetune, batch_size=n_seg)
 finetune_time = datetime.datetime.now()
 print('elapsed time finetune:', finetune_time - pre_train_time)
+
+model.save_weights('weights_demo', save_format='tf')
 

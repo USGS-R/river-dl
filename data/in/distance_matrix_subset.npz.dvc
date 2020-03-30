@@ -1,0 +1,7 @@
+md5: 4b463487c4c363b5b84052c32d47d239
+outs:
+- md5: ea80236ea5701379cd0a6117539cad1b
+  path: distance_matrix_subset.npz
+  cache: true
+  metric: false
+  persist: false

@@ -1,0 +1,7 @@
+md5: 214cac33a53805e0e5078c82110f8d9b
+outs:
+- md5: 8980db642a8eeaa572524e64807b5ede
+  path: obs_temp_full.csv
+  cache: true
+  metric: false
+  persist: false

@@ -1,0 +1,7 @@
+md5: f77b155245ff228f74fa208845119226
+outs:
+- md5: e8ff3ab9252c3d8926ad27c888b2f3f6
+  path: uncal_sntemp_input_output.feather
+  cache: true
+  metric: false
+  persist: false

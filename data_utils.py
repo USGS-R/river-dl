@@ -239,11 +239,14 @@ def filter_output_var(y_data, out_cols):
     return y_data
 
 
-def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
-                      finetune_out_vars="both"):
+def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
+                      pretrain_out_vars="both", finetune_out_vars="both",
+                      dist_type='upstream'):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
+    :param subset: [bool] whether you want data for the subsection (True) or
+    for the entire DRB (false)
     :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
     would mean that 80% of the data would be for training and the rest for test
     :param batch_offset:
@@ -252,6 +255,8 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
     "temp", "flow" or "both"
     :param finetune_out_vars: [str] which parameters to fine tune on should be
     "temp", "flow" or "both"
+    :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
+    "updown")
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             'x_trn': batched, input data for the training period scaled and
@@ -276,8 +281,18 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
             'dates_ids_tst: un-batched dates and national seg ids for testing
                             data [n_yrs, n_seg, len_seq, 2]
     """
+    data_dir = 'data/in/'
+    if subset:
+        pretrain_file = f'{data_dir}uncal_sntemp_input_output_subset.feather'
+        obs_files = [f'{data_dir}obs_temp_subset.csv',
+                     f'{data_dir}obs_flow_subset.csv']
+    else:
+        pretrain_file = f'{data_dir}uncal_sntemp_input_output.feather'
+        obs_files = [f'{data_dir}obs_temp_full.csv',
+                     f'{data_dir}obs_flow_full.csv']
+
     # read, filter, separate x, y_pretrain
-    df_pre = read_format_data('data/sntemp_input_output_subset.feather')
+    df_pre = read_format_data(pretrain_file)
     df_pre_filt = filter_unwanted_cols(df_pre)
     x, y_pre = sep_x_y(df_pre_filt)
     df_dates_ids = df_pre[['date']]
@@ -286,9 +301,8 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
     # names
     df_dates_ids['seg_id_nat1'] = df_dates_ids.index
 
-    # read, filter y for fine tuning
-    df_y_obs = read_multiple_obs(['data/obs_temp_subset.csv',
-                                  'data/obs_flow_subset.csv'], df_pre)
+    # read, filter y for finetuning
+    df_y_obs = read_multiple_obs(obs_files, df_pre)
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
 
     # convert to numpy arrays
@@ -302,7 +316,7 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
     y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
     dates_ids_trn, dates_ids_tst = separate_trn_tst(dates_ids, trn_ratio)
 
-    # filter pre-train/fine-tune
+    # filter pretrain/finetune y
     y_pre = filter_output_var(y_pre, pretrain_out_vars)
     y_trn_obs = filter_output_var(y_trn_obs, finetune_out_vars)
 
@@ -347,15 +361,42 @@ def read_process_data(trn_ratio=0.8, batch_offset=0.5, pretrain_out_vars="both",
             'y_trn_obs_mean': y_trn_obs_mean,
             'y_tst_obs': y_tst_batch,
             'dates_ids_trn': dates_ids_trn_batch,
-            'dates_ids_tst': dates_ids_tst_batch
+            'dates_ids_tst': dates_ids_tst_batch,
+            'dist_matrix': process_adj_matrix(dist_type, subset)
             }
     return data
 
 
-def process_adj_matrix():
-    adj_up = np.load('data/up_full.npy')
-    adj_dn = np.load('data/dn_full.npy')
-    adj = adj_up  # +adj_dn#adj_up #adj_up+adj_dn
+def sort_dist_matrix(mat, row_col_names):
+    """
+    sort the distance matrix by seg_id_nat
+    :return:
+    """
+    df = pd.DataFrame(mat, columns=row_col_names, index=row_col_names)
+    df = df.sort_index(axis=0)
+    df = df.sort_index(axis=1)
+    return df
+
+
+def process_adj_matrix(dist_type, subset=True):
+    """
+    process adj matrix.
+    **The matrix is sorted by seg_id_nat **
+    :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
+    "updown")
+    :param subset: [bool] whether you want data for the subsection (True) or
+    for the entire DRB (False)
+    :return: [numpy array] processed adjacency matrix
+    """
+    data_dir = "data/in/"
+    if subset:
+        data_file = f'{data_dir}distance_matrix_subset.npz'
+    else:
+        data_file = f'{data_dir}distance_matrix.npz'
+    adj_matrices = np.load(data_file)
+    adj = adj_matrices[dist_type]
+    adj = sort_dist_matrix(adj, adj_matrices['rowcolnames'])
+    adj = np.where(np.isinf(adj), 0, adj)
     adj = -adj
     mean_adj = np.mean(adj[adj != 0])
     std_adj = np.std(adj[adj != 0])
@@ -384,3 +425,7 @@ def post_process(y_pred, dates_ids, y_std, y_mean):
     df_dates = pd.DataFrame(dates_ids, columns=['date', 'seg_id_nat'])
     df = pd.concat([df_dates, df_preds], axis=1)
     return df
+
+
+# read_process_data()
+# process_adj_matrix('downstream', True)

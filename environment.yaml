@@ -1,0 +1,12 @@
+name: rgcn
+channels:
+    - conda-forge
+    - defaults
+dependencies:
+    - dvc
+    - ipython
+    - matplotlib
+    - pandas
+    - pyarrow
+    - scikit-learn
+    - tensorflow >= 2.0

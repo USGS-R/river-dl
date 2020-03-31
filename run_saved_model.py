@@ -1,6 +1,6 @@
 import tensorflow as tf
 from RGCN_tf2 import RGCNModel, rmse_masked
-from data_utils import read_process_data, process_adj_matrix, post_process
+from data_utils import read_process_data, post_process
 
 
 tf.random.set_seed(23)

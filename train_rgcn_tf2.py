@@ -13,12 +13,12 @@ epochs_finetune = 3
 epochs_pre = 3
 batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
-n_seg = 42
 
 # set up model/read in data
 data = read_process_data(subset=True, trn_ratio=0.67, batch_offset=1,
                          pretrain_out_vars='both', finetune_out_vars='temp',
                          dist_type='upstream')
+n_seg = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 optimizer = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 model.compile(optimizer, loss=rmse_masked)

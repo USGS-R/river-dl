@@ -14,7 +14,7 @@ epochs_finetune = 100
 batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
 out_dir = 'data/out/'
-out_time_file = f'{out_dir}training_time'
+out_time_file = f'{out_dir}training_time.txt'
 
 # set up model/read in data
 data = read_process_data(subset=True, trn_ratio=0.67, batch_offset=1,
@@ -59,5 +59,5 @@ with open(out_time_file, 'a') as f:
     f.write(f'elapsed time finetune:\
              {finetune_time_elapsed} \n')
 
-model.save_weights(f'{out_dir}trained_weights.h5')
+model.save_weights(f'{out_dir}trained_weights/')
 

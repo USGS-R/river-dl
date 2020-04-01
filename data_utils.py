@@ -25,16 +25,16 @@ def get_unwanted_cols(df):
     aren't actually predictors like seg_id_nat and 3) columns that are too
     strong of predictors?
     """
-    non_varying_cols = get_non_varying_cols(df)
-    sntemp_cols = ['model_idx', 'date']
+    # non_varying_cols = get_non_varying_cols(df)
+    # sntemp_cols = ['model_idx', 'date']
     # unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width']
     # first lets just try taking the flow and temp out since that is what
     # xiaowei did 
-    unwanted_cols = []
-    non_varying_cols = []
-    unwanted_cols.extend(non_varying_cols)
-    unwanted_cols.extend(sntemp_cols)
-    return unwanted_cols
+    # unwanted_cols = []
+    # non_varying_cols = []
+    # unwanted_cols.extend(non_varying_cols)
+    # unwanted_cols.extend(sntemp_cols)
+    return ['model_idx', 'date']
 
 
 def convert_to_np_arr(df):
@@ -72,7 +72,7 @@ def sep_x_y(df):
     :param df: [dataframe] the raw input and output data
     :return: [tuple] df of predictors (x), df of targets (y)
     """
-    target_cols = ['seg_outflow', 'seg_tave_water']
+    target_cols = ['seg_tave_water', 'seg_outflow']
     predictor_cols = [c for c in df.columns if c not in target_cols]
     return df[predictor_cols], df[target_cols]
 
@@ -187,6 +187,7 @@ def read_multiple_obs(obs_files, x_data):
         df.set_index([df.index, 'date'], inplace=True)
         obs.append(df)
     obs = pd.concat(obs, axis=1)
+    obs = obs[['temp_C', 'discharge_cms']]
     obs.reset_index(level=1, inplace=True)
     return obs
 
@@ -291,10 +292,8 @@ def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
         obs_files = [f'{data_dir}obs_temp_full.csv',
                      f'{data_dir}obs_flow_full.csv']
 
-    # read, filter, separate x, y_pretrain
+    # read, y_pretrain
     df_pre = read_format_data(pretrain_file)
-    df_pre_filt = filter_unwanted_cols(df_pre)
-    x, y_pre = sep_x_y(df_pre_filt)
     df_dates_ids = df_pre[['date']]
     # have to have a seg_id column since it gets squashed in the processing code
     # have to name it something other than seg_id_nat to avoid duplicate col ...
@@ -304,6 +303,10 @@ def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
     # read, filter y for finetuning
     df_y_obs = read_multiple_obs(obs_files, df_pre)
     df_y_obs_filt = filter_unwanted_cols(df_y_obs)
+
+    # filter and separate pretrain data
+    df_pre_filt = filter_unwanted_cols(df_pre)
+    x, y_pre = sep_x_y(df_pre_filt)
 
     # convert to numpy arrays
     x = convert_to_np_arr(x)
@@ -425,4 +428,3 @@ def post_process(y_pred, dates_ids, y_std, y_mean):
     df_dates = pd.DataFrame(dates_ids, columns=['date', 'seg_id_nat'])
     df = pd.concat([df_dates, df_preds], axis=1)
     return df
-

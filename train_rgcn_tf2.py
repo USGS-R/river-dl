@@ -9,8 +9,8 @@ start_time = datetime.datetime.now()
 tf.random.set_seed(23)
 learning_rate_pre = 0.005
 learning_rate_ft = 0.01
-epochs_finetune = 3
-epochs_pre = 3
+epochs_pre = 200
+epochs_finetune = 100
 batch_offset = 0.5  # for the batches, offset half the year
 hidden_size = 20
 out_dir = 'data/out/'
@@ -55,7 +55,7 @@ model.fit(x=x_trn_obs, y=y_trn_obs, epochs=epochs_finetune, batch_size=n_seg,
 
 finetune_time = datetime.datetime.now()
 finetune_time_elapsed = finetune_time - pre_train_time
-with open(out_time_file, 'w') as f:
+with open(out_time_file, 'a') as f:
     f.write(f'elapsed time finetune:\
              {finetune_time_elapsed} \n')
 

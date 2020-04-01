@@ -1,0 +1,26 @@
+md5: 32965c90eb3699340177cca05be52e0b
+cmd: python train_rgcn_tf2.py
+wdir: ../..
+deps:
+- md5: ef6893c9309ec91361036696ecf3b443
+  path: RGCN_tf2.py
+- md5: 0a74f8e6c878d1e9862bc62396da2c8b
+  path: train_rgcn_tf2.py
+- md5: e70895d0de818791758083d2f0fa947a.dir
+  path: data/in
+outs:
+- md5: db02c1216da19c16fd20d77ee7831404
+  path: data/out/trained_weights.h5
+  cache: true
+  metric: false
+  persist: false
+- md5: 3dba66ec40f12ae231a65a13e4935564
+  path: data/out/pretrain_log.csv
+  cache: true
+  metric: false
+  persist: false
+- md5: acbf04aa449918926963c34f4bd56fa9
+  path: data/out/finetune_log.csv
+  cache: true
+  metric: false
+  persist: false

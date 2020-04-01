@@ -402,7 +402,7 @@ def process_adj_matrix(dist_type, subset=True):
     std_adj = np.std(adj[adj != 0])
     adj[adj != 0] = adj[adj != 0] - mean_adj
     adj[adj != 0] = adj[adj != 0] / std_adj
-    adj[adj != 0] = 1 / (1 + np.exp(adj[adj != 0]))
+    adj[adj != 0] = 1 / (1 + np.exp(-adj[adj != 0]))
 
     I = np.eye(adj.shape[0])
     A_hat = adj.copy() + I
@@ -426,6 +426,3 @@ def post_process(y_pred, dates_ids, y_std, y_mean):
     df = pd.concat([df_dates, df_preds], axis=1)
     return df
 
-
-# read_process_data()
-# process_adj_matrix('downstream', True)

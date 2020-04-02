@@ -1,4 +1,5 @@
 import argparse
+import json
 import pandas as pd
 from RGCN_tf2 import RGCNModel, rmse_masked
 from data_utils import read_process_data
@@ -102,13 +103,14 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network):
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'], y_pred_pp['temp_degC'])
     rmse_flow = rmse_masked(y_obs_pp['discharge_cms'],
                             y_pred_pp['discharge_cms'])
+    metrics_data = {f'rmse_temp_{network}_{tag}': str(rmse_temp.numpy()),
+                    f'rmse_flow_{network}_{tag}': str(rmse_flow.numpy())}
 
     # save files
-    with open(f'data/out/preds/{network}/{tag}_rmse_flow.txt', 'w') as f:
-        f.write(str(rmse_flow.numpy()))
-    with open(f'data/out/preds/{network}/{tag}_rmse_temp.txt', 'w') as f:
-        f.write(str(rmse_temp.numpy()))
-    y_pred_pp.to_feather(f'data/out/preds/{network}/{tag}_preds.feather')
+    with open(f'data/out/preds/{network}/metrics.json', 'a') as f:
+        json.dump(metrics_data, f)
+    y_pred_pp.to_feather(f'data/out/preds/{network}/'
+                         f'{network}_{tag}_preds.feather')
 
 
 parser = argparse.ArgumentParser()

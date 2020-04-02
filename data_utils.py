@@ -307,6 +307,10 @@ def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
     # filter and separate pretrain data
     df_pre_filt = filter_unwanted_cols(df_pre)
     x, y_pre = sep_x_y(df_pre_filt)
+    # set seg_shade to all zeros b/c there are some nan in full sntemp io
+    # note: in the sntemp_input_output data, seg_shade is always zero except
+    # when it's 'nan'
+    x['seg_shade'] = 0
 
     # convert to numpy arrays
     x = convert_to_np_arr(x)
@@ -414,5 +418,3 @@ def process_adj_matrix(dist_type, subset=True):
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
-
-

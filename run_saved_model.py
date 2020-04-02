@@ -104,11 +104,11 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network):
                             y_pred_pp['discharge_cms'])
 
     # save files
-    with open(f'data/out/{tag}_{network}_rmse_flow.txt', 'w') as f:
+    with open(f'data/out/preds/{network}/{tag}_rmse_flow.txt', 'w') as f:
         f.write(str(rmse_flow.numpy()))
-    with open(f'data/out/{tag}_{network}_rmse_temp.txt', 'w') as f:
+    with open(f'data/out/preds/{network}/{tag}_rmse_temp.txt', 'w') as f:
         f.write(str(rmse_temp.numpy()))
-    y_pred_pp.to_feather(f'data/out/{tag}_{network}_preds.feather')
+    y_pred_pp.to_feather(f'data/out/preds/{network}/{tag}_preds.feather')
 
 
 parser = argparse.ArgumentParser()

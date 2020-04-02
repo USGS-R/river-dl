@@ -107,7 +107,7 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network):
                     f'rmse_flow_{network}_{tag}': str(rmse_flow.numpy())}
 
     # save files
-    with open(f'data/out/preds/{network}/metrics.json', 'a') as f:
+    with open(f'data/out/preds/{network}/{tag}_metrics.json', 'w') as f:
         json.dump(metrics_data, f)
     y_pred_pp.to_feather(f'data/out/preds/{network}/'
                          f'{network}_{tag}_preds.feather')

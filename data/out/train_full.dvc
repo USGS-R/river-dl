@@ -1,0 +1,37 @@
+md5: ecbef872712c9d79fc84cb0551173624
+cmd: python train_rgcn_tf2.py full
+wdir: ../..
+deps:
+- md5: ef6893c9309ec91361036696ecf3b443
+  path: RGCN_tf2.py
+- md5: 1ab2f17afddf9d947cdbefb8854a2259
+  path: train_rgcn_tf2.py
+- md5: f7d2c7d730f8f1aa6189da146079ffad
+  path: data/in/distance_matrix.npz
+- md5: e8ff3ab9252c3d8926ad27c888b2f3f6
+  path: data/in/uncal_sntemp_input_output.feather
+- md5: 8980db642a8eeaa572524e64807b5ede
+  path: data/in/obs_temp_full.csv
+- md5: 0711466b5f8d947a2929b9cb9f85e294
+  path: data/in/obs_flow_full.csv
+outs:
+- md5: 3ebccf7a764c9309d1a706574ee12a8a.dir
+  path: data/out/trained_weights_full
+  cache: true
+  metric: false
+  persist: false
+- md5: 2c1ae2e9a9b1019d9f1de6a2421dd4de
+  path: data/out/pretrain_log_full.csv
+  cache: true
+  metric: false
+  persist: false
+- md5: 6b5e8cb3ae92ea25620e0ec57d7d646f
+  path: data/out/finetune_log_full.csv
+  cache: true
+  metric: false
+  persist: false
+- md5: 767f9c933416193ca286ca3b72e18daa
+  path: data/out/training_time_full.txt
+  cache: true
+  metric: false
+  persist: false

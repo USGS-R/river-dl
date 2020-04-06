@@ -10,8 +10,8 @@ start_time = datetime.datetime.now()
 tf.random.set_seed(23)
 learning_rate_pre = 0.005
 learning_rate_ft = 0.01
-epochs_pre = 200
-epochs_finetune = 100
+epochs_pre = 1
+epochs_finetune = 1
 batch_offset = 1  # for the batches, offset half the year
 hidden_size = 20
 
@@ -25,6 +25,8 @@ parser.add_argument("-f", "--finetune_vars", help='whether to finetune on\
                     temp, flow, or both', choices=['temp', 'flow', 'both'])
 parser.add_argument("-p", "--pretrain_vars", help='whether to pretrain on\
                     temp, flow, or both', choices=['temp', 'flow', 'both'])
+parser.add_argument('-i', '--input_data_dir', help='directory where input data\
+                    are located')
 parser.add_argument("-d", "--dist_matrix", help='which type of distance matrix\
                     to use', choices=['upstream', 'downstream', 'updown'],
                     default='upstream')
@@ -32,6 +34,7 @@ parser.add_argument("-t", "--tag", help='tag to append to end of file',
                     default='')
 args = parser.parse_args()
 
+in_data_dir = args.input_data_dir
 network = args.network
 out_dir = args.outdir
 pt_vars = args.pretrain_vars
@@ -48,7 +51,7 @@ elif network == "subset":
     subset = True
 
 # set up model/read in data
-data = read_process_data(subset=subset, trn_ratio=0.67,
+data = read_process_data(in_data_dir, subset=subset, trn_ratio=0.67,
                          batch_offset=batch_offset,
                          pretrain_out_vars=pt_vars, finetune_out_vars=ft_vars,
                          dist_type=dist_mat)

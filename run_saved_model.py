@@ -123,11 +123,14 @@ parser.add_argument("-o", "--outdir", help='directory where the output should\
                     be written')
 parser.add_argument("-t", "--tag", help='tag to append to end of output files',
                     default='')
+parser.add_argument('-i', '--input_data_dir', help='directory where input data\
+                    are located')
 parser.add_argument("-w", "--weights_dir", help='directory where\
                     trained_weights_{network}{tag}/ is')
 args = parser.parse_args()
 
 hidden_size = 20
+in_data_dir = args.input_data_dir
 network = args.network
 outdir = args.outdir
 dist_mat = args.dist_matrix
@@ -142,8 +145,8 @@ if network == "full":
 elif network == "subset":
     subset = True
 
-data = read_process_data(subset=subset, trn_ratio=0.67, batch_offset=1,
-                         dist_type=dist_mat)
+data = read_process_data(in_data_dir, subset=subset, trn_ratio=0.67,
+                         batch_offset=1, dist_type=dist_mat)
 num_segs = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 

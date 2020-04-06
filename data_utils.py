@@ -240,8 +240,9 @@ def filter_output_var(y_data, out_cols):
     return y_data
 
 
-def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
-                      pretrain_out_vars="both", finetune_out_vars="both",
+def read_process_data(data_dir='data/in', subset=True, trn_ratio=0.8,
+                      batch_offset=0.5, pretrain_out_vars="both",
+                      finetune_out_vars="both",
                       dist_type='upstream'):
     """
     read in and process data into training and testing datasets. the training 
@@ -282,7 +283,6 @@ def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
             'dates_ids_tst: un-batched dates and national seg ids for testing
                             data [n_yrs, n_seg, len_seq, 2]
     """
-    data_dir = 'data/in/'
     if subset:
         pretrain_file = f'{data_dir}uncal_sntemp_input_output_subset.feather'
         obs_files = [f'{data_dir}obs_temp_subset.csv',
@@ -369,7 +369,7 @@ def read_process_data(subset=True, trn_ratio=0.8, batch_offset=0.5,
             'y_tst_obs': y_tst_batch,
             'dates_ids_trn': dates_ids_trn_batch,
             'dates_ids_tst': dates_ids_tst_batch,
-            'dist_matrix': process_adj_matrix(dist_type, subset)
+            'dist_matrix': process_adj_matrix(data_dir, dist_type, subset)
             }
     return data
 
@@ -385,7 +385,7 @@ def sort_dist_matrix(mat, row_col_names):
     return df
 
 
-def process_adj_matrix(dist_type, subset=True):
+def process_adj_matrix(data_dir, dist_type, subset=True):
     """
     process adj matrix.
     **The matrix is sorted by seg_id_nat **
@@ -395,7 +395,6 @@ def process_adj_matrix(dist_type, subset=True):
     for the entire DRB (False)
     :return: [numpy array] processed adjacency matrix
     """
-    data_dir = "data/in/"
     if subset:
         data_file = f'{data_dir}distance_matrix_subset.npz'
     else:

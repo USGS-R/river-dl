@@ -14,15 +14,33 @@ epochs_pre = 200
 epochs_finetune = 100
 batch_offset = 1  # for the batches, offset half the year
 hidden_size = 20
-out_dir = 'data/out/'
 
 # read in arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("network", help='network - "full" or "subset"',
+parser.add_argument("-n", "--network", help='network - "full" or "subset"',
                     choices=['full', 'subset'])
+parser.add_argument("-o", "--outdir", help='directory where the output should\
+                    be written')
+parser.add_argument("-f", "--finetune_vars", help='whether to finetune on\
+                    temp, flow, or both', choices=['temp', 'flow', 'both'])
+parser.add_argument("-p", "--pretrain_vars", help='whether to pretrain on\
+                    temp, flow, or both', choices=['temp', 'flow', 'both'])
+parser.add_argument("-d", "--dist_matrix", help='which type of distance matrix\
+                    to use', choices=['upstream', 'downstream', 'updown'],
+                    default='upstream')
+parser.add_argument("-t", "--tag", help='tag to append to end of file',
+                    default='')
 args = parser.parse_args()
 
 network = args.network
+out_dir = args.outdir
+pt_vars = args.pretrain_vars
+ft_vars = args.finetune_vars
+dist_mat = args.dist_matrix
+tag = args.tag
+if tag != '':
+    tag = f'_{tag}'
+
 
 if network == "full":
     subset = False
@@ -32,8 +50,8 @@ elif network == "subset":
 # set up model/read in data
 data = read_process_data(subset=subset, trn_ratio=0.67,
                          batch_offset=batch_offset,
-                         pretrain_out_vars='both', finetune_out_vars='temp',
-                         dist_type='upstream')
+                         pretrain_out_vars=pt_vars, finetune_out_vars=ft_vars,
+                         dist_type=dist_mat)
 n_seg = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
@@ -41,7 +59,8 @@ model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 model.compile(optimizer_pre, loss=rmse_masked)
 
-csv_log_pre = tf.keras.callbacks.CSVLogger(f'{out_dir}pretrain_log_{network}.csv')
+csv_log_pre = tf.keras.callbacks.CSVLogger(f'{out_dir}pretrain_log_{network}'
+                                           f'{tag}.csv')
 
 x_trn_pre = data['x_trn_pre']
 y_trn_pre = data['y_trn_pre']
@@ -56,11 +75,14 @@ with open(out_time_file, 'w') as f:
     f.write(f'elapsed time pretrain (includes building graph):\
              {pre_train_time_elapsed} \n')
 
+model.save_weights(f'{out_dir}pretrained_weights_{network}{tag}/')
+
 # finetune
 optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 model.compile(optimizer_ft, loss=rmse_masked)
 
-csv_log_ft = tf.keras.callbacks.CSVLogger(f'{out_dir}finetune_log_{network}.csv')
+csv_log_ft = tf.keras.callbacks.CSVLogger(f'{out_dir}finetune_log_{network}'
+                                          f'{tag}.csv')
 
 x_trn_obs = data['x_trn']
 y_trn_obs = data['y_trn_obs']
@@ -74,5 +96,5 @@ with open(out_time_file, 'a') as f:
     f.write(f'elapsed time finetune:\
              {finetune_time_elapsed} \n')
 
-model.save_weights(f'{out_dir}trained_weights_{network}/')
+model.save_weights(f'{out_dir}trained_weights_{network}{tag}/')
 

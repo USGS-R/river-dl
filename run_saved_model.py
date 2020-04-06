@@ -59,7 +59,8 @@ def unscale_output(y_scl, y_std, y_mean):
     return y_scl
 
 
-def predict_evaluate(trained_model, io_data, tag, num_segs, network):
+def predict_evaluate(trained_model, io_data, tag, num_segs, network, run_tag,
+                     outdir):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -103,23 +104,38 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network):
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'], y_pred_pp['temp_degC'])
     rmse_flow = rmse_masked(y_obs_pp['discharge_cms'],
                             y_pred_pp['discharge_cms'])
-    metrics_data = {f'rmse_temp_{network}_{tag}': str(rmse_temp.numpy()),
-                    f'rmse_flow_{network}_{tag}': str(rmse_flow.numpy())}
+    metrics_data = {f'rmse_temp_{network}_{tag}{run_tag}':
+                        str(rmse_temp.numpy()),
+                    f'rmse_flow_{network}_{tag}{run_tag}':
+                        str(rmse_flow.numpy())}
 
     # save files
-    with open(f'data/out/preds/{network}/{tag}_metrics.json', 'w') as f:
+    with open(f'{outdir}{network}/{tag}_metrics{run_tag}.json', 'w') as f:
         json.dump(metrics_data, f)
     y_pred_pp.to_feather(f'data/out/preds/{network}/'
-                         f'{network}_{tag}_preds.feather')
+                         f'{network}_{tag}_preds{run_tag}.feather')
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("network", help='network - "full" or "subset"',
                     choices=['full', 'subset'])
+parser.add_argument("-o", "--outdir", help='directory where the output should\
+                    be written')
+parser.add_argument("-t", "--tag", help='tag to append to end of output files',
+                    default='')
+parser.add_argument("-w", "--weights_dir", help='directory where\
+                    trained_weights_{network}{tag}/ is')
 args = parser.parse_args()
 
 hidden_size = 20
 network = args.network
+outdir = args.outdir
+dist_mat = args.dist_matrix
+weights_dir = args.weights_dir
+run_tag = args.tag
+if run_tag != '':
+    run_tag = f'_{run_tag}'
+
 
 if network == "full":
     subset = False
@@ -127,11 +143,11 @@ elif network == "subset":
     subset = True
 
 data = read_process_data(subset=subset, trn_ratio=0.67, batch_offset=1,
-                         dist_type='upstream')
+                         dist_type=dist_mat)
 num_segs = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
-model.load_weights('data/out/trained_weights/')
+model.load_weights(f'{weights_dir}/trained_weights_{network}{run_tag}/')
 
-predict_evaluate(model, data, 'dev', num_segs, network)
-predict_evaluate(model, data, 'trn', num_segs, network)
+predict_evaluate(model, data, 'dev', num_segs, network, run_tag, outdir)
+predict_evaluate(model, data, 'trn', num_segs, network, run_tag, outdir)

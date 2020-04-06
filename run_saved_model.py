@@ -112,12 +112,12 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network, run_tag,
     # save files
     with open(f'{outdir}{network}/{tag}_metrics{run_tag}.json', 'w') as f:
         json.dump(metrics_data, f)
-    y_pred_pp.to_feather(f'data/out/preds/{network}/'
+    y_pred_pp.to_feather(f'{outdir}preds/{network}/'
                          f'{network}_{tag}_preds{run_tag}.feather')
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("network", help='network - "full" or "subset"',
+parser.add_argument("-n", "--network", help='network - "full" or "subset"',
                     choices=['full', 'subset'])
 parser.add_argument("-o", "--outdir", help='directory where the output should\
                     be written')

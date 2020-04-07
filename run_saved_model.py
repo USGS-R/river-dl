@@ -110,10 +110,9 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network, run_tag,
                         str(rmse_flow.numpy())}
 
     # save files
-    with open(f'{outdir}{network}/{tag}_metrics{run_tag}.json', 'w') as f:
+    with open(f'{outdir}{network}_{tag}_metrics{run_tag}.json', 'w') as f:
         json.dump(metrics_data, f)
-    y_pred_pp.to_feather(f'{outdir}preds/{network}/'
-                         f'{network}_{tag}_preds{run_tag}.feather')
+    y_pred_pp.to_feather(f'{outdir}{network}_{tag}_preds{run_tag}.feather')
 
 
 parser = argparse.ArgumentParser()

@@ -10,9 +10,9 @@ start_time = datetime.datetime.now()
 tf.random.set_seed(23)
 learning_rate_pre = 0.005
 learning_rate_ft = 0.01
-epochs_pre = 1
-epochs_finetune = 1
-batch_offset = 1  # for the batches, offset half the year
+epochs_pre = 200
+epochs_finetune = 100
+batch_offset = 1  
 hidden_size = 20
 
 # read in arguments

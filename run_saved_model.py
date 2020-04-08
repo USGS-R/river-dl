@@ -126,6 +126,9 @@ parser.add_argument('-i', '--input_data_dir', help='directory where input data\
                     are located')
 parser.add_argument("-w", "--weights_dir", help='directory where\
                     trained_weights_{network}{tag}/ is')
+parser.add_argument("-d", "--dist_matrix", help='which type of distance matrix\
+                    to use', choices=['upstream', 'downstream', 'updown'],
+                    default='upstream')
 args = parser.parse_args()
 
 hidden_size = 20
@@ -143,6 +146,7 @@ if network == "full":
     subset = False
 elif network == "subset":
     subset = True
+
 
 data = read_process_data(in_data_dir, subset=subset, trn_ratio=0.67,
                          batch_offset=1, dist_type=dist_mat)

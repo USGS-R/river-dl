@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+import xarray as xr
+import datetime
+from dateutil.relativedelta import relativedelta
 
 
 def get_non_varying_cols(df, std_thresh=1e-5):
@@ -66,15 +69,17 @@ def filter_unwanted_cols(df):
     return df[wanted_cols]
 
 
-def sep_x_y(df):
+def sep_x_y(ds, predictor_vars=None):
     """
     separate into input and output
-    :param df: [dataframe] the raw input and output data
+    :param ds: [xr dataset] the raw input and output data
+    :param predictor_vars: [list] list of predictor column names
     :return: [tuple] df of predictors (x), df of targets (y)
     """
-    target_cols = ['seg_tave_water', 'seg_outflow']
-    predictor_cols = [c for c in df.columns if c not in target_cols]
-    return df[predictor_cols], df[target_cols]
+    target_vars = ['seg_tave_water', 'seg_outflow']
+    if not predictor_vars:
+        predictor_vars = [v for v in ds.data_vars if v not in target_vars]
+    return ds[predictor_vars], ds[target_vars]
 
 
 def get_df_for_rand_seg(df, seg_id):
@@ -92,14 +97,11 @@ def scale(data_arr, std=None, mean=None):
     :param mean: [numpy array] mean if scaling test data with dims [nfeats]
     :return: scaled data with original dims
     """
-    nseg, ndates, nfeats = data_arr.shape
-    all_segs = np.reshape(data_arr, [nseg*ndates, nfeats])
-    if not isinstance(std, np.ndarray) or not isinstance(mean, np.ndarray):
-        std = np.nanstd(all_segs, axis=0)
-        mean = np.nanmean(all_segs, axis=0)
+    if not isinstance(std, xr.Dataset) or not isinstance(mean, xr.Dataset):
+        std = data_arr.std(skipna=True)
+        mean = data_arr.mean(skipna=True)
     # adding small number in case there is a std of zero
-    scaled = (all_segs - mean)/(std + 1e-10)
-    scaled = np.reshape(scaled, [nseg, ndates, nfeats])
+    scaled = (data_arr - mean)/(std + 1e-10)
     return scaled, std, mean
 
 
@@ -116,37 +118,40 @@ def unscale_data(df, std, mean):
     return (df * std) + mean
 
 
-def separate_trn_tst(data_arr, trn_ratio=0.8):
+def separate_trn_tst(dataset, test_start, n_test_years):
     """
-    separate the train data from the test data according to the trn_ratio along
-    the date axis
-    :param data_arr: [numpy array] input or output data with dims
-    [nseg, ndates, nfeat]
-    :param trn_ratio: the amount of data to take for training. it will be taken
-    from the beginning of the dataset
+    separate the train data from the test data according to the start and end
+    dates. This assumes your training data is in one continuous block and all
+    the dates that are not in the training are in the testing.
+    :param dataset: [xr dataset] input or output data with dims
+    :param test_start: [str] date where training data should start
+    :param test_end: [str] date where training data should end
     """
-    sep_idx = int(data_arr.shape[1] * trn_ratio)
-    trn = data_arr[:, :sep_idx, :]
-    tst = data_arr[:, sep_idx:, :]
+    start_date = datetime.datetime.strptime(test_start, '%Y-%m-%d')
+    test_end = start_date + relativedelta(years=n_test_years)
+    tst = dataset.sel(date=slice(test_start, test_end))
+    # take all the rest
+    trn_dates = dataset.date[~dataset.date.isin(tst.date)]
+    trn = dataset.sel(date=trn_dates)
     return trn, tst
 
 
-def split_into_batches(data_array, batch_size=365, offset=0.5):
+def split_into_batches(data_array, seq_len=365, offset=1):
     """
     split training data into batches with size of batch_size
     :param data_array: [numpy array] array of training data with dims [nseg,
     ndates, nfeat]
-    :param batch_size: [int] number of batches
+    :param seq_len: [int] length of sequences (i.e., 365)
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
     the first batch will be 0-365 and the second will be 182-547)
-    :return: [numpy array] batched data with dims [nbatches, nseg, ndates
+    :return: [numpy array] batched data with dims [nbatches, nseg, seq_len
     (batch_size), nfeat]
     """
     combined = []
     for i in range(int(1/offset)):
-        start = int(i * offset * batch_size)
+        start = int(i * offset * seq_len)
         idx = np.arange(start=start, stop=data_array.shape[1],
-                        step=batch_size)
+                        step=seq_len)
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
         combined.extend(split[1:-1])
@@ -165,13 +170,16 @@ def read_format_data(filename):
         df = pd.read_csv(filename)
     elif filename.endswith('feather'):
         df = pd.read_feather(filename)
+        del df['model_idx']
     else:
         raise ValueError('file_format should be "feather" or "csv"')
     df['date'] = pd.to_datetime(df['date'])
     df['seg_id_nat'] = pd.to_numeric(df['seg_id_nat'])
     df = df.sort_values(['date', 'seg_id_nat'])
-    df = df.set_index('seg_id_nat')
-    return df
+    df = df.set_index(['seg_id_nat', 'date'])
+    ds = df.to_xarray()
+    return ds
+
 
 
 def read_multiple_obs(obs_files, x_data):
@@ -181,36 +189,13 @@ def read_multiple_obs(obs_files, x_data):
     :param x_data:
     :return:
     """
-    obs = []
+    obs = [x_data]
     for filename in obs_files:
-        df = read_format_obs(filename, x_data)
-        df.set_index([df.index, 'date'], inplace=True)
-        obs.append(df)
-    obs = pd.concat(obs, axis=1)
+        ds = read_format_data(filename)
+        obs.append(ds)
+    obs = xr.merge(obs, join='left')
     obs = obs[['temp_C', 'discharge_cms']]
-    obs.reset_index(level=1, inplace=True)
     return obs
-
-
-def read_format_obs(obs_file: str, x_data: pd.DataFrame) -> pd.DataFrame:
-    """
-    format obs data so it has the same dimensions as input data
-    :type obs_file: str
-    :param obs_file: file from which to read the observations
-    :type x_data: pandas DataFrame
-    :param x_data: input data
-    :rtype: pd.DataFrame
-    :return: formatted observation data
-    """
-    df_y_obs = read_format_data(obs_file)
-    df_y_obs = df_y_obs.reset_index()
-    x_data = x_data.reset_index()
-    x_data = x_data[['seg_id_nat', 'date']]
-    merged = pd.merge(x_data, df_y_obs, how='outer', on=['date', 'seg_id_nat'])
-    merged_filt = merged[(merged['date'] >= x_data.date.min()) &
-                         (merged['date'] <= x_data.date.max())]
-    merged_filt = merged_filt.set_index('seg_id_nat')
-    return merged_filt
 
 
 def reshape_for_training(data):
@@ -240,13 +225,47 @@ def filter_output_var(y_data, out_cols):
     return y_data
 
 
-def read_process_data(data_dir='data/in', subset=True, trn_ratio=0.8,
-                      batch_offset=0.5, pretrain_out_vars="both",
-                      finetune_out_vars="both",
-                      dist_type='upstream'):
+def convert_batch_reshape(dataset):
+    """
+    convert xarray dataset into numpy array, swap the axes, batch the array and
+    reshape for training
+    :param dataset: [xr dataset] x or y data
+    :return: [numpy array] batched and reshaped dataset
+    """
+    # convert xr.dataset to numpy array
+    dataset = dataset.transpose('seg_id_nat', 'date')
+    arr = dataset.to_array().values
+
+    # before [nfeat, nseg, ndates]; after [nseg, ndates, nfeat]
+    # this is the order that the split into batches expects
+    arr = np.moveaxis(arr, 0, -1)
+
+    # batch the data
+    # after [nbatch, nseg, seq_len, nfeat]
+    batched = split_into_batches(arr)
+
+    # reshape data
+    # after [nbatch * nseg, seq_len, nfeat]
+    reshaped = reshape_for_training(batched)
+    return reshaped
+
+
+def coord_as_reshaped_array(dataset, coord_name):
+    coord_array = xr.broadcast(dataset[coord_name], dataset['seg_tave_air'])[0]
+    new_var_name = coord_name + '1'
+    dataset[new_var_name] = coord_array
+    reshaped_np_arr = convert_batch_reshape(dataset[[new_var_name]])
+    return reshaped_np_arr
+
+
+def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
+                      pretrain_out_vars="both", finetune_out_vars="both",
+                      dist_type='upstream', test_start_date='2004-09-30',
+                      n_test_yr=12):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
+    :param data_dir:
     :param subset: [bool] whether you want data for the subsection (True) or
     for the entire DRB (false)
     :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
@@ -259,6 +278,8 @@ def read_process_data(data_dir='data/in', subset=True, trn_ratio=0.8,
     "temp", "flow" or "both"
     :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
     "updown")
+    :param test_start_date: the date to start for the test period
+    :param n_test_yr: number of years to take for the test period
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             'x_trn': batched, input data for the training period scaled and
@@ -271,12 +292,12 @@ def read_process_data(data_dir='data/in', subset=True, trn_ratio=0.8,
                          of record of SNTemp
             'y_trn_pre': batched, scaled, and centered output data for entire
                          period of record of SNTemp [n_samples, seq_len, n_out]
-            'y_trn_obs': batched, scaled, and centered output observation data
+            'y_obs_trn': batched, scaled, and centered output observation data
                          for the training period
             'y_trn_obs_std': standard deviation of the y observations training
                              data [n_out]
             'y_trn_obs_mean': mean of the observation training data [n_out]
-            'y_tst_obs': un-batched, unscaled, uncentered observation data for
+            'y_obs_tst': un-batched, unscaled, uncentered observation data for
                          the test period [n_yrs, n_seg, len_seq, n_out]
             'dates_ids_trn: batched dates and national seg ids for training data
                             [n_samples, seq_len, 2]
@@ -293,82 +314,52 @@ def read_process_data(data_dir='data/in', subset=True, trn_ratio=0.8,
                      f'{data_dir}obs_flow_full.csv']
 
     # read, y_pretrain
-    df_pre = read_format_data(pretrain_file)
-    df_dates_ids = df_pre[['date']]
-    # have to have a seg_id column since it gets squashed in the processing code
-    # have to name it something other than seg_id_nat to avoid duplicate col ...
-    # names
-    df_dates_ids['seg_id_nat1'] = df_dates_ids.index
-
-    # read, filter y for finetuning
-    df_y_obs = read_multiple_obs(obs_files, df_pre)
-    df_y_obs_filt = filter_unwanted_cols(df_y_obs)
-
-    # filter and separate pretrain data
-    df_pre_filt = filter_unwanted_cols(df_pre)
-    x, y_pre = sep_x_y(df_pre_filt)
+    ds_pre = read_format_data(pretrain_file)
     # set seg_shade to all zeros b/c there are some nan in full sntemp io
     # note: in the sntemp_input_output data, seg_shade is always zero except
     # when it's 'nan'
-    x['seg_shade'] = 0
+    ds_pre.seg_shade.loc[:, :] = 0
 
-    # convert to numpy arrays
-    x = convert_to_np_arr(x)
-    y_pre = convert_to_np_arr(y_pre)
-    y_obs = convert_to_np_arr(df_y_obs_filt)
-    dates_ids = convert_to_np_arr(df_dates_ids)
+    # read, filter observations for finetuning
+    ds_y_obs = read_multiple_obs(obs_files, ds_pre)
 
     # separate trn_tst for fine-tuning;
-    x_trn, x_tst = separate_trn_tst(x, trn_ratio)
-    y_trn_obs, y_tst_obs = separate_trn_tst(y_obs, trn_ratio)
-    dates_ids_trn, dates_ids_tst = separate_trn_tst(dates_ids, trn_ratio)
+    pt_train, pt_test = separate_trn_tst(ds_pre, test_start_date, n_test_yr)
+    y_obs_train, y_obs_test = separate_trn_tst(ds_y_obs, test_start_date,
+                                               n_test_yr)
+    # dates_ids_trn, dates_ids_tst = separate_trn_tst(dates_ids, trn_ratio)
+
+    # separate x, y
+    x, y_pre = sep_x_y(ds_pre)
+    x_trn, _ = sep_x_y(pt_train)
+    x_tst, _ = sep_x_y(pt_test)
 
     # filter pretrain/finetune y
     y_pre = filter_output_var(y_pre, pretrain_out_vars)
-    y_trn_obs = filter_output_var(y_trn_obs, finetune_out_vars)
+    y_obs_trn = filter_output_var(y_obs_train, finetune_out_vars)
 
     # scale on all x data
     x_scl, x_std, x_mean = scale(x)
     x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
-    # for pre-training, keep everything together
-    x_trn_pre_scl = x_scl
 
     # scale y training data and get the mean and std
-    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_trn_obs)
+    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre)
 
-    # batch the data
-    x_trn_batch = split_into_batches(x_trn_scl, offset=batch_offset)
-    x_tst_batch = split_into_batches(x_tst_scl, offset=1)
-    x_trn_pre_batch = split_into_batches(x_trn_pre_scl, offset=batch_offset)
-    y_trn_pre_batch = split_into_batches(y_trn_pre_scl, offset=batch_offset)
-    y_trn_obs_batch = split_into_batches(y_trn_obs_scl, offset=batch_offset)
-    y_tst_batch = split_into_batches(y_tst_obs, offset=1)
-    dates_ids_trn_batch = split_into_batches(dates_ids_trn, offset=batch_offset)
-    dates_ids_tst_batch = split_into_batches(dates_ids_tst, offset=1)
-
-    # reshape data
-    x_trn_batch = reshape_for_training(x_trn_batch)
-    x_tst_batch = reshape_for_training(x_tst_batch)
-    x_trn_pre_batch = reshape_for_training(x_trn_pre_batch)
-    y_trn_pre_batch = reshape_for_training(y_trn_pre_batch)
-    y_trn_obs_batch = reshape_for_training(y_trn_obs_batch)
-    y_tst_batch = reshape_for_training(y_tst_batch)
-    dates_ids_trn_batch = reshape_for_training(dates_ids_trn_batch)
-    dates_ids_tst_batch = reshape_for_training(dates_ids_tst_batch)
-
-    data = {'x_trn': x_trn_batch,
-            'x_tst': x_tst_batch,
-            'x_trn_pre': x_trn_pre_batch,
-            'y_trn_pre': y_trn_pre_batch,
-            'y_trn_obs': y_trn_obs_batch,
-            'y_trn_obs_std': y_trn_obs_std,
-            'y_trn_obs_mean': y_trn_obs_mean,
-            'y_tst_obs': y_tst_batch,
-            'dates_ids_trn': dates_ids_trn_batch,
-            'dates_ids_tst': dates_ids_tst_batch,
+    data = {'x_trn': convert_batch_reshape(x_trn_scl),
+            'x_tst': convert_batch_reshape(x_tst_scl),
+            'x_trn_pre': convert_batch_reshape(x_scl),
+            'y_trn_pre': convert_batch_reshape(y_trn_pre_scl),
+            'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
+            'y_trn_obs_std': y_trn_obs_std.to_array().values,
+            'y_trn_obs_mean': y_trn_obs_mean.to_array().values,
+            'y_obs_tst': convert_batch_reshape(y_obs_test),
+            'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
+            'dates_ids_trn': coord_as_reshaped_array(x_trn, 'date'),
+            'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
+            'dates_ids_tst': coord_as_reshaped_array(x_tst, 'date'),
             'dist_matrix': process_adj_matrix(data_dir, dist_type, subset)
             }
     return data
@@ -417,3 +408,7 @@ def process_adj_matrix(data_dir, dist_type, subset=True):
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
+
+
+d = read_process_data()
+np.savez_compressed('processed_data_new.npz', **d)

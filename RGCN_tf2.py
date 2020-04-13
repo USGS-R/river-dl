@@ -157,8 +157,8 @@ def rmse_masked(data, y_pred):
     :param y_pred: [tensor] predicted y values
     :return: rmse (one value for each training sample)
     """
-    weights = data[:, -1]
-    y_true = data[:, :-1]
+    weights = data[:, -2]
+    y_true = data[:, :-2]
 
     y_true = rm_zero_wgted_obs(y_true, weights)
 

@@ -8,6 +8,7 @@ based off code by Xiaowei Jia
 from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras import layers
+import numpy as np
 
 
 class RGCN(layers.Layer):
@@ -134,26 +135,48 @@ class RGCNModel(tf.keras.Model):
         return output
 
 
-def rmse_masked(y_true, y_pred):
+def rm_zero_wgted_obs(y_true, weights):
+    """
+    make all zero-weighted observations 'nan' so they don't get counted at all 
+    in the loss calculation
+    """
+    zero_idx = weights == 0
+    y_true[zero_idx] = np.nan
+    return y_true
+
+
+def rmse_masked(data, y_pred):
     """
     Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
     with 0 when y_s is nan; num_y_s is a count of just those non-nan
     observations) so we're only looking at predictions with corresponding
     observations available
     (credit: @aappling-usgs)
-    :param y_true: [tensor] true (observed) y values. these may have nans
+    :param data: [tensor] true (observed) y values. these may have nans and 
+    sample weights
     :param y_pred: [tensor] predicted y values
     :return: rmse (one value for each training sample)
     """
+    weights = data[:, -1]
+    y_true = data[:, :-1]
+
+    y_true = rm_zero_wgted_obs(y_true, weights)
+
+    # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)
+    weights = tf.convert_to_tensor(weights)
     y_true = tf.cast(y_true, y_pred.dtype)
-    n_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
-                      tf.float32)
+    weights = tf.cast(weights, y_pred.dtype)
+
+    # count the number of non-nans
+    num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
+                         tf.float32)
     zero_or_error = tf.where(tf.math.is_nan(y_true),
                              tf.zeros_like(y_true),
                              y_pred - y_true)
-    sum_squared_errors = tf.reduce_sum(tf.square(zero_or_error))
-    rmse_loss = tf.sqrt(sum_squared_errors / n_y_true)
+    wgt_zero_or_err = (zero_or_error * weights)/tf.math.reduce_sum(weights, 1)
+    sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
+    rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss
 
 

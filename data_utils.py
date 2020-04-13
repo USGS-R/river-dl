@@ -285,7 +285,7 @@ def coord_as_reshaped_array(dataset, coord_name):
     return reshaped_np_arr
 
 
-def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
+def read_process_data(data_dir='data/in/', subset=True,
                       pretrain_out_vars="both", finetune_out_vars="both",
                       dist_type='upstream', test_start_date='2004-09-30',
                       n_test_yr=12, exclude_segs=None):
@@ -390,9 +390,9 @@ def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
             'y_obs_wgts': y_obs_weights.to_array().values,
             'y_obs_tst': convert_batch_reshape(y_obs_test),
             'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
-            'dates_ids_trn': coord_as_reshaped_array(x_trn, 'date'),
+            'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
             'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
-            'dates_ids_tst': coord_as_reshaped_array(x_tst, 'date'),
+            'dates_tst': coord_as_reshaped_array(x_tst, 'date'),
             'dist_matrix': process_adj_matrix(data_dir, dist_type, subset)
             }
     return data

@@ -441,3 +441,14 @@ def process_adj_matrix(data_dir, dist_type, subset=True):
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
+
+
+def read_exclude_segs_file(exclude_file):
+    """
+    read the exclude segs file. should be a file with no header and one segment
+    id per line
+    :param exclude_file: [str] exclude segs file
+    :return: [list] list of segments to exclude
+    """
+    df = pd.read_csv(exclude_file, header=None)
+    return df[0].tolist()

@@ -181,7 +181,6 @@ def read_format_data(filename):
     return ds
 
 
-
 def read_multiple_obs(obs_files, x_data):
     """
     read and format multiple observation files
@@ -195,6 +194,8 @@ def read_multiple_obs(obs_files, x_data):
         obs.append(ds)
     obs = xr.merge(obs, join='left')
     obs = obs[['temp_C', 'discharge_cms']]
+    obs = obs.rename({'temp_C': 'seg_tave_water',
+                      'discharge_cms': 'seg_outflow'})
     return obs
 
 
@@ -209,19 +210,45 @@ def reshape_for_training(data):
     return np.reshape(data, [n_batch*n_seg, seq_len, n_feat])
 
 
-def filter_output_var(y_data, out_cols):
+def exclude_segments(weights, exclude_segs):
+    """
+    exclude segments from being trained on by setting their weights as zero
+    :param weights: [xr dataset] dataset of weights
+    :param exclude_segs: [list] list of segments to exclude in the loss
+    calculation
+    :return:
+    """
+    weights.seg_tave_water.loc[exclude_segs, :] = 0
+    weights.seg_outflow.loc[exclude_segs, :] = 0
+    return weights
+
+
+def create_weight_vectors(y_data, out_cols, exclude_segs):
     """
     filter out either flow, temperature, or neither in the pre-training and 
     finetune y data
+    :param y_data: [xr dataset]
+    :param out_cols: [str] which columns to have count in the loss function;
+    either 'temp', 'flow', or 'both'
+    :param exclude_segs: [list] list of segment ids to exclude from the loss
+    function
+    :return: [xr dataset] dataset of weights between one and zero
     """
+    weights = y_data.copy
+    # assume all weights will be one (fully counted)
+    weights.seg_tave_water.loc[:, :] = 1
+    weights.seg_outflow.loc[:, :] = 1
+
     if out_cols == "both":
         pass
     elif out_cols == 'temp':
-        y_data[:, :, 1] = np.nan
+        weights.seg_outflow.loc[:, :] = 0
     elif out_cols == 'flow':
-        y_data[:, :, 0] = np.nan
+        weights.seg_tave_water.loc[:, :] = 0
     else:
         raise ValueError('out_cols needs to be "flow", "temp", or "both"')
+
+    weights = exclude_segments(weights, exclude_segs)
     return y_data
 
 
@@ -261,7 +288,7 @@ def coord_as_reshaped_array(dataset, coord_name):
 def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
                       pretrain_out_vars="both", finetune_out_vars="both",
                       dist_type='upstream', test_start_date='2004-09-30',
-                      n_test_yr=12):
+                      n_test_yr=12, exclude_segs=None):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
@@ -280,6 +307,8 @@ def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
     "updown")
     :param test_start_date: the date to start for the test period
     :param n_test_yr: number of years to take for the test period
+    :param exclude_segs: [list] which (if any) segments to exclude from loss
+    calculation
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             'x_trn': batched, input data for the training period scaled and
@@ -335,8 +364,10 @@ def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
     x_tst, _ = sep_x_y(pt_test)
 
     # filter pretrain/finetune y
-    y_pre = filter_output_var(y_pre, pretrain_out_vars)
-    y_obs_trn = filter_output_var(y_obs_train, finetune_out_vars)
+    y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,
+                                          exclude_segs)
+    y_obs_weights = create_weight_vectors(y_obs_train, finetune_out_vars,
+                                          exclude_segs)
 
     # scale on all x data
     x_scl, x_std, x_mean = scale(x)
@@ -344,7 +375,7 @@ def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # scale y training data and get the mean and std
-    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
+    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_train)
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre)
 
@@ -355,6 +386,8 @@ def read_process_data(data_dir='data/in/', subset=True, batch_offset=0.5,
             'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
             'y_trn_obs_std': y_trn_obs_std.to_array().values,
             'y_trn_obs_mean': y_trn_obs_mean.to_array().values,
+            'y_pre_wgts': y_pre_weights.to_array().values,
+            'y_obs_wgts': y_obs_weights.to_array().values,
             'y_obs_tst': convert_batch_reshape(y_obs_test),
             'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
             'dates_ids_trn': coord_as_reshaped_array(x_trn, 'date'),
@@ -408,7 +441,3 @@ def process_adj_matrix(data_dir, dist_type, subset=True):
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
     return A_hat
-
-
-d = read_process_data()
-np.savez_compressed('processed_data_new.npz', **d)

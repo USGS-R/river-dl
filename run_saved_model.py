@@ -2,7 +2,6 @@ import argparse
 import json
 import pandas as pd
 from RGCN_tf2 import RGCNModel, rmse_masked
-from data_utils import read_process_data
 import numpy as np
 
 
@@ -59,8 +58,7 @@ def unscale_output(y_scl, y_std, y_mean):
     return y_scl
 
 
-def predict_evaluate(trained_model, io_data, tag, num_segs, network, run_tag,
-                     outdir):
+def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -71,8 +69,6 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network, run_tag,
     :param tag: [str] must be 'trn' or 'dev'; whether you want to predict for
     the train or the dev period
     :param num_segs: [int] the number of segments in the data for prediction
-    :param network: [str] 'full' or 'subset'; whether you are making predictions
-    on the full or the subset of the network. This is only used in file naming
     :return:[none]
     """
     # evaluate training
@@ -104,56 +100,40 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, network, run_tag,
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'], y_pred_pp['temp_degC'])
     rmse_flow = rmse_masked(y_obs_pp['discharge_cms'],
                             y_pred_pp['discharge_cms'])
-    metrics_data = {f'rmse_temp_{network}_{tag}{run_tag}':
+    metrics_data = {f'rmse_temp_{tag}{run_tag}':
                         str(rmse_temp.numpy()),
-                    f'rmse_flow_{network}_{tag}{run_tag}':
+                    f'rmse_flow_{tag}{run_tag}':
                         str(rmse_flow.numpy())}
 
     # save files
-    with open(f'{outdir}{network}_{tag}_metrics{run_tag}.json', 'w') as f:
+    with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:
         json.dump(metrics_data, f)
-    y_pred_pp.to_feather(f'{outdir}{network}_{tag}_preds{run_tag}.feather')
+    y_pred_pp.to_feather(f'{outdir}{tag}_preds{run_tag}.feather')
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-n", "--network", help='network - "full" or "subset"',
-                    choices=['full', 'subset'])
 parser.add_argument("-o", "--outdir", help='directory where the output should\
                     be written')
 parser.add_argument("-t", "--tag", help='tag to append to end of output files',
                     default='')
-parser.add_argument('-i', '--input_data_dir', help='directory where input data\
-                    are located')
+parser.add_argument('-i', "--input_data_file", help='data file [something].npz')
 parser.add_argument("-w", "--weights_dir", help='directory where\
-                    trained_weights_{network}{tag}/ is')
-parser.add_argument("-d", "--dist_matrix", help='which type of distance matrix\
-                    to use', choices=['upstream', 'downstream', 'updown'],
-                    default='upstream')
+                    trained_weights_{tag}/ is')
 args = parser.parse_args()
 
 hidden_size = 20
-in_data_dir = args.input_data_dir
-network = args.network
+in_data_file = args.input_data_file
 outdir = args.outdir
-dist_mat = args.dist_matrix
 weights_dir = args.weights_dir
 run_tag = args.tag
 if run_tag != '':
     run_tag = f'_{run_tag}'
 
-
-if network == "full":
-    subset = False
-elif network == "subset":
-    subset = True
-
-
-data = read_process_data(in_data_dir, subset=subset, trn_ratio=0.67,
-                         batch_offset=1, dist_type=dist_mat)
+data = np.load(in_data_file)
 num_segs = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
-model.load_weights(f'{weights_dir}/trained_weights_{network}{run_tag}/')
+model.load_weights(f'{weights_dir}/trained_weights{run_tag}/')
 
-predict_evaluate(model, data, 'dev', num_segs, network, run_tag, outdir)
-predict_evaluate(model, data, 'trn', num_segs, network, run_tag, outdir)
+predict_evaluate(model, data, 'dev', num_segs, run_tag, outdir)
+predict_evaluate(model, data, 'trn', num_segs, run_tag, outdir)

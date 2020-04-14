@@ -66,18 +66,16 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     :param trained_model:[tf model] model with trained weights loaded
     :param io_data:[dict] dictionary with all the io data for x_trn, y_trn,
     y_tst, etc.
-    :param tag: [str] must be 'trn' or 'dev'; whether you want to predict for
+    :param tag: [str] must be 'trn' or 'tst'; whether you want to predict for
     the train or the dev period
     :param num_segs: [int] the number of segments in the data for prediction
     :return:[none]
     """
     # evaluate training
-    if tag == 'trn':
-        data_tag = 'trn'
-    elif tag == 'dev':
-        data_tag = 'tst'
+    if tag == 'trn' or tag == 'tst':
+        pass
     else:
-        raise ValueError('tag arg needs to be "trn" or "dev"')
+        raise ValueError('tag arg needs to be "trn" or "tst"')
 
     y_pred = trained_model.predict(io_data[f'x_{data_tag}'],
                                    batch_size=num_segs)
@@ -87,17 +85,13 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
                                io_data['y_trn_obs_mean'])
 
-    y_obs_pp = post_process(io_data[f'y_{data_tag}_obs'],
+    y_obs_pp = post_process(io_data[f'y_obs_{data_tag}'],
                             io_data[f'dates_ids_{data_tag}'],
                             io_data[f'ids_{data_tag}'])
     if tag == 'trn':
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
                                   io_data['y_trn_obs_mean'])
 
-    # only save the first half of the predictions to maintain a test holdout
-    if tag == 'dev':
-        y_pred_pp = take_first_half(y_pred_pp)
-        y_obs_pp = take_first_half(y_obs_pp)
 
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'], y_pred_pp['temp_degC'])
     rmse_flow = rmse_masked(y_obs_pp['discharge_cms'],

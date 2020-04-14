@@ -58,6 +58,34 @@ def unscale_output(y_scl, y_std, y_mean):
     return y_scl
 
 
+def rmse_masked(y_true, y_pred):
+    """
+    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
+    with 0 when y_s is nan; num_y_s is a count of just those non-nan
+    observations) so we're only looking at predictions with corresponding
+    observations available
+    (credit: @aappling-usgs)
+    :param data: [tensor] true (observed) y values. these may have nans and 
+    sample weights
+    :param y_pred: [tensor] predicted y values
+    :return: rmse (one value for each training sample)
+    """
+
+    # count the number of non-nans
+    num_y_true = np.sum(np.isnan(y_true))
+    print (num_y_true)
+    zero_or_error = np.where(np.isnan(y_true),
+                             0,
+                             y_pred - y_true)
+    print(zero_or_error.shape)
+    sum_squared_errors = np.sum(zero_or_error ** 2)
+    print(sum_squared_errors.shape)
+    rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
+    print(rmse_loss)
+    return rmse_loss
+
+
+
 def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     """
     use trained model to make predictions and then evaluate those predictions.
@@ -77,29 +105,30 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     else:
         raise ValueError('tag arg needs to be "trn" or "tst"')
 
-    y_pred = trained_model.predict(io_data[f'x_{data_tag}'],
+    y_pred = trained_model.predict(io_data[f'x_{tag}'],
                                    batch_size=num_segs)
-    y_pred_pp = post_process(y_pred, io_data[f'dates_{data_tag}'],
-                             io_data[f'ids_{data_tag}'])
+    y_pred_pp = post_process(y_pred, io_data[f'dates_{tag}'],
+                             io_data[f'ids_{tag}'])
 
+    print(y_pred_pp)
     y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
                                io_data['y_trn_obs_mean'])
+    print(y_pred_pp)
 
-    y_obs_pp = post_process(io_data[f'y_obs_{data_tag}'],
-                            io_data[f'dates_ids_{data_tag}'],
-                            io_data[f'ids_{data_tag}'])
+    y_obs_pp = post_process(io_data[f'y_obs_{tag}'],
+                            io_data[f'dates_{tag}'],
+                            io_data[f'ids_{tag}'])
     if tag == 'trn':
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
                                   io_data['y_trn_obs_mean'])
 
 
-    rmse_temp = rmse_masked(y_obs_pp['temp_degC'], y_pred_pp['temp_degC'])
-    rmse_flow = rmse_masked(y_obs_pp['discharge_cms'],
-                            y_pred_pp['discharge_cms'])
-    metrics_data = {f'rmse_temp_{tag}{run_tag}':
-                        str(rmse_temp.numpy()),
-                    f'rmse_flow_{tag}{run_tag}':
-                        str(rmse_flow.numpy())}
+    rmse_temp = rmse_masked(y_obs_pp['temp_degC'].values,
+                            y_pred_pp['temp_degC'].values)
+    rmse_flow = rmse_masked(y_obs_pp['discharge_cms'].values,
+                            y_pred_pp['discharge_cms'].values)
+    metrics_data = {f'rmse_temp_{tag}{run_tag}': str(rmse_temp),
+                    f'rmse_flow_{tag}{run_tag}': str(rmse_flow)}
 
     # save files
     with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:

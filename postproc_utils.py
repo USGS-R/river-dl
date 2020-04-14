@@ -4,23 +4,24 @@ import numpy as np
 from RGCN_tf2 import rmse_masked
 
 
-def post_process(y_pred, dates_ids):
+def post_process(y_pred, dates, ids):
     """
     post process y data (reshape and make into pandas DFs)
     :param y_pred:[numpy array] array of predictions [nbatch, seq_len, n_out]
-    :param dates_ids:[numpy array] array of dates and seg_id's
-    [nbatch, seq_len, n_out]
+    :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
+    :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]
     :return:[pd dataframe] df with cols
     ['date', 'seg_id_nat', 'temp_degC', 'discharge_cms]
     """
     y_pred = np.reshape(y_pred, [y_pred.shape[0]*y_pred.shape[1],
                                  y_pred.shape[2]])
 
-    dates_ids = np.reshape(dates_ids, [dates_ids.shape[0]*dates_ids.shape[1],
-                                       dates_ids.shape[2]])
+    dates = np.reshape(dates, [dates.shape[0]*dates.shape[1], dates.shape[2]])
+    ids = np.reshape(ids, [ids.shape[0]*ids.shape[1], ids.shape[2]])
     df_preds = pd.DataFrame(y_pred, columns=['temp_degC', 'discharge_cms'])
-    df_dates = pd.DataFrame(dates_ids, columns=['date', 'seg_id_nat'])
-    df = pd.concat([df_dates, df_preds], axis=1)
+    df_dates = pd.DataFrame(dates, columns=['date'])
+    df_ids = pd.DataFrame(ids, columns=['seg_id_nat'])
+    df = pd.concat([df_dates, df_ids, df_preds], axis=1)
     return df
 
 
@@ -80,13 +81,15 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
 
     y_pred = trained_model.predict(io_data[f'x_{data_tag}'],
                                    batch_size=num_segs)
-    y_pred_pp = post_process(y_pred, io_data[f'dates_ids_{data_tag}'])
+    y_pred_pp = post_process(y_pred, io_data[f'dates_{data_tag}'],
+                             io_data[f'ids_{data_tag}'])
 
     y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
                                io_data['y_trn_obs_mean'])
 
     y_obs_pp = post_process(io_data[f'y_{data_tag}_obs'],
-                            io_data[f'dates_ids_{data_tag}'])
+                            io_data[f'dates_ids_{data_tag}'],
+                            io_data[f'ids_{data_tag}'])
     if tag == 'trn':
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
                                   io_data['y_trn_obs_mean'])

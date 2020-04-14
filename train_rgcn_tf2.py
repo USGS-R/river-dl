@@ -3,7 +3,6 @@ import numpy as np
 import datetime
 import tensorflow as tf
 from RGCN_tf2 import RGCNModel, rmse_masked
-from data_utils import read_process_data, read_exclude_segs_file
 
 start_time = datetime.datetime.now()
 

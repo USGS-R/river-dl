@@ -1,0 +1,20 @@
+md5: 8e474ae944854c9c4b8b75069431d69c
+cmd: python prep_data.py -o data/in/prepped/ -i data/in/ -s 1980-10-01 -y 13
+wdir: ../..
+deps:
+- md5: 03a8ef2c5df7a48d7ffd3b560397a8b6
+  path: preproc_utils.py
+- md5: e67f1f2f00607697b1af127c356b8eda
+  path: data/in/uncal_sntemp_input_output.feather
+- md5: 9ab2669a8c4dcde06459f3cf897866a2
+  path: data/in/obs_temp_full.csv
+- md5: 0711466b5f8d947a2929b9cb9f85e294
+  path: data/in/obs_flow_full.csv
+- md5: 993b4c913894da3fb1665c865e65f1f7
+  path: data/in/exclude.yml
+outs:
+- md5: 675982b61f1c304d9265636eade0594c
+  path: data/in/prepped/processed_data.npz
+  cache: true
+  metric: false
+  persist: false

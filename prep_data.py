@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-from data_utils import read_exclude_segs_file, read_process_data
+from preproc_utils import read_exclude_segs_file, read_process_data
 
 # read in arguments
 parser = argparse.ArgumentParser()
@@ -9,9 +9,11 @@ parser.add_argument("-n", "--network", help='network - "full" or "subset"',
 parser.add_argument("-o", "--outdir", help='directory where the output should\
                     be written')
 parser.add_argument("-f", "--finetune_vars", help='whether to finetune on\
-                    temp, flow, or both', choices=['temp', 'flow', 'both'])
+                    temp, flow, or both', choices=['temp', 'flow', 'both'],
+                    default='both')
 parser.add_argument("-p", "--pretrain_vars", help='whether to pretrain on\
-                    temp, flow, or both', choices=['temp', 'flow', 'both'])
+                    temp, flow, or both', choices=['temp', 'flow', 'both'],
+                    default='both')
 parser.add_argument('-s', '--start_tst_date', help='date when test period \
                     starts', default='2004-09-30')
 parser.add_argument('-y', '--y_tst_year', help='number of years in test set',
@@ -53,7 +55,8 @@ data = read_process_data(in_data_dir,
                          pretrain_out_vars=pt_vars,
                          finetune_out_vars=ft_vars,
                          dist_type=dist_mat,
-                         test_start_date=args.y_tst_year,
+                         n_test_yr=args.y_tst_year,
+                         test_start_date=args.start_tst_date,
                          exclude_segs=exclude_segs)
 
-np.savez_compressed(f'{out_dir}processed_data.npz')
+np.savez_compressed(f'{out_dir}processed_data{tag}.npz', **data)

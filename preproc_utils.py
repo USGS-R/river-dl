@@ -219,11 +219,17 @@ def exclude_segments(weights, exclude_segs):
     calculation
     :return:
     """
-    for seg_grp in weights:
+    for seg_grp in exclude_segs:
         start = seg_grp.get('start_date')
+        if start:
+            start = datetime.datetime.strptime(start[0], '%Y-%m-%d')
+
         end = seg_grp.get('end_date')
-        weights.seg_tave_water.loc[exclude_segs, start:end] = 0
-        weights.seg_outflow.loc[exclude_segs, start:end] = 0
+        if end:
+            end = datetime.datetime.strptime(end[0], '%Y-%m-%d')
+
+        weights.seg_tave_water.loc[seg_grp['seg_id_nats'], start:end] = 0
+        weights.seg_outflow.loc[seg_grp['seg_id_nats'], start:end] = 0
     return weights
 
 
@@ -238,7 +244,7 @@ def create_weight_vectors(y_data, out_cols, exclude_segs):
     function
     :return: [xr dataset] dataset of weights between one and zero
     """
-    weights = y_data.copy
+    weights = y_data.copy()
     # assume all weights will be one (fully counted)
     weights.seg_tave_water.loc[:, :] = 1
     weights.seg_outflow.loc[:, :] = 1
@@ -252,8 +258,9 @@ def create_weight_vectors(y_data, out_cols, exclude_segs):
     else:
         raise ValueError('out_cols needs to be "flow", "temp", or "both"')
 
-    weights = exclude_segments(weights, exclude_segs)
-    return y_data
+    if exclude_segs:
+        weights = exclude_segments(weights, exclude_segs)
+    return weights
 
 
 def convert_batch_reshape(dataset):
@@ -390,8 +397,8 @@ def read_process_data(data_dir='data/in/', subset=True,
             'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
             'y_trn_obs_std': y_trn_obs_std.to_array().values,
             'y_trn_obs_mean': y_trn_obs_mean.to_array().values,
-            'y_pre_wgts': y_pre_weights.to_array().values,
-            'y_obs_wgts': y_obs_weights.to_array().values,
+            'y_pre_wgts': convert_batch_reshape(y_pre_weights),
+            'y_obs_wgts': convert_batch_reshape(y_obs_weights),
             'y_obs_tst': convert_batch_reshape(y_obs_test),
             'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
             'dates_trn': coord_as_reshaped_array(x_trn, 'date'),

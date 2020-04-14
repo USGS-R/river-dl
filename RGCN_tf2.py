@@ -147,8 +147,8 @@ def rmse_masked(data, y_pred):
     :param y_pred: [tensor] predicted y values
     :return: rmse (one value for each training sample)
     """
-    weights = data[:, -2]
-    y_true = data[:, :-2]
+    weights = data[:, :, -2:]
+    y_true = data[:, :, :-2]
 
     # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)
@@ -166,7 +166,7 @@ def rmse_masked(data, y_pred):
     zero_or_error = tf.where(tf.math.is_nan(y_true),
                              tf.zeros_like(y_true),
                              y_pred - y_true)
-    wgt_zero_or_err = (zero_or_error * weights)/tf.math.reduce_sum(weights, 1)
+    wgt_zero_or_err = (zero_or_error * weights)
     sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
     rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss

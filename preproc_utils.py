@@ -244,7 +244,7 @@ def create_weight_vectors(y_data, out_cols, exclude_segs):
     function
     :return: [xr dataset] dataset of weights between one and zero
     """
-    weights = y_data.copy()
+    weights = y_data.copy(deep=True)
     # assume all weights will be one (fully counted)
     weights.seg_tave_water.loc[:, :] = 1
     weights.seg_outflow.loc[:, :] = 1
@@ -386,7 +386,9 @@ def read_process_data(data_dir='data/in/', subset=True,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # scale y training data and get the mean and std
+    print(y_obs_train)
     y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_train)
+    print(y_trn_obs_std, y_trn_obs_mean)
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre)
 

@@ -12,7 +12,6 @@ learning_rate_pre = 0.005
 learning_rate_ft = 0.01
 epochs_pre = 200
 epochs_finetune = 100
-batch_offset = 1  
 hidden_size = 20
 
 
@@ -31,7 +30,7 @@ tag = args.tag
 if tag != '':
     tag = f'_{tag}'
 
-data = np.load()
+data = np.load(in_data_file)
 n_seg = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
@@ -43,7 +42,7 @@ csv_log_pre = tf.keras.callbacks.CSVLogger(f'{out_dir}pretrain_log{tag}.csv')
 
 x_trn_pre = data['x_trn_pre']
 # combine with weights to pass to loss function
-y_trn_pre = np.hstack([data['y_trn_pre'], data['y_pre_wgts']])
+y_trn_pre = np.concatenate([data['y_trn_pre'], data['y_pre_wgts']], axis=2)
 
 model.fit(x=x_trn_pre, y=y_trn_pre, epochs=epochs_pre, batch_size=n_seg,
           callbacks=[csv_log_pre])
@@ -64,7 +63,7 @@ model.compile(optimizer_ft, loss=rmse_masked)
 csv_log_ft = tf.keras.callbacks.CSVLogger(f'{out_dir}finetune_log{tag}.csv')
 
 x_trn_obs = data['x_trn']
-y_trn_obs = np.hstack(data['y_trn_obs'], data['y_obs_wgts'])
+y_trn_obs = np.concatenate([data['y_obs_trn'], data['y_obs_wgts']], axis=2)
 
 model.fit(x=x_trn_obs, y=y_trn_obs, epochs=epochs_finetune, batch_size=n_seg,
           callbacks=[csv_log_ft])

@@ -135,16 +135,6 @@ class RGCNModel(tf.keras.Model):
         return output
 
 
-def rm_zero_wgted_obs(y_true, weights):
-    """
-    make all zero-weighted observations 'nan' so they don't get counted at all 
-    in the loss calculation
-    """
-    zero_idx = weights == 0
-    y_true[zero_idx] = np.nan
-    return y_true
-
-
 def rmse_masked(data, y_pred):
     """
     Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
@@ -160,13 +150,15 @@ def rmse_masked(data, y_pred):
     weights = data[:, -2]
     y_true = data[:, :-2]
 
-    y_true = rm_zero_wgted_obs(y_true, weights)
-
     # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)
     weights = tf.convert_to_tensor(weights)
     y_true = tf.cast(y_true, y_pred.dtype)
     weights = tf.cast(weights, y_pred.dtype)
+
+    # make all zero-weighted observations 'nan' so they don't get counted at all
+    # in the loss calculation
+    y_true = tf.where(weights == 0, np.nan, y_true)
 
     # count the number of non-nans
     num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),

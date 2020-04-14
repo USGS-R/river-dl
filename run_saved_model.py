@@ -28,5 +28,5 @@ model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
 model.load_weights(f'{weights_dir}/trained_weights{run_tag}/')
 
-predict_evaluate(model, data, 'dev', num_segs, run_tag, outdir)
+predict_evaluate(model, data, 'tst', num_segs, run_tag, outdir)
 predict_evaluate(model, data, 'trn', num_segs, run_tag, outdir)

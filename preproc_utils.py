@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import yaml
 import xarray as xr
 import datetime
 from dateutil.relativedelta import relativedelta
@@ -218,8 +219,11 @@ def exclude_segments(weights, exclude_segs):
     calculation
     :return:
     """
-    weights.seg_tave_water.loc[exclude_segs, :] = 0
-    weights.seg_outflow.loc[exclude_segs, :] = 0
+    for seg_grp in weights:
+        start = seg_grp.get('start_date')
+        end = seg_grp.get('end_date')
+        weights.seg_tave_water.loc[exclude_segs, start:end] = 0
+        weights.seg_outflow.loc[exclude_segs, start:end] = 0
     return weights
 
 
@@ -307,8 +311,8 @@ def read_process_data(data_dir='data/in/', subset=True,
     "updown")
     :param test_start_date: the date to start for the test period
     :param n_test_yr: number of years to take for the test period
-    :param exclude_segs: [list] which (if any) segments to exclude from loss
-    calculation
+    :param exclude_segs: [dict] which (if any) segments to exclude from loss
+    calculation and the start (and optionally end date) to exclude
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             'x_trn': batched, input data for the training period scaled and
@@ -445,10 +449,11 @@ def process_adj_matrix(data_dir, dist_type, subset=True):
 
 def read_exclude_segs_file(exclude_file):
     """
-    read the exclude segs file. should be a file with no header and one segment
-    id per line
+    read the exclude segs file. should be a yml file with start_date and list of
+    segments to exclude
     :param exclude_file: [str] exclude segs file
     :return: [list] list of segments to exclude
     """
-    df = pd.read_csv(exclude_file, header=None)
-    return df[0].tolist()
+    with open('data/in/exclude.yml', 'r') as s:
+        d = yaml.safe_load(s)
+    return [val for key, val in d.items()]

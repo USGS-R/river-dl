@@ -5,7 +5,7 @@ from data_utils import read_exclude_segs_file, read_process_data
 # read in arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", "--network", help='network - "full" or "subset"',
-                    choices=['full', 'subset'])
+                    choices=['full', 'subset'], default='full')
 parser.add_argument("-o", "--outdir", help='directory where the output should\
                     be written')
 parser.add_argument("-f", "--finetune_vars", help='whether to finetune on\
@@ -33,7 +33,7 @@ out_dir = args.outdir
 pt_vars = args.pretrain_vars
 ft_vars = args.finetune_vars
 dist_mat = args.dist_matrix
-if args.exclued_segs_file:
+if args.exclude_segs_file:
     exclude_segs = read_exclude_segs_file(args.exclude_segs_file)
 else:
     exclude_segs = []

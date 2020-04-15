@@ -1,7 +1,6 @@
 import json
 import pandas as pd
 import numpy as np
-from RGCN import rmse_masked
 
 
 def post_process(y_pred, dates, ids):
@@ -72,7 +71,7 @@ def rmse_masked(y_true, y_pred):
     """
 
     # count the number of non-nans
-    num_y_true = np.sum(np.isnan(y_true))
+    num_y_true = np.sum(~np.isnan(y_true))
     print (num_y_true)
     zero_or_error = np.where(np.isnan(y_true),
                              0,

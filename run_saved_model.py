@@ -1,5 +1,5 @@
 import argparse
-from RGCN_tf2 import RGCNModel
+from RGCN import RGCNModel
 import numpy as np
 from postproc_utils import predict_evaluate
 

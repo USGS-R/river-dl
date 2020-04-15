@@ -1,7 +1,7 @@
 import json
 import pandas as pd
 import numpy as np
-from RGCN_tf2 import rmse_masked
+from RGCN import rmse_masked
 
 
 def post_process(y_pred, dates, ids):

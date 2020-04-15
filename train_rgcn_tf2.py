@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import datetime
 import tensorflow as tf
-from RGCN_tf2 import RGCNModel, rmse_masked
+from RGCN import RGCNModel, rmse_masked
 
 start_time = datetime.datetime.now()
 

@@ -1,5 +1,5 @@
-md5: 8e474ae944854c9c4b8b75069431d69c
-cmd: python prep_data.py -o data/in/prepped/ -i data/in/ -s 1980-10-01 -y 13
+md5: f995d8995263c12d22aa7ad8780ef8e7
+cmd: python prep_data.py -o data/in/prepped/ -i data/in/ -s 1980-10-01 -y 13 -x data/in/exclude.yml
 wdir: ../..
 deps:
 - md5: 03a8ef2c5df7a48d7ffd3b560397a8b6
@@ -13,7 +13,7 @@ deps:
 - md5: 993b4c913894da3fb1665c865e65f1f7
   path: data/in/exclude.yml
 outs:
-- md5: 675982b61f1c304d9265636eade0594c
+- md5: ae4145d23ffcd0feeed93b6812656af5
   path: data/in/prepped/processed_data.npz
   cache: true
   metric: false

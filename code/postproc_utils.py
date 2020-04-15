@@ -72,15 +72,11 @@ def rmse_masked(y_true, y_pred):
 
     # count the number of non-nans
     num_y_true = np.sum(~np.isnan(y_true))
-    print (num_y_true)
     zero_or_error = np.where(np.isnan(y_true),
                              0,
                              y_pred - y_true)
-    print(zero_or_error.shape)
     sum_squared_errors = np.sum(zero_or_error ** 2)
-    print(sum_squared_errors.shape)
     rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
-    print(rmse_loss)
     return rmse_loss
 
 
@@ -109,10 +105,8 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     y_pred_pp = post_process(y_pred, io_data[f'dates_{tag}'],
                              io_data[f'ids_{tag}'])
 
-    print(y_pred_pp)
     y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
                                io_data['y_trn_obs_mean'])
-    print(y_pred_pp)
 
     y_obs_pp = post_process(io_data[f'y_obs_{tag}'],
                             io_data[f'dates_{tag}'],

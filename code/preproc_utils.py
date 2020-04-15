@@ -386,9 +386,7 @@ def read_process_data(data_dir='data/in/', subset=True,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # scale y training data and get the mean and std
-    print(y_obs_train)
     y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_train)
-    print(y_trn_obs_std, y_trn_obs_mean)
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre)
 

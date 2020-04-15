@@ -1,4 +1,4 @@
-md5: f995d8995263c12d22aa7ad8780ef8e7
+md5: a9fce90e70c5a725ba54a5bfcb2374dc
 cmd: python prep_data.py -o data/in/prepped/ -i data/in/ -s 1980-10-01 -y 13 -x data/in/exclude.yml
 wdir: ../..
 deps:
@@ -10,10 +10,10 @@ deps:
   path: data/in/obs_temp_full.csv
 - md5: 0711466b5f8d947a2929b9cb9f85e294
   path: data/in/obs_flow_full.csv
-- md5: 993b4c913894da3fb1665c865e65f1f7
+- md5: 3bccbaada8809280645af215d7e174eb
   path: data/in/exclude.yml
 outs:
-- md5: ae4145d23ffcd0feeed93b6812656af5
+- md5: 261b383b3bebe42449c8f0972d1641d4
   path: data/in/prepped/processed_data.npz
   cache: true
   metric: false

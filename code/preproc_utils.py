@@ -374,6 +374,9 @@ def read_process_data(data_dir='data/in/', subset=True,
     x_trn, _ = sep_x_y(pt_train)
     x_tst, _ = sep_x_y(pt_test)
 
+    y_obs_train['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_obs_train['seg_outflow'])
+    y_pre['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_pre['seg_outflow'])
+
     # filter pretrain/finetune y
     y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,
                                           exclude_segs)

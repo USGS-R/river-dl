@@ -107,7 +107,11 @@ class RGCN(layers.Layer):
                                      + tf.matmul(c_graph, self.W_c_prev)
                                      + self.b_c)
 
-            out_pred = tf.matmul(h_update, self.W_out) + self.b_out
+            # out_pred = tf.matmul(h_update, self.W_out) + self.b_out
+            # dimensions = 1
+            out_pred_q = tf.matmul(h_update, self.W_out) + self.b_out
+            out_pred_t = tf.matmul(concat(h_update, out_pred_q), self.W_out2) + self.b_out2
+            out_pred = concat(out_pred_q, out_pred_t)
             out.append(out_pred)
 
             hidden_state_prev = h_update

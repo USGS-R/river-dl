@@ -54,6 +54,7 @@ def unscale_output(y_scl, y_std, y_mean):
     yscl_data = y_scl[data_cols]
     y_unscaled_data = (yscl_data * y_std) + y_mean
     y_scl[data_cols] = y_unscaled_data
+    y_scl['discharge_cms'] = np.exp(y_scl['discharge_cms'])
     return y_scl
 
 
@@ -78,7 +79,6 @@ def rmse_masked(y_true, y_pred):
     sum_squared_errors = np.sum(zero_or_error ** 2)
     rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss
-
 
 
 def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
@@ -114,7 +114,6 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     if tag == 'trn':
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
                                   io_data['y_trn_obs_mean'])
-
 
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'].values,
                             y_pred_pp['temp_degC'].values)

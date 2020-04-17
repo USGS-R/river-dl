@@ -10,8 +10,6 @@ start_time = datetime.datetime.now()
 tf.random.set_seed(23)
 learning_rate_pre = 0.005
 learning_rate_ft = 0.01
-epochs_pre = 200
-epochs_finetune = 100
 hidden_size = 20
 
 
@@ -21,8 +19,14 @@ parser.add_argument("-o", "--outdir", help='directory where the output should\
 parser.add_argument('-i', "--input_data_file", help='data file [something].npz')
 parser.add_argument("-t", "--tag", help='tag to append to end of file',
                     default='')
+parser.add_argument("-f", "--finetune_epochs", help='num finetuning epochs',
+                    default=100, type=int)
+parser.add_argument("-p", "--pretrain_epochs", help='num pretraining epochs',
+                    default=200, type=int)
 
 args = parser.parse_args()
+epochs_pre = args.pretrain_epochs
+epochs_finetune = args.finetune_epochs
 
 in_data_file = args.input_data_file
 out_dir = args.outdir

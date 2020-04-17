@@ -80,8 +80,7 @@ def rmse_masked(y_true, y_pred):
     return rmse_loss
 
 
-
-def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
+def predict_evaluate(trained_model, io_data, tag, run_tag, outdir):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -91,7 +90,6 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     y_tst, etc.
     :param tag: [str] must be 'trn' or 'tst'; whether you want to predict for
     the train or the dev period
-    :param num_segs: [int] the number of segments in the data for prediction
     :return:[none]
     """
     # evaluate training
@@ -100,6 +98,7 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     else:
         raise ValueError('tag arg needs to be "trn" or "tst"')
 
+    num_segs = io_data['dist_matrix'].shape[0]
     y_pred = trained_model.predict(io_data[f'x_{tag}'],
                                    batch_size=num_segs)
     y_pred_pp = post_process(y_pred, io_data[f'dates_{tag}'],
@@ -114,7 +113,6 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     if tag == 'trn':
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
                                   io_data['y_trn_obs_mean'])
-
 
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'].values,
                             y_pred_pp['temp_degC'].values)

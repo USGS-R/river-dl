@@ -23,7 +23,6 @@ if run_tag != '':
     run_tag = f'_{run_tag}'
 
 data = np.load(in_data_file)
-num_segs = data['dist_matrix'].shape[0]
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
 model.load_weights(f'{weights_dir}/trained_weights{run_tag}/')

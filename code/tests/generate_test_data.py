@@ -23,8 +23,8 @@ dft = pd.read_csv('../../data/in/obs_flow_subset.csv', parse_dates=['date'],
 dfq = pd.read_csv('../../data/in/obs_temp_subset.csv', parse_dates=['date'],
                   infer_datetime_format=True)
 
-start_date = '2004-10-01'
-end_date = '2006-10-01'
+start_date = '2004-09-15'
+end_date = '2006-10-15'
 segs = ['2012', '2007']
 
 dft = sel_date_segs(dft, segs, start_date, end_date)
@@ -33,4 +33,4 @@ dfs = sel_date_segs(dfs, segs, start_date, end_date)
 
 dft.to_csv('test_data/obs_temp_full.csv', index=False)
 dfq.to_csv('test_data/obs_flow_full.csv', index=False)
-dfq.to_feather('test_data/uncal_sntemp_input_output.feather')
+dfs.to_feather('test_data/uncal_sntemp_input_output.feather')

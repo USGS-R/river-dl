@@ -23,8 +23,11 @@ weights_dir = args.weights_dir
 run_tag = args.tag
 if run_tag != '':
     run_tag = f'_{run_tag}'
+
 if args.dev:
     halve = True
+else:
+    halve = False
 
 data = np.load(in_data_file)
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])

@@ -41,20 +41,23 @@ def take_first_half(df):
     return df_first_half
 
 
-def unscale_output(y_scl, y_std, y_mean):
+def unscale_output(y_scl, y_std, y_mean, logged_q=False):
     """
     unscale output data given a standard deviation and a mean value for the
     outputs
     :param y_scl: [pd dataframe] scaled output data (predicted or observed)
     :param y_std:[numpy array] array of standard deviation of variables [n_out]
     :param y_mean:[numpy array] array of variable means [n_out]
+    :param logged_q: [bool] whether the model predicted log of discharge. if
+    true, the exponent of the discharge will be executed
     :return:
     """
     data_cols = ['temp_degC', 'discharge_cms']
     yscl_data = y_scl[data_cols]
     y_unscaled_data = (yscl_data * y_std) + y_mean
     y_scl[data_cols] = y_unscaled_data
-    y_scl['discharge_cms'] = np.exp(y_scl['discharge_cms'])
+    if logged_q:
+        y_scl['discharge_cms'] = np.exp(y_scl['discharge_cms'])
     return y_scl
 
 
@@ -81,7 +84,8 @@ def rmse_masked(y_true, y_pred):
     return rmse_loss
 
 
-def predict_evaluate(trained_model, io_data, half_tst, tag, run_tag, outdir):
+def predict_evaluate(trained_model, io_data, half_tst, tag, outdir, run_tag='',
+                     logged_q=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -95,6 +99,8 @@ def predict_evaluate(trained_model, io_data, half_tst, tag, run_tag, outdir):
     the train or the dev period
     :param outdir: [str] the directory where the output data should be stored
     :param run_tag: [str] the tag to append to the output files
+    :param logged_q: [str] whether the discharge was logged in training. if True
+    the exponent of the discharge will be taken in the model unscaling
     :return:[none]
     """
     # evaluate training
@@ -110,14 +116,14 @@ def predict_evaluate(trained_model, io_data, half_tst, tag, run_tag, outdir):
                              io_data[f'ids_{tag}'])
 
     y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
-                               io_data['y_trn_obs_mean'])
+                               io_data['y_trn_obs_mean'], logged_q)
 
     y_obs_pp = post_process(io_data[f'y_obs_{tag}'],
                             io_data[f'dates_{tag}'],
                             io_data[f'ids_{tag}'])
     if tag == 'trn':
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
-                                  io_data['y_trn_obs_mean'])
+                                  io_data['y_trn_obs_mean'], logged_q)
 
     if half_tst and tag=='tst':
         y_obs_pp = take_first_half(y_obs_pp)

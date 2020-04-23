@@ -303,7 +303,7 @@ def check_if_finite(xarr):
 def read_process_data(data_dir='data/in/', subset=True,
                       pretrain_out_vars="both", finetune_out_vars="both",
                       dist_type='upstream', test_start_date='2004-09-30',
-                      n_test_yr=12, exclude_segs=None):
+                      n_test_yr=12, exclude_segs=None, log_q=False):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
@@ -324,6 +324,7 @@ def read_process_data(data_dir='data/in/', subset=True,
     :param n_test_yr: number of years to take for the test period
     :param exclude_segs: [dict] which (if any) segments to exclude from loss
     calculation and the start (and optionally end date) to exclude
+    :param log_q: whether or not to take the log of discharge in training
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             'x_trn': batched, input data for the training period scaled and
@@ -378,10 +379,12 @@ def read_process_data(data_dir='data/in/', subset=True,
     x_trn, _ = sep_x_y(pt_train)
     x_tst, _ = sep_x_y(pt_test)
 
-    y_obs_train['seg_outflow'].loc[:, :] = y_obs_train['seg_outflow'] + 1e-6
-    y_obs_train['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_obs_train['seg_outflow'])
-    y_pre['seg_outflow'].loc[:, :] = y_pre['seg_outflow'] + 1e-6
-    y_pre['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_pre['seg_outflow'])
+    if log_q:
+        y_obs_train['seg_outflow'].loc[:, :] = y_obs_train['seg_outflow'] + 1e-6
+        y_obs_train['seg_outflow'].loc[:, :] =\
+            xr.ufuncs.log(y_obs_train['seg_outflow'])
+        y_pre['seg_outflow'].loc[:, :] = y_pre['seg_outflow'] + 1e-6
+        y_pre['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_pre['seg_outflow'])
 
     # filter pretrain/finetune y
     y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,

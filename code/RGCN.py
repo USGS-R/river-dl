@@ -116,9 +116,9 @@ class RGCN(layers.Layer):
                                      + self.b_c)
 
             out_pred_q = tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
-            out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q], ax=1),
+            out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q], axis=1),
                                    self.W_out_temp) + self.b_out_temp
-            out_pred = tf.concat(out_pred_t, out_pred_q, axis=1)
+            out_pred = tf.concat([out_pred_t, out_pred_q], axis=1)
             out.append(out_pred)
 
             hidden_state_prev = h_update

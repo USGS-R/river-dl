@@ -83,6 +83,19 @@ def rmse_masked(y_true, y_pred):
     rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss
 
+  
+def nse(y_true, y_pred):
+    """
+    compute the nash-sutcliffe model efficiency coefficient
+    :param y_true:
+    :param y_pred:
+    :return:
+    """
+    q_mean = np.nanmean(y_true)
+    numerator = np.sum((y_true-y_pred)**2)
+    denominator = np.sum((y_true - q_mean)**2)
+    return 1 - (numerator/denominator)
+
 
 def predict_evaluate(trained_model, io_data, half_tst, tag, outdir, run_tag='',
                      logged_q=False):
@@ -133,8 +146,12 @@ def predict_evaluate(trained_model, io_data, half_tst, tag, outdir, run_tag='',
                             y_pred_pp['temp_degC'].values)
     rmse_flow = rmse_masked(y_obs_pp['discharge_cms'].values,
                             y_pred_pp['discharge_cms'].values)
-    metrics_data = {f'rmse_temp_{tag}{run_tag}': str(rmse_temp),
-                    f'rmse_flow_{tag}{run_tag}': str(rmse_flow)}
+    nse_temp = nse(y_obs_pp['temp_degC'].values,
+                   y_pred_pp['temp_degC'].values)
+    nse_flow = nse(y_obs_pp['discharge_cms'].values,
+                   y_pred_pp['discharge_cms'].values)
+    metrics_data = {'rmse_temp': str(rmse_temp), 'rmse_flow': str(rmse_flow),
+                    'nse_temp': str(nse_temp), 'nse_flow': str(nse_flow)}
 
     # save files
     with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:

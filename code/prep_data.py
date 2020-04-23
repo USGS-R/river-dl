@@ -27,6 +27,8 @@ parser.add_argument("-t", "--tag", help='tag to append to end of file',
                     default='')
 parser.add_argument("-x", "--exclude_segs_file", help='yml file that contains\
                     segments to exclude', default=None)
+parser.add_argument("-l", "--log_q", help='whether or not to log discharge for\
+                    training', action='store_true')
 args = parser.parse_args()
 
 in_data_dir = args.input_data_dir
@@ -35,6 +37,7 @@ out_dir = args.outdir
 pt_vars = args.pretrain_vars
 ft_vars = args.finetune_vars
 dist_mat = args.dist_matrix
+log_q = args.log_q
 if args.exclude_segs_file:
     exclude_segs = read_exclude_segs_file(args.exclude_segs_file)
 else:
@@ -57,6 +60,7 @@ data = read_process_data(in_data_dir,
                          dist_type=dist_mat,
                          n_test_yr=args.y_tst_year,
                          test_start_date=args.start_tst_date,
-                         exclude_segs=exclude_segs)
+                         exclude_segs=exclude_segs,
+                         log_q=log_q)
 
 np.savez_compressed(f'{out_dir}processed_data{tag}.npz', **data)

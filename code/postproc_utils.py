@@ -80,8 +80,20 @@ def rmse_masked(y_true, y_pred):
     return rmse_loss
 
 
+def nse(y_true, y_pred):
+    """
+    compute the nash-sutcliffe model efficiency coefficient
+    :param y_true:
+    :param y_pred:
+    :return:
+    """
+    q_mean = np.nanmean(y_true)
+    numerator = np.sum((y_true-y_pred)**2)
+    denominator = np.sum((y_true - q_mean)**2)
+    return 1 - (numerator/denominator)
 
-def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
+
+def predict_evaluate(trained_model, io_data, half_tst, tag, run_tag, outdir):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -89,9 +101,12 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     :param trained_model:[tf model] model with trained weights loaded
     :param io_data:[dict] dictionary with all the io data for x_trn, y_trn,
     y_tst, etc.
+    :param half_tst: [bool] whether or not to halve the testing data so some
+    can be held out
     :param tag: [str] must be 'trn' or 'tst'; whether you want to predict for
     the train or the dev period
-    :param num_segs: [int] the number of segments in the data for prediction
+    :param outdir: [str] the directory where the output data should be stored
+    :param run_tag: [str] the tag to append to the output files
     :return:[none]
     """
     # evaluate training
@@ -100,6 +115,7 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
     else:
         raise ValueError('tag arg needs to be "trn" or "tst"')
 
+    num_segs = io_data['dist_matrix'].shape[0]
     y_pred = trained_model.predict(io_data[f'x_{tag}'],
                                    batch_size=num_segs)
     y_pred_pp = post_process(y_pred, io_data[f'dates_{tag}'],
@@ -115,13 +131,20 @@ def predict_evaluate(trained_model, io_data, tag, num_segs, run_tag, outdir):
         y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
                                   io_data['y_trn_obs_mean'])
 
+    if half_tst and tag=='tst':
+        y_obs_pp = take_first_half(y_obs_pp)
+        y_pred_pp = take_first_half(y_pred_pp)
 
     rmse_temp = rmse_masked(y_obs_pp['temp_degC'].values,
                             y_pred_pp['temp_degC'].values)
     rmse_flow = rmse_masked(y_obs_pp['discharge_cms'].values,
                             y_pred_pp['discharge_cms'].values)
-    metrics_data = {f'rmse_temp_{tag}{run_tag}': str(rmse_temp),
-                    f'rmse_flow_{tag}{run_tag}': str(rmse_flow)}
+    nse_temp = nse(y_obs_pp['temp_degC'].values,
+                   y_pred_pp['temp_degC'].values)
+    nse_flow = nse(y_obs_pp['discharge_cms'].values,
+                   y_pred_pp['discharge_cms'].values)
+    metrics_data = {'rmse_temp': str(rmse_temp), 'rmse_flow': str(rmse_flow),
+                    'nse_temp': str(nse_temp), 'nse_flow': str(nse_flow)}
 
     # save files
     with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:

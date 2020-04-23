@@ -12,7 +12,7 @@ import numpy as np
 
 
 class RGCN(layers.Layer):
-    def __init__(self, hidden_size, pred_out_size, A):
+    def __init__(self, hidden_size, pred_out_size, A, rand_seed=None):
         """
 
         :param hidden_size: [int] the number of hidden units
@@ -30,7 +30,8 @@ class RGCN(layers.Layer):
         self.lstm = tf.keras.layers.LSTMCell(hidden_size)
 
         ### set up the weights ###
-        w_initializer = tf.random_normal_initializer(stddev=0.02)
+        w_initializer = tf.random_normal_initializer(stddev=0.02,
+                                                     seed=rand_seed)
 
         # was Wg1
         self.W_graph_h = self.add_weight(shape=[hidden_size, hidden_size],
@@ -122,7 +123,7 @@ class RGCN(layers.Layer):
 
 
 class RGCNModel(tf.keras.Model):
-    def __init__(self, hidden_size, pred_out_size, A):
+    def __init__(self, hidden_size, pred_out_size, A, rand_seed=None):
         """
         :param hidden_size: [int] the number of hidden units
         :param pred_out_size: [int] the number of outputs to produce in
@@ -132,7 +133,7 @@ class RGCNModel(tf.keras.Model):
         :param A: [numpy array] adjacency matrix
         """
         super().__init__()
-        self.rgcn_layer = RGCN(hidden_size, pred_out_size, A)
+        self.rgcn_layer = RGCN(hidden_size, pred_out_size, A, rand_seed)
 
     def call(self, inputs, **kwargs):
         output = self.rgcn_layer(inputs)

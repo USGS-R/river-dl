@@ -73,12 +73,19 @@ class RGCN(layers.Layer):
                                    name='b_c')
 
         # was W2
-        self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
-                                     initializer=w_initializer,
-                                     name='W_out')
+        self.W_out_flow = self.add_weight(shape=[hidden_size, 1],
+                                          initializer=w_initializer,
+                                          name='W_out')
         # was b2
-        self.b_out = self.add_weight(shape=[pred_out_size], initializer='zeros',
-                                     name='b_out')
+        self.b_out_flow = self.add_weight(shape=[1], initializer='zeros',
+                                          name='b_out')
+
+        self.W_out_temp = self.add_weight(shape=[hidden_size+1, 1],
+                                          initializer=w_initializer,
+                                          name='W_out')
+
+        self.b_out_temp = self.add_weight(shape=[1], initializer='zeros',
+                                          name='b_out')
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -108,11 +115,10 @@ class RGCN(layers.Layer):
                                      + tf.matmul(c_graph, self.W_c_prev)
                                      + self.b_c)
 
-            # out_pred = tf.matmul(h_update, self.W_out) + self.b_out
-            # dimensions = 1
-            out_pred_q = tf.matmul(h_update, self.W_out) + self.b_out
-            out_pred_t = tf.matmul(concat(h_update, out_pred_q), self.W_out2) + self.b_out2
-            out_pred = concat(out_pred_q, out_pred_t)
+            out_pred_q = tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
+            out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q], ax=1),
+                                   self.W_out_temp) + self.b_out_temp
+            out_pred = tf.concat(out_pred_t, out_pred_q, axis=1)
             out.append(out_pred)
 
             hidden_state_prev = h_update

@@ -13,7 +13,7 @@ parser.add_argument("-d", "--dev", help='whether to only do the analysis on \
                      only half the tst  period', action='store_true')
 parser.add_argument('-i', "--input_data_file", help='data file [something].npz')
 parser.add_argument('-l', "--logged_q", help='whether the model was trained to\
-                    predict the log of discharge')
+                    predict the log of discharge', action='store_true')
 parser.add_argument("-w", "--weights_dir", help='directory where\
                     trained_weights_{tag}/ is')
 args = parser.parse_args()

@@ -1,7 +1,7 @@
 import argparse
 from RGCN import RGCNModel
 import numpy as np
-from postproc_utils import predict_evaluate
+from postproc_utils import predict
 
 
 parser = argparse.ArgumentParser()

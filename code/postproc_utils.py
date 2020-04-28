@@ -73,7 +73,6 @@ def rmse_masked(y_true, y_pred):
     :param y_pred: [tensor] predicted y values
     :return: rmse (one value for each training sample)
     """
-
     # count the number of non-nans
     num_y_true = np.sum(~np.isnan(y_true))
     zero_or_error = np.where(np.isnan(y_true),
@@ -92,13 +91,13 @@ def nse(y_true, y_pred):
     :return:
     """
     q_mean = np.nanmean(y_true)
-    numerator = np.sum((y_true-y_pred)**2)
-    denominator = np.sum((y_true - q_mean)**2)
+    numerator = np.nansum((y_true-y_pred)**2)
+    denominator = np.nansum((y_true - q_mean)**2)
     return 1 - (numerator/denominator)
 
 
-def predict_evaluate(trained_model, io_data, half_tst, tag, outdir, run_tag='',
-                     logged_q=False):
+def predict(trained_model, io_data, half_tst, tag, outdir, run_tag='',
+            logged_q=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -131,29 +130,41 @@ def predict_evaluate(trained_model, io_data, half_tst, tag, outdir, run_tag='',
     y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
                                io_data['y_trn_obs_mean'], logged_q)
 
-    y_obs_pp = post_process(io_data[f'y_obs_{tag}'],
-                            io_data[f'dates_{tag}'],
-                            io_data[f'ids_{tag}'])
-    if tag == 'trn':
-        y_obs_pp = unscale_output(y_obs_pp, io_data['y_trn_obs_std'],
-                                  io_data['y_trn_obs_mean'], logged_q)
-
-    if half_tst and tag=='tst':
-        y_obs_pp = take_first_half(y_obs_pp)
+    if half_tst and tag == 'tst':
         y_pred_pp = take_first_half(y_pred_pp)
 
-    rmse_temp = rmse_masked(y_obs_pp['temp_degC'].values,
-                            y_pred_pp['temp_degC'].values)
-    rmse_flow = rmse_masked(y_obs_pp['discharge_cms'].values,
-                            y_pred_pp['discharge_cms'].values)
-    nse_temp = nse(y_obs_pp['temp_degC'].values,
-                   y_pred_pp['temp_degC'].values)
-    nse_flow = nse(y_obs_pp['discharge_cms'].values,
-                   y_pred_pp['discharge_cms'].values)
+    y_pred_pp.to_feather(f'{outdir}{tag}_preds{run_tag}.feather')
+
+
+def calc_metrics(pred_file, obs_file, outdir, tag, run_tag):
+    pred_data = pd.read_feather(pred_file)
+    pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
+    obs_data = pd.read_feather(obs_file)
+    obs_data.set_index(['date', 'seg_id_nat'], inplace=True)
+    data = pred_data.join(obs_data, lsuffix='_preds', rsuffix='_obs')
+
+    rmse_temp = rmse_masked(data['temp_degC_obs'].values,
+                            data['temp_degC_preds'].values)
+
+    obs_mont = obs_data.query("seg_id_nat == 1659")
+    obs_mont.reset_index(1, inplace=True)
+    obs_mont = obs_mont.loc['2006']
+    flow_mont = data.query("seg_id_nat == 1659")
+    flow_mont.reset_index(1, inplace=True)
+    flow_mont = flow_mont.loc['2006']
+    rmse_flow = rmse_masked(data['discharge_cms_obs'].values,
+                            data['discharge_cms_preds'].values)
+
+    nse_temp = nse(data['temp_degC_obs'].values,
+                   data['temp_degC_preds'].values)
+    nse_flow = nse(data['discharge_cms_obs'].values,
+                   data['discharge_cms_preds'].values)
+
     metrics_data = {'rmse_temp': str(rmse_temp), 'rmse_flow': str(rmse_flow),
                     'nse_temp': str(nse_temp), 'nse_flow': str(nse_flow)}
 
     # save files
     with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:
         json.dump(metrics_data, f)
-    y_pred_pp.to_feather(f'{outdir}{tag}_preds{run_tag}.feather')
+
+# calc_metrics('../../experiments/A/Av1/A4/tst_preds.feather', '../../data/obs.feather', '', '', '')

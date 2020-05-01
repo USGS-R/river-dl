@@ -136,35 +136,50 @@ def predict(trained_model, io_data, half_tst, tag, outdir, run_tag='',
     y_pred_pp.to_feather(f'{outdir}{tag}_preds{run_tag}.feather')
 
 
-def calc_metrics(pred_file, obs_file, outdir, tag, run_tag):
+def fmt_preds_obs(pred_file, obs_file, variable):
     pred_data = pd.read_feather(pred_file)
     pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
-    obs_data = pd.read_feather(obs_file)
-    obs_data.set_index(['date', 'seg_id_nat'], inplace=True)
-    data = pred_data.join(obs_data, lsuffix='_preds', rsuffix='_obs')
+    obs = pd.read_feather(obs_file).set_index(['date', 'seg_id_nat'])
+    obs.columns = ['obs']
+    preds = pred_data[[variable]]
+    preds.columns = ['pred']
+    combined = preds.join(obs)
+    return combined
 
-    rmse_temp = rmse_masked(data['temp_degC_obs'].values,
-                            data['temp_degC_preds'].values)
 
-    obs_mont = obs_data.query("seg_id_nat == 1659")
-    obs_mont.reset_index(1, inplace=True)
-    obs_mont = obs_mont.loc['2006']
-    flow_mont = data.query("seg_id_nat == 1659")
-    flow_mont.reset_index(1, inplace=True)
-    flow_mont = flow_mont.loc['2006']
-    rmse_flow = rmse_masked(data['discharge_cms_obs'].values,
-                            data['discharge_cms_preds'].values)
+def calc_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag, run_tag):
+    temp_data = fmt_preds_obs(pred_file, obs_file_temp, 'temp_degC')
+    flow_data = fmt_preds_obs(pred_file, obs_file_flow, 'discharge_cms')
+    temp_data.reset_index().to_feather('fmt_temp.feather')
 
-    nse_temp = nse(data['temp_degC_obs'].values,
-                   data['temp_degC_preds'].values)
-    nse_flow = nse(data['discharge_cms_obs'].values,
-                   data['discharge_cms_preds'].values)
+    rmse_temp = rmse_masked(temp_data['obs'], temp_data['pred'])
+    rmse_flow = rmse_masked(flow_data['obs'], flow_data['pred'])
+    nse_temp = nse(temp_data['obs'], temp_data['pred'])
+    nse_flow = nse(flow_data['obs'], flow_data['pred'])
 
     metrics_data = {'rmse_temp': str(rmse_temp), 'rmse_flow': str(rmse_flow),
                     'nse_temp': str(nse_temp), 'nse_flow': str(nse_flow)}
-
     # save files
     with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:
         json.dump(metrics_data, f)
 
-# calc_metrics('../../experiments/A/Av1/A4/tst_preds.feather', '../../data/obs.feather', '', '', '')
+
+def calc_reach_specific_metrics(df):
+    if df['obs'].count() > 10:
+        reach_rmse = rmse_masked(df['obs'], df['pred'])
+        reach_nse = nse(df['obs'].values, df['pred'].values)
+        return pd.Series(dict(rmse=reach_rmse, nse=reach_nse))
+    else:
+        return pd.Series(dict(rmse=np.nan, nse=np.nan))
+
+
+def reach_specific_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag,
+                           run_tag):
+    temp_data = fmt_preds_obs(pred_file, obs_file_temp, 'temp_degC')
+    flow_data = fmt_preds_obs(pred_file, obs_file_flow, 'discharge_cms')
+    reach_metrics_temp = temp_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()
+    reach_metrics_flow = flow_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()
+    reach_metrics_temp.to_feather(f'{outdir}{tag}_temp_reach_metrics{run_tag}.feather')
+    reach_metrics_flow.to_feather(f'{outdir}{tag}_flow_reach_metrics{run_tag}.feather')
+#
+# calc_metrics('../../experiments/A/Av1/A4/tst_preds.feather', '../../data/obs_temp.feather', '../../data/obs_flow.feather', '', '', '')

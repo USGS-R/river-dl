@@ -233,7 +233,39 @@ def exclude_segments(weights, exclude_segs):
     return weights
 
 
-def create_weight_vectors(y_data, out_cols, exclude_segs):
+def initialize_weights_1(y_data):
+    """
+    initialize all weights as ones. 
+    :param y_data:[xr dataset] y data. this is used to get the dimensions
+    correct
+    """
+    weights = y_data.copy(deep=True)
+    # assume all weights will be one (fully counted)
+    weights.seg_tave_water.loc[:, :] = 1
+    weights.seg_outflow.loc[:, :] = 1
+    return weights
+
+
+def change_weights_by_outcols(weights, outcols):
+    """
+    modify the weights by the outcolumns
+    :param weights:[xr dataset] weights
+    :param outcols:[str] which columns you will be looking at. should be
+    'temp', 'flow', or 'both'
+    :returns: [xr dataset] modified weights
+    """
+    if out_cols == "both":
+        pass
+    elif out_cols == 'temp':
+        weights.seg_outflow.loc[:, :] = 0
+    elif out_cols == 'flow':
+        weights.seg_tave_water.loc[:, :] = 0
+    else:
+        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
+    return weights
+
+
+def create_weight_vectors(y_data, out_cols, exclude_segs, pretrain=False):
     """
     filter out either flow, temperature, or neither in the pre-training and 
     finetune y data
@@ -244,23 +276,15 @@ def create_weight_vectors(y_data, out_cols, exclude_segs):
     function
     :return: [xr dataset] dataset of weights between one and zero
     """
-    weights = y_data.copy(deep=True)
-    # assume all weights will be one (fully counted)
-    weights.seg_tave_water.loc[:, :] = 1
-    weights.seg_outflow.loc[:, :] = 1
+    initial_weights = initialize_weights_1(y_data)
 
-    if out_cols == "both":
-        pass
-    elif out_cols == 'temp':
-        weights.seg_outflow.loc[:, :] = 0
-    elif out_cols == 'flow':
-        weights.seg_tave_water.loc[:, :] = 0
+    if pretrain:
+        return initial_weights
     else:
-        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
-
-    if exclude_segs:
-        weights = exclude_segments(weights, exclude_segs)
-    return weights
+        weights = change_weights_by_outcols(initial_weights, out_cols)
+        if exclude_segs:
+            weights = exclude_segments(weights, exclude_segs)
+        return weights
 
 
 def convert_batch_reshape(dataset):
@@ -388,7 +412,7 @@ def read_process_data(data_dir='data/in/', subset=True,
     # filter pretrain/finetune y
     exclude_segs = read_exclude_segs_file(exclude_file)
     y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,
-                                          exclude_segs)
+                                          exclude_segs, pretrain=True)
     y_obs_weights = create_weight_vectors(y_obs_train, finetune_out_vars,
                                           exclude_segs)
 

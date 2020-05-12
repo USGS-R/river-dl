@@ -10,14 +10,14 @@ def post_process(y_pred, dates, ids):
     :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
     :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]
     :return:[pd dataframe] df with cols
-    ['date', 'seg_id_nat', 'temp_degC', 'discharge_cms]
+    ['date', 'seg_id_nat', 'temp_c', 'discharge_cms]
     """
     y_pred = np.reshape(y_pred, [y_pred.shape[0]*y_pred.shape[1],
                                  y_pred.shape[2]])
 
     dates = np.reshape(dates, [dates.shape[0]*dates.shape[1], dates.shape[2]])
     ids = np.reshape(ids, [ids.shape[0]*ids.shape[1], ids.shape[2]])
-    df_preds = pd.DataFrame(y_pred, columns=['temp_degC', 'discharge_cms'])
+    df_preds = pd.DataFrame(y_pred, columns=['temp_c', 'discharge_cms'])
     df_dates = pd.DataFrame(dates, columns=['date'])
     df_ids = pd.DataFrame(ids, columns=['seg_id_nat'])
     df = pd.concat([df_dates, df_ids, df_preds], axis=1)
@@ -29,7 +29,7 @@ def take_first_half(df):
     filter out the second half of the dates in the predictions. this is to
     retain a "test" set of the i/o data for evaluation
     :param df:[pd dataframe] df of predictions or observations cols ['date',
-    'seg_id_nat', 'temp_degC', 'discharge_cms']
+    'seg_id_nat', 'temp_c', 'discharge_cms']
     :return: [pd dataframe] same cols as input, but only the first have of dates
     """
     df.set_index('date', inplace=True)
@@ -52,7 +52,7 @@ def unscale_output(y_scl, y_std, y_mean, logged_q=False):
     true, the exponent of the discharge will be executed
     :return:
     """
-    data_cols = ['temp_degC', 'discharge_cms']
+    data_cols = ['temp_c', 'discharge_cms']
     yscl_data = y_scl[data_cols]
     y_unscaled_data = (yscl_data * y_std) + y_mean
     y_scl[data_cols] = y_unscaled_data
@@ -137,9 +137,18 @@ def predict(trained_model, io_data, half_tst, tag, outdir, run_tag='',
 
 
 def fmt_preds_obs(pred_file, obs_file, variable):
+    """
+    combine predictions and observations in one dataframe
+    :param pred_file:[str] filepath to the predictions file 
+    :param obs_file:[str] filepath to the observations file
+    :param variable: [str] variable (either 'discharge_cms' or 'temp_c')
+    """
     pred_data = pd.read_feather(pred_file)
     pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
-    obs = pd.read_feather(obs_file).set_index(['date', 'seg_id_nat'])
+    obs = pd.read_csv(obs_file, parse_dates=['date'],
+                      infer_datetime_format=True,
+                      index_col=['date', 'seg_id_nat'])
+    obs = obs[[variable]]
     obs.columns = ['obs']
     preds = pred_data[[variable]]
     preds.columns = ['pred']
@@ -148,7 +157,7 @@ def fmt_preds_obs(pred_file, obs_file, variable):
 
 
 def calc_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag, run_tag):
-    temp_data = fmt_preds_obs(pred_file, obs_file_temp, 'temp_degC')
+    temp_data = fmt_preds_obs(pred_file, obs_file_temp, 'temp_c')
     flow_data = fmt_preds_obs(pred_file, obs_file_flow, 'discharge_cms')
     temp_data.reset_index().to_feather('fmt_temp.feather')
 
@@ -175,7 +184,7 @@ def calc_reach_specific_metrics(df):
 
 def reach_specific_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag,
                            run_tag):
-    temp_data = fmt_preds_obs(pred_file, obs_file_temp, 'temp_degC')
+    temp_data = fmt_preds_obs(pred_file, obs_file_temp, 'temp_c')
     flow_data = fmt_preds_obs(pred_file, obs_file_flow, 'discharge_cms')
     reach_metrics_temp = temp_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()
     reach_metrics_flow = flow_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()

@@ -194,8 +194,8 @@ def read_multiple_obs(obs_files, x_data):
         ds = read_format_data(filename)
         obs.append(ds)
     obs = xr.merge(obs, join='left')
-    obs = obs[['temp_C', 'discharge_cms']]
-    obs = obs.rename({'temp_C': 'seg_tave_water',
+    obs = obs[['temp_c', 'discharge_cms']]
+    obs = obs.rename({'temp_c': 'seg_tave_water',
                       'discharge_cms': 'seg_outflow'})
     return obs
 
@@ -303,7 +303,7 @@ def check_if_finite(xarr):
 def read_process_data(data_dir='data/in/', subset=True,
                       pretrain_out_vars="both", finetune_out_vars="both",
                       dist_type='upstream', test_start_date='2004-09-30',
-                      n_test_yr=12, exclude_segs=None, log_q=False):
+                      n_test_yr=12, exclude_file=None, log_q=False):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
@@ -322,8 +322,7 @@ def read_process_data(data_dir='data/in/', subset=True,
     "updown")
     :param test_start_date: the date to start for the test period
     :param n_test_yr: number of years to take for the test period
-    :param exclude_segs: [dict] which (if any) segments to exclude from loss
-    calculation and the start (and optionally end date) to exclude
+    :param exclude_file: [str] path to exclude file 
     :param log_q: whether or not to take the log of discharge in training
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
@@ -387,6 +386,7 @@ def read_process_data(data_dir='data/in/', subset=True,
         y_pre['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_pre['seg_outflow'])
 
     # filter pretrain/finetune y
+    exclude_segs = read_exclude_segs_file(exclude_file)
     y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,
                                           exclude_segs)
     y_obs_weights = create_weight_vectors(y_obs_train, finetune_out_vars,
@@ -474,10 +474,32 @@ def read_exclude_segs_file(exclude_file):
     """
     read the exclude segs file. should be a yml file with start_date and list of
     segments to exclude
+    --
+    example exclude file:
+
+    group_after_2017:
+        start_date:
+            - "2017-10-01"
+        seg_id_nats:
+            - 1556
+            - 1569
+    group_2018_water_year:
+        start_date:
+            - "2017-10-01"
+        end_date:
+            - "2018-10-01"
+        seg_id_nats:
+            - 1653
+    group_all_time:
+        seg_id_nats:
+            - 1806
+            - 2030
+
+    --
     :param exclude_file: [str] exclude segs file
     :return: [list] list of segments to exclude
     """
-    with open('data/in/exclude.yml', 'r') as s:
+    with open(exclude_file, 'r') as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]
 

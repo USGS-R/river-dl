@@ -38,10 +38,7 @@ pt_vars = args.pretrain_vars
 ft_vars = args.finetune_vars
 dist_mat = args.dist_matrix
 log_q = args.log_q
-if args.exclude_segs_file:
-    exclude_segs = read_exclude_segs_file(args.exclude_segs_file)
-else:
-    exclude_segs = []
+exclude_file = args.exclude_segs_file
 tag = args.tag
 if tag != '':
     tag = f'_{tag}'
@@ -60,7 +57,7 @@ data = read_process_data(in_data_dir,
                          dist_type=dist_mat,
                          n_test_yr=args.y_tst_year,
                          test_start_date=args.start_tst_date,
-                         exclude_segs=exclude_segs,
+                         exclude_file=exclude_file,
                          log_q=log_q)
 
 np.savez_compressed(f'{out_dir}processed_data{tag}.npz', **data)

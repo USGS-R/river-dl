@@ -1,4 +1,5 @@
 import argparse
+import pyarrow
 from RGCN import RGCNModel
 import numpy as np
 from postproc_utils import predict
@@ -33,5 +34,5 @@ model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
 model.load_weights(f'{weights_dir}/trained_weights{run_tag}/')
 
-predict_evaluate(model, data, halve, 'tst', outdir, run_tag, logged_q)
-predict_evaluate(model, data, halve, 'trn', outdir, run_tag, logged_q)
+predict(model, data, halve, 'tst', outdir, run_tag, logged_q)
+predict(model, data, halve, 'trn', outdir, run_tag, logged_q)

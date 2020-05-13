@@ -9,7 +9,6 @@ start_time = datetime.datetime.now()
 # Declare constants ######
 learning_rate_pre = 0.005
 learning_rate_ft = 0.01
-hidden_size = 20
 
 
 parser = argparse.ArgumentParser()
@@ -23,6 +22,9 @@ parser.add_argument("-f", "--finetune_epochs", help='num finetuning epochs',
 parser.add_argument("-p", "--pretrain_epochs", help='num pretraining epochs',
                     default=200, type=int)
 parser.add_argument("-s", "--seed", help='random seed', type=int)
+parser.add_argument("-u", "--hidden_units", help='number of hidden units',
+                    type=int)
+
 
 args = parser.parse_args()
 epochs_pre = args.pretrain_epochs
@@ -38,6 +40,7 @@ out_dir = args.outdir
 tag = args.tag
 if tag != '':
     tag = f'_{tag}'
+hidden_size = args.hidden_units
 
 data = np.load(in_data_file)
 n_seg = data['dist_matrix'].shape[0]

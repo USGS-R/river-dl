@@ -246,7 +246,7 @@ def initialize_weights_1(y_data):
     return weights
 
 
-def change_weights_by_outcols(weights, outcols):
+def change_weights_by_outcols(weights, out_cols):
     """
     modify the weights by the outcolumns
     :param weights:[xr dataset] weights
@@ -410,7 +410,10 @@ def read_process_data(data_dir='data/in/', subset=True,
         y_pre['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_pre['seg_outflow'])
 
     # filter pretrain/finetune y
-    exclude_segs = read_exclude_segs_file(exclude_file)
+    if exclude_file:
+        exclude_segs = read_exclude_segs_file(exclude_file)
+    else:
+        exclude_segs = None
     y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,
                                           exclude_segs, pretrain=True)
     y_obs_weights = create_weight_vectors(y_obs_train, finetune_out_vars,

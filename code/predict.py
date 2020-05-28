@@ -17,9 +17,11 @@ parser.add_argument('-l', "--logged_q", help='whether the model was trained to\
                     predict the log of discharge', action='store_true')
 parser.add_argument("-w", "--weights_dir", help='directory where\
                     trained_weights_{tag}/ is')
+parser.add_argument("-u", "--hidden_units", help='number of hidden units',
+                    type=int)
 args = parser.parse_args()
 
-hidden_size = 20
+hidden_size = args.hidden_units
 in_data_file = args.input_data_file
 outdir = args.outdir
 weights_dir = args.weights_dir

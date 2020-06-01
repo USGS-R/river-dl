@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 import numpy as np
 import yaml
@@ -373,13 +374,15 @@ def read_process_data(data_dir='data/in/', subset=True,
                             data [n_yrs, n_seg, len_seq, 2]
     """
     if subset:
-        pretrain_file = f'{data_dir}uncal_sntemp_input_output_subset.feather'
-        obs_files = [f'{data_dir}obs_temp_subset.csv',
-                     f'{data_dir}obs_flow_subset.csv']
+        pretrain_file = os.path.join(
+            data_dir, f'uncal_sntemp_input_output_subset.feather')
+        obs_files = [os.path.join(data_dir, f'obs_temp_subset.csv'),
+                     os.path.join(data_dir, f'obs_flow_subset.csv')]
     else:
-        pretrain_file = f'{data_dir}uncal_sntemp_input_output.feather'
-        obs_files = [f'{data_dir}obs_temp_full.csv',
-                     f'{data_dir}obs_flow_full.csv']
+        pretrain_file = os.path.join(data_dir,
+                                     f'uncal_sntemp_input_output.feather')
+        obs_files = [os.path.join(data_dir, f'obs_temp_full.csv'),
+                     os.path.join(data_dir, f'obs_flow_full.csv')]
 
     # read, y_pretrain
     ds_pre = read_format_data(pretrain_file)
@@ -474,9 +477,9 @@ def process_adj_matrix(data_dir, dist_type, subset=True):
     :return: [numpy array] processed adjacency matrix
     """
     if subset:
-        data_file = f'{data_dir}distance_matrix_subset.npz'
+        data_file = os.path.join(data_dir, f'distance_matrix_subset.npz')
     else:
-        data_file = f'{data_dir}distance_matrix.npz'
+        data_file = os.path.join(data_dir, f'distance_matrix.npz')
     adj_matrices = np.load(data_file)
     adj = adj_matrices[dist_type]
     adj = sort_dist_matrix(adj, adj_matrices['rowcolnames'])

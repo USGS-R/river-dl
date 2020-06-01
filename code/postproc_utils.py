@@ -1,3 +1,4 @@
+import os
 import json
 import pandas as pd
 import numpy as np
@@ -133,7 +134,7 @@ def predict(trained_model, io_data, half_tst, tag, outdir, run_tag='',
     if half_tst and tag == 'tst':
         y_pred_pp = take_first_half(y_pred_pp)
 
-    y_pred_pp.to_feather(f'{outdir}{tag}_preds{run_tag}.feather')
+    y_pred_pp.to_feather(os.path.join(outdir, f'{tag}_preds{run_tag}.feather'))
 
 
 def fmt_preds_obs(pred_file, obs_file, variable):
@@ -169,7 +170,7 @@ def calc_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag, run_tag):
     metrics_data = {'rmse_temp': str(rmse_temp), 'rmse_flow': str(rmse_flow),
                     'nse_temp': str(nse_temp), 'nse_flow': str(nse_flow)}
     # save files
-    with open(f'{outdir}{tag}_metrics{run_tag}.json', 'w') as f:
+    with open(os.path.join(outdir, f'{tag}_metrics{run_tag}.json', 'w')) as f:
         json.dump(metrics_data, f)
 
 
@@ -188,7 +189,7 @@ def reach_specific_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag,
     flow_data = fmt_preds_obs(pred_file, obs_file_flow, 'discharge_cms')
     reach_metrics_temp = temp_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()
     reach_metrics_flow = flow_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()
-    reach_metrics_temp.to_feather(f'{outdir}{tag}_temp_reach_metrics{run_tag}.feather')
-    reach_metrics_flow.to_feather(f'{outdir}{tag}_flow_reach_metrics{run_tag}.feather')
+    reach_metrics_temp.to_feather(os.path.join(outdir, f'{tag}_temp_reach_metrics{run_tag}.feather'))
+    reach_metrics_flow.to_feather(os.path.join(outdir, f'{tag}_flow_reach_metrics{run_tag}.feather'))
 #
 # calc_metrics('../../experiments/A/Av1/A4/tst_preds.feather', '../../data/obs_temp.feather', '../../data/obs_flow.feather', '', '', '')

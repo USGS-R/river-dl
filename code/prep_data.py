@@ -1,6 +1,7 @@
+import os
 import argparse
 import numpy as np
-from preproc_utils import read_exclude_segs_file, read_process_data
+from preproc_utils import read_process_data
 
 # read in arguments
 parser = argparse.ArgumentParser()
@@ -60,4 +61,4 @@ data = read_process_data(in_data_dir,
                          exclude_file=exclude_file,
                          log_q=log_q)
 
-np.savez_compressed(f'{out_dir}processed_data{tag}.npz', **data)
+np.savez_compressed(os.path.join(out_dir, f'processed_data{tag}.npz'), **data)

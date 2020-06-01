@@ -1,3 +1,4 @@
+import os
 import argparse
 import pyarrow
 from RGCN import RGCNModel
@@ -34,7 +35,7 @@ if run_tag != '':
 data = np.load(in_data_file)
 model = RGCNModel(hidden_size, 2, A=data['dist_matrix'])
 
-model.load_weights(f'{weights_dir}/trained_weights{run_tag}/')
+model.load_weights(os.path.join(weights_dir, f'/trained_weights{run_tag}/'))
 
 predict(model, data, halve, 'tst', outdir, run_tag, logged_q)
 predict(model, data, halve, 'trn', outdir, run_tag, logged_q)

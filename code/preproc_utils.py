@@ -276,25 +276,6 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def change_weights_by_outcols(weights, out_cols):
-    """
-    modify the weights by the outcolumns
-    :param weights:[xr dataset] weights
-    :param outcols:[str] which columns you will be looking at. should be
-    'temp', 'flow', or 'both'
-    :returns: [xr dataset] modified weights
-    """
-    if out_cols == "both":
-        pass
-    elif out_cols == 'temp':
-        weights.seg_outflow.loc[:, :] = 0
-    elif out_cols == 'flow':
-        weights.seg_tave_water.loc[:, :] = 0
-    else:
-        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
-    return weights
-
-
 def create_pretrain_weights(y_pre_data):
     """
     create pretrain weights with the same shape as the pretrain data with all
@@ -352,8 +333,8 @@ def create_finetune_weights_data(y_pre_data, y_trn_data, exclude_segs):
     """
     ft_wgts, ft_data = mask_ft_wgts_data(y_pre_data, y_trn_data)
     if exclude_segs:
-        weights = exclude_segments(ft_wgts, exclude_segs)
-    return weights
+        ft_wgts = exclude_segments(ft_wgts, exclude_segs)
+    return ft_wgts
 
 
 def convert_batch_reshape(dataset):
@@ -596,16 +577,13 @@ def read_exclude_segs_file(exclude_file):
     example exclude file:
 
     group_after_2017:
-        start_date:
-            - "2017-10-01"
+        start_date: "2017-10-01"
         seg_id_nats:
             - 1556
             - 1569
     group_2018_water_year:
-        start_date:
-            - "2017-10-01"
-        end_date:
-            - "2018-10-01"
+        start_date: "2017-10-01"
+        end_date: "2018-10-01"
         seg_id_nats:
             - 1653
     group_all_time:
@@ -615,7 +593,8 @@ def read_exclude_segs_file(exclude_file):
 
     --
     :param exclude_file: [str] exclude segs file
-    :return: [list] list of segments to exclude
+    :return: [list] list of dictionaries of segments to exclude. dict keys must
+    have 'seg_id_nats' and may also have 'start_date' and 'end_date'
     """
     with open(exclude_file, 'r') as s:
         d = yaml.safe_load(s)

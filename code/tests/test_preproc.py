@@ -49,13 +49,13 @@ def test_weight_creation():
 
 
 def test_read_exclude():
-    exclude_file = 'test_data/exclude.yml'
+    exclude_file = 'test_data/exclude_2007.yml'
     ex0 = preproc_utils.read_exclude_segs_file(exclude_file)
     assert ex0 == [{'seg_id_nats': [2007]}]
     exclude_file = 'test_data/exclude1.yml'
     ex1 = preproc_utils.read_exclude_segs_file(exclude_file)
-    assert ex1 == [{'seg_id_nats': [2007], 'start_date': '2005-09-15'},
-                   {'seg_id_nats': [2012], 'end_date': '2005-09-15'}]
+    assert ex1 == [{'seg_id_nats': [2007], 'start_date': '2005-03-15'},
+                   {'seg_id_nats': [2012], 'end_date': '2005-03-15'}]
 
 
 class PreppedData:
@@ -82,14 +82,28 @@ class PreppedData:
             self.y_data['y_obs_trn'],
             self.x_data['dates_trn'],
             self.x_data['ids_trn'],
-            self.y_data['y_vars_ft']).set_index(
+            self.y_data['y_vars']).set_index(
+            ['seg_id_nat', 'date']).to_xarray()
+
+        self.sample_y_pre_trn = postproc_utils.prepped_array_to_df(
+            self.y_data['y_pre_trn'],
+            self.x_data['dates_trn'],
+            self.x_data['ids_trn'],
+            self.y_data['y_vars']).set_index(
             ['seg_id_nat', 'date']).to_xarray()
 
         self.sample_y_obs_wgts = postproc_utils.prepped_array_to_df(
             self.y_data['y_obs_wgts'],
             self.x_data['dates_trn'],
             self.x_data['ids_trn'],
-            self.y_data['y_vars_ft']).set_index(
+            self.y_data['y_vars']).set_index(
+            ['seg_id_nat', 'date']).to_xarray()
+
+        self.sample_y_pre_wgts = postproc_utils.prepped_array_to_df(
+            self.y_data['y_pre_wgts'],
+            self.x_data['dates_trn'],
+            self.x_data['ids_trn'],
+            self.y_data['y_vars']).set_index(
             ['seg_id_nat', 'date']).to_xarray()
 
         # read in unprocessed observations/inputs
@@ -137,7 +151,7 @@ def test_prep():
     assert np.allclose(processed[mask], obs[mask])
 
 
-def test_exclude():
+def test_no_exclude():
     # test no exclude
     prepped = PreppedData()
     wgts = prepped.sample_y_obs_wgts.to_array()
@@ -146,6 +160,8 @@ def test_exclude():
     assert seg_2007_sum > 0
     assert seg_2012_sum > 0
 
+
+def test_exclude_2007():
     # try just excluding 2007 (exclude_2007.yml)
     prepped = PreppedData(exclude_file='test_data/exclude_2007.yml')
     wgts = prepped.sample_y_obs_wgts.to_array()
@@ -154,6 +170,8 @@ def test_exclude():
     assert seg_2007_sum == 0
     assert seg_2012_sum > 0
 
+
+def test_exclude_periods():
     # excluding 2007 for second half, 2012 first half(exclude1.yml)
     prepped = PreppedData(exclude_file='test_data/exclude1.yml')
     wgts = prepped.sample_y_obs_wgts.to_array()
@@ -173,3 +191,70 @@ def test_exclude():
     assert seg_2007_sum_2nd == 0
     assert seg_2012_sum_1st == 0
     assert seg_2012_sum_2nd > 0
+
+
+def test_var_weights():
+    # try with both variables
+    prepped = PreppedData()
+    wgts = prepped.sample_y_obs_wgts.to_array()
+    flow_sum = wgts.sel(variable='seg_outflow').sum().values
+    temp_sum = wgts.sel(variable='seg_tave_water').sum().values
+    assert flow_sum > 0
+    assert temp_sum > 0
+
+
+def test_var_weights_temp_ft():
+    # try with just temp in finetuning
+    prepped = PreppedData(ft_vars=['seg_tave_water'])
+    wgts_obs = prepped.sample_y_obs_wgts.to_array()
+    wgts_pre = prepped.sample_y_pre_wgts.to_array()
+    flow_sum_pre = wgts_pre.sel(variable='seg_outflow').sum().values
+    temp_sum_pre= wgts_pre.sel(variable='seg_tave_water').sum().values
+    flow_sum = wgts_obs.sel(variable='seg_outflow').sum().values
+    temp_sum = wgts_obs.sel(variable='seg_tave_water').sum().values
+    assert flow_sum_pre > 0
+    assert temp_sum_pre > 0
+    assert flow_sum == 0
+    assert temp_sum > 0
+
+
+def test_var_weights_flow_ft():
+    # try with just flow in finetuning
+    prepped = PreppedData(ft_vars=['seg_outflow'])
+    wgts_obs = prepped.sample_y_obs_wgts.to_array()
+    wgts_pre = prepped.sample_y_pre_wgts.to_array()
+    flow_sum_pre = wgts_pre.sel(variable='seg_outflow').sum().values
+    temp_sum_pre = wgts_pre.sel(variable='seg_tave_water').sum().values
+    flow_sum = wgts_obs.sel(variable='seg_outflow').sum().values
+    temp_sum = wgts_obs.sel(variable='seg_tave_water').sum().values
+    assert flow_sum_pre > 0
+    assert temp_sum_pre > 0
+    assert flow_sum > 0
+    assert temp_sum == 0
+
+
+def test_var_weights_temp_ft_pt():
+    # try with just temp in finetuning and pretraining
+    prepped = PreppedData(ft_vars=['seg_tave_water'],
+                          pt_vars=['seg_tave_water'])
+    wgts_obs = prepped.sample_y_obs_wgts.to_array()
+    wgts_pre = prepped.sample_y_pre_wgts.to_array()
+    temp_sum_pre = wgts_pre.sel(variable='seg_tave_water').sum().values
+    temp_sum = wgts_obs.sel(variable='seg_tave_water').sum().values
+    assert len(wgts_obs.variable) == 1
+    assert len(wgts_pre.variable) == 1
+    assert temp_sum_pre > 0
+    assert temp_sum > 0
+
+
+def test_var_weights_flow_ft_pt():
+    # try with just flow in finetuning and pretraining
+    prepped = PreppedData(ft_vars=['seg_outflow'], pt_vars=['seg_outflow'])
+    wgts_obs = prepped.sample_y_obs_wgts.to_array()
+    wgts_pre = prepped.sample_y_pre_wgts.to_array()
+    flow_sum_pre = wgts_pre.sel(variable='seg_outflow').sum().values
+    flow_sum = wgts_obs.sel(variable='seg_outflow').sum().values
+    assert len(wgts_obs.variable) == 1
+    assert len(wgts_pre.variable) == 1
+    assert flow_sum_pre > 0
+    assert flow_sum > 0

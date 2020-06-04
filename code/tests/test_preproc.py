@@ -78,8 +78,15 @@ class PreppedData:
             self.x_data['ids_trn'], self.x_data[ 'x_cols']).set_index(
             ['seg_id_nat', 'date']).to_xarray()
 
-        self.sample_y = postproc_utils.prepped_array_to_df(
+        self.sample_y_obs_trn = postproc_utils.prepped_array_to_df(
             self.y_data['y_obs_trn'],
+            self.x_data['dates_trn'],
+            self.x_data['ids_trn'],
+            self.y_data['y_vars_ft']).set_index(
+            ['seg_id_nat', 'date']).to_xarray()
+
+        self.sample_y_obs_wgts = postproc_utils.prepped_array_to_df(
+            self.y_data['y_obs_wgts'],
             self.x_data['dates_trn'],
             self.x_data['ids_trn'],
             self.y_data['y_vars_ft']).set_index(
@@ -114,18 +121,55 @@ def test_prep():
     assert np.allclose(processed, sntemp_r)
 
     # temp
-    obs = prepped.obs_y_temp['temp_c'].loc[:, prepped.sample_y.date].values
-    processed = prepped.sample_y['seg_tave_water'].loc[:, prepped.sample_y.date].values
+    obs = prepped.obs_y_temp['temp_c'].loc[:, prepped.sample_y_obs_trn.date].values
+    processed = prepped.sample_y_obs_trn['seg_tave_water'].loc[:, prepped.sample_y_obs_trn.date].values
     processed = processed * prepped.y_data['y_obs_trn_std'][0] + \
                 prepped.y_data['y_obs_trn_mean'][0]
     mask = ~(np.isnan(obs))
     assert np.allclose(processed[mask], obs[mask])
 
     # flow
-    obs = prepped.obs_y_flow['discharge_cms'].loc[:, prepped.sample_y.date].values
-    processed = prepped.sample_y['seg_outflow'].loc[:, prepped.sample_y.date].values
+    obs = prepped.obs_y_flow['discharge_cms'].loc[:, prepped.sample_y_obs_trn.date].values
+    processed = prepped.sample_y_obs_trn['seg_outflow'].loc[:, prepped.sample_y_obs_trn.date].values
     processed = processed * prepped.y_data['y_obs_trn_std'][1] + \
                 prepped.y_data['y_obs_trn_mean'][1]
     mask = ~(np.isnan(obs))
     assert np.allclose(processed[mask], obs[mask])
 
+
+def test_exclude():
+    # test no exclude
+    prepped = PreppedData()
+    wgts = prepped.sample_y_obs_wgts.to_array()
+    seg_2007_sum = wgts.sel(seg_id_nat=2007).sum().values
+    seg_2012_sum = wgts.sel(seg_id_nat=2012).sum().values
+    assert seg_2007_sum > 0
+    assert seg_2012_sum > 0
+
+    # try just excluding 2007 (exclude_2007.yml)
+    prepped = PreppedData(exclude_file='test_data/exclude_2007.yml')
+    wgts = prepped.sample_y_obs_wgts.to_array()
+    seg_2007_sum = wgts.sel(seg_id_nat=2007).sum().values
+    seg_2012_sum = wgts.sel(seg_id_nat=2012).sum().values
+    assert seg_2007_sum == 0
+    assert seg_2012_sum > 0
+
+    # excluding 2007 for second half, 2012 first half(exclude1.yml)
+    prepped = PreppedData(exclude_file='test_data/exclude1.yml')
+    wgts = prepped.sample_y_obs_wgts.to_array()
+    start_date = wgts.date.min()
+    mid_date = '2005-03-15'
+    end_date = wgts.date.max()
+    seg_2012_sum_1st = wgts.sel(seg_id_nat=2012,
+                                date=slice(start_date, mid_date)).sum().values
+    seg_2012_sum_2nd = wgts.sel(seg_id_nat=2012, date=slice(mid_date, end_date)
+                                ).sum().values
+    seg_2007_sum_1st = wgts.sel(seg_id_nat=2007,
+                                date=slice(start_date, mid_date)).sum().values
+    seg_2007_sum_2nd = wgts.sel(seg_id_nat=2007,
+                                date=slice(mid_date, end_date)
+                                ).sum().values
+    assert seg_2007_sum_1st > 0
+    assert seg_2007_sum_2nd == 0
+    assert seg_2012_sum_1st == 0
+    assert seg_2012_sum_2nd > 0

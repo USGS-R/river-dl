@@ -155,11 +155,11 @@ def exclude_segments(weights, exclude_segs):
     for seg_grp in exclude_segs:
         start = seg_grp.get('start_date')
         if start:
-            start = datetime.datetime.strptime(start[0], '%Y-%m-%d')
+            start = datetime.datetime.strptime(start, '%Y-%m-%d')
 
         end = seg_grp.get('end_date')
         if end:
-            end = datetime.datetime.strptime(end[0], '%Y-%m-%d')
+            end = datetime.datetime.strptime(end, '%Y-%m-%d')
 
         for v in weights.data_vars:
             weights[v].load()

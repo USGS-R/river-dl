@@ -154,11 +154,11 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     combined = []
     for i in range(int(1/offset)):
         start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1],
+        idx = np.arange(start=start, stop=data_array.shape[1]+1,
                         step=seq_len)
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
-        combined.extend(split[1:-1])
+        combined.extend([s for s in split if s.shape[1] == seq_len])
     combined = np.asarray(combined)
     return combined
 
@@ -257,8 +257,9 @@ def exclude_segments(weights, exclude_segs):
         if end:
             end = datetime.datetime.strptime(end[0], '%Y-%m-%d')
 
-        weights.seg_tave_water.loc[seg_grp['seg_id_nats'], start:end] = 0
-        weights.seg_outflow.loc[seg_grp['seg_id_nats'], start:end] = 0
+        for v in weights.data_vars:
+            weights[v].load()
+            weights[v].loc[seg_grp['seg_id_nats'], start:end] = 0
     return weights
 
 
@@ -272,6 +273,7 @@ def initialize_weights(y_data, initial_val=1):
     """
     weights = y_data.copy(deep=True)
     for v in y_data.data_vars:
+        weights[v].load()
         weights[v].loc[:, :] = initial_val
     return weights
 
@@ -334,7 +336,7 @@ def create_finetune_weights_data(y_pre_data, y_trn_data, exclude_segs):
     ft_wgts, ft_data = mask_ft_wgts_data(y_pre_data, y_trn_data)
     if exclude_segs:
         ft_wgts = exclude_segments(ft_wgts, exclude_segs)
-    return ft_wgts
+    return ft_wgts, ft_data
 
 
 def convert_batch_reshape(dataset):
@@ -395,6 +397,9 @@ def prep_x(in_file, x_vars, test_start_date='2004-09-30', n_test_yr=12,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
     data = {'x_trn': convert_batch_reshape(x_trn_scl),
             'x_tst': convert_batch_reshape(x_tst_scl),
+            'x_std': x_std.to_array().values,
+            'x_mean': x_mean.to_array().values,
+            'x_cols': np.array(x_vars),
             'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
             'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
             'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
@@ -427,7 +432,7 @@ def get_y_partition(ds_y, x_data_file, partition):
     return ds_y.sel(date=dates)
 
 
-def get_y_obs(obs_files, x_data_file, pretrain_file, finetune_vars):
+def get_y_obs(obs_files, pretrain_file, x_data_file, finetune_vars):
     """
     get y_obs_trn and y_obs_tst
     :param obs_files: [list] observation files
@@ -519,6 +524,8 @@ def prep_y(obs_temper_file, obs_flow_file, pretrain_file, x_data_file,
             'y_obs_trn_mean': y_trn_obs_mean.to_array().values,
             'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
             'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
+            'y_vars_pre': np.array(pretrain_vars),
+            'y_vars_ft': np.array(finetune_vars),
             'y_obs_tst': convert_batch_reshape(y_obs_tst),
             }
     if out_file:
@@ -599,3 +606,6 @@ def read_exclude_segs_file(exclude_file):
     with open(exclude_file, 'r') as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]
+
+# prep_x('../data/in/uncal_sntemp_input_output_subset',
+#        ['seg_tave_air', 'seg_rain'], out_file='../data/in/prepped/x.npz')

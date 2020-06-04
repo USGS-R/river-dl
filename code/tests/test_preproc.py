@@ -72,14 +72,14 @@ def test_prep():
     y_data = preproc_utils.prep_y(obs_temp, obs_flow, sntemp, x_data_file,
                                   pt_vars, ft_vars, "test_data/exclude.yml")
 
-    sample_x = postproc_utils.post_process(x_data['x_trn'], x_data['dates_trn'],
-                                           x_data['ids_trn'],
-                                           x_data['x_cols']).set_index(
+    sample_x = postproc_utils.prepped_array_to_df(x_data['x_trn'], x_data['dates_trn'],
+                                                  x_data['ids_trn'],
+                                                  x_data['x_cols']).set_index(
         ['seg_id_nat', 'date']).to_xarray()
-    sample_y = postproc_utils.post_process(y_data['y_obs_trn'],
-                                           x_data['dates_trn'],
-                                           x_data['ids_trn'],
-                                           y_data['y_vars_ft']).set_index(
+    sample_y = postproc_utils.prepped_array_to_df(y_data['y_obs_trn'],
+                                                  x_data['dates_trn'],
+                                                  x_data['ids_trn'],
+                                                  y_data['y_vars_ft']).set_index(
         ['seg_id_nat', 'date']).to_xarray()
 
     # read in unprocessed observations/inputs

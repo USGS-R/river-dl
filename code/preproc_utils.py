@@ -1,92 +1,9 @@
-import os
 import pandas as pd
 import numpy as np
 import yaml
 import xarray as xr
 import datetime
 from dateutil.relativedelta import relativedelta
-
-
-def get_non_varying_cols(df, std_thresh=1e-5):
-    """
-    get columns that don't vary at all
-    :param df: [dataframe] dataframe of input/output data
-    :param std_thresh: [float] when a variable (column) has a std deviation
-    below the std_thresh it will be counted as "non-varying" 
-    :return: index of columns (like a list of column names) that have a std
-    below the threshold
-    """
-    st_dev = df.std()
-    sml_std = st_dev[st_dev < std_thresh]
-    print(f"the {sml_std.index} columns were removed b/c they had small std\
-            deviations")
-    return sml_std.index.to_list()
-
-
-def get_unwanted_cols(df):
-    """
-    get the columns that should be removed in the input data including
-    1) columns that don't vary at all, 2) columns that are for the model but
-    aren't actually predictors like seg_id_nat and 3) columns that are too
-    strong of predictors?
-    """
-    # non_varying_cols = get_non_varying_cols(df)
-    # sntemp_cols = ['model_idx', 'date']
-    # unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width']
-    # first lets just try taking the flow and temp out since that is what
-    # xiaowei did 
-    # unwanted_cols = []
-    # non_varying_cols = []
-    # unwanted_cols.extend(non_varying_cols)
-    # unwanted_cols.extend(sntemp_cols)
-    return ['model_idx', 'date']
-
-
-def convert_to_np_arr(df):
-    """
-    convert dataframe to numpy arrays with dimensions [nseg, ndate, nfeat]
-    :param df: [dataframe] input or output data
-    :return: numpy array
-    """
-    df = df.reset_index()
-    seg_id_groups = df.groupby('seg_id_nat')
-    # this should work, but it raises an error
-    # data_by_seg_id = seg_id_groups.apply(pd.DataFrame.to_numpy)
-    seg_id_arrays = []
-    for seg_id, seg_id_df in seg_id_groups:
-        del seg_id_df['seg_id_nat']
-        seg_id_arrays.append(seg_id_df.to_numpy())
-    array_for_all_seg_ids = np.array(seg_id_arrays)
-    return array_for_all_seg_ids
-
-
-def filter_unwanted_cols(df):
-    """
-    filter out unwanted columns
-    :param df: [dataframe] unfiltered data
-    :return: [dataframe] filtered data
-    """
-    unwanted_cols = get_unwanted_cols(df)
-    wanted_cols = [c for c in df.columns if c not in unwanted_cols]
-    return df[wanted_cols]
-
-
-def sep_x_y(ds, predictor_vars=None):
-    """
-    separate into input and output
-    :param ds: [xr dataset] the raw input and output data
-    :param predictor_vars: [list] list of predictor column names
-    :return: [tuple] df of predictors (x), df of targets (y)
-    """
-    target_vars = ['seg_tave_water', 'seg_outflow']
-    if not predictor_vars:
-        predictor_vars = [v for v in ds.data_vars if v not in target_vars]
-    return ds[predictor_vars], ds[target_vars]
-
-
-def get_df_for_rand_seg(df, seg_id):
-    df_seg = df[df['seg_id_nat'] == seg_id]
-    return df_seg
 
 
 def scale(data_arr, std=None, mean=None):
@@ -109,19 +26,6 @@ def scale(data_arr, std=None, mean=None):
     return scaled, std, mean
 
 
-def get_format_preds(model, x, unscale=False, y_std=None, y_mean=None):
-    preds = model.predict(x)
-    preds = pd.Series([p[0] for p in preds])
-    if unscale:
-        return unscale_data(preds, y_std, y_mean)
-    else:
-        return preds
-
-
-def unscale_data(df, std, mean):
-    return (df * std) + mean
-
-
 def separate_trn_tst(dataset, test_start, n_test_years):
     """
     separate the train data from the test data according to the start and end
@@ -129,7 +33,7 @@ def separate_trn_tst(dataset, test_start, n_test_years):
     the dates that are not in the training are in the testing.
     :param dataset: [xr dataset] input or output data with dims
     :param test_start: [str] date where training data should start
-    :param test_end: [str] date where training data should end
+    :param n_test_years: [int] number of years to take for the test period
     """
     start_date = datetime.datetime.strptime(test_start, '%Y-%m-%d')
     test_end = start_date + relativedelta(years=n_test_years)
@@ -606,6 +510,3 @@ def read_exclude_segs_file(exclude_file):
     with open(exclude_file, 'r') as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]
-
-# prep_x('../data/in/uncal_sntemp_input_output_subset',
-#        ['seg_tave_air', 'seg_rain'], out_file='../data/in/prepped/x.npz')

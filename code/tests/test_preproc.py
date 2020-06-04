@@ -51,11 +51,11 @@ def test_weight_creation():
 def test_read_exclude():
     exclude_file = 'test_data/exclude_2007.yml'
     ex0 = preproc_utils.read_exclude_segs_file(exclude_file)
-    assert ex0 == [{'seg_id_nats': [2007]}]
+    assert ex0 == [{'seg_id_nats_ex': [2007]}]
     exclude_file = 'test_data/exclude1.yml'
     ex1 = preproc_utils.read_exclude_segs_file(exclude_file)
-    assert ex1 == [{'seg_id_nats': [2007], 'start_date': '2005-03-15'},
-                   {'seg_id_nats': [2012], 'end_date': '2005-03-15'}]
+    assert ex1 == [{'seg_id_nats_ex': [2007], 'start_date': '2005-03-15'},
+                   {'seg_id_nats_ex': [2012], 'end_date': '2005-03-15'}]
 
 
 class PreppedData:
@@ -159,6 +159,16 @@ def test_no_exclude():
     seg_2012_sum = wgts.sel(seg_id_nat=2012).sum().values
     assert seg_2007_sum > 0
     assert seg_2012_sum > 0
+
+
+def test_exclude_in():
+    # try just *including* 2007 (exclude_in.yml)
+    prepped = PreppedData(exclude_file='test_data/exclude_in.yml')
+    wgts = prepped.sample_y_obs_wgts.to_array()
+    seg_2007_sum = wgts.sel(seg_id_nat=2007).sum().values
+    seg_2012_sum = wgts.sel(seg_id_nat=2012).sum().values
+    assert seg_2007_sum > 0
+    assert seg_2012_sum == 0
 
 
 def test_exclude_2007():

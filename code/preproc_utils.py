@@ -163,7 +163,15 @@ def exclude_segments(weights, exclude_segs):
 
         for v in weights.data_vars:
             weights[v].load()
-            weights[v].loc[seg_grp['seg_id_nats'], start:end] = 0
+            if 'seg_id_nats_ex' in seg_grp.keys():
+                ex_segs = seg_grp['seg_id_nats_ex']
+            elif 'seg_id_nats_in' in seg_grp.keys():
+                ex_mask = ~weights.seg_id_nat.isin(seg_grp['seg_id_nats_in'])
+                ex_segs = weights.seg_id_nat[ex_mask]
+            else:
+                raise ValueError('exclude grp needs either "seg_id_nats_in" or'
+                                 '"seg_id_nats_ex')
+            weights[v].loc[ex_segs, start:end] = 0
     return weights
 
 
@@ -428,8 +436,7 @@ def prep_y(obs_temper_file, obs_flow_file, pretrain_file, x_data_file,
             'y_obs_trn_mean': y_trn_obs_mean.to_array().values,
             'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
             'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
-            'y_vars_pre': np.array(pretrain_vars),
-            'y_vars_ft': np.array(finetune_vars),
+            'y_vars': np.array(pretrain_vars),
             'y_obs_tst': convert_batch_reshape(y_obs_tst),
             }
     if out_file:

@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 
-def post_process(y_pred, dates, ids):
+def prepped_array_to_df(y_pred, dates, ids, col_names):
     """
     post process y data (reshape and make into pandas DFs)
     :param y_pred:[numpy array] array of predictions [nbatch, seq_len, n_out]
@@ -18,7 +18,7 @@ def post_process(y_pred, dates, ids):
 
     dates = np.reshape(dates, [dates.shape[0]*dates.shape[1], dates.shape[2]])
     ids = np.reshape(ids, [ids.shape[0]*ids.shape[1], ids.shape[2]])
-    df_preds = pd.DataFrame(y_pred, columns=['temp_c', 'discharge_cms'])
+    df_preds = pd.DataFrame(y_pred, columns=col_names)
     df_dates = pd.DataFrame(dates, columns=['date'])
     df_ids = pd.DataFrame(ids, columns=['seg_id_nat'])
     df = pd.concat([df_dates, df_ids, df_preds], axis=1)
@@ -97,15 +97,16 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict(trained_model, io_data, half_tst, tag, outdir, run_tag='',
-            logged_q=False):
+def predict(trained_model, x_data_file, y_col_names, half_tst, tag, outdir,
+            run_tag='', logged_q=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
     predictions feather file.
     :param trained_model:[tf model] model with trained weights loaded
-    :param io_data:[dict] dictionary with all the io data for x_trn, y_trn,
+    :param x_data_file:[dict] dictionary with all the io data for x_trn, y_trn,
     y_tst, etc.
+    :param y_col_names: [list] the y column names
     :param half_tst: [bool] whether or not to halve the testing data so some
     can be held out
     :param tag: [str] must be 'trn' or 'tst'; whether you want to predict for
@@ -122,14 +123,14 @@ def predict(trained_model, io_data, half_tst, tag, outdir, run_tag='',
     else:
         raise ValueError('tag arg needs to be "trn" or "tst"')
 
-    num_segs = io_data['dist_matrix'].shape[0]
-    y_pred = trained_model.predict(io_data[f'x_{tag}'],
+    num_segs = x_data_file['dist_matrix'].shape[0]
+    y_pred = trained_model.predict(x_data_file[f'x_{tag}'],
                                    batch_size=num_segs)
-    y_pred_pp = post_process(y_pred, io_data[f'dates_{tag}'],
-                             io_data[f'ids_{tag}'])
+    y_pred_pp = prepped_array_to_df(y_pred, x_data_file[f'dates_{tag}'],
+                                    x_data_file[f'ids_{tag}'], y_col_names)
 
-    y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
-                               io_data['y_trn_obs_mean'], logged_q)
+    y_pred_pp = unscale_output(y_pred_pp, x_data_file['y_trn_obs_std'],
+                               x_data_file['y_trn_obs_mean'], logged_q)
 
     if half_tst and tag == 'tst':
         y_pred_pp = take_first_half(y_pred_pp)
@@ -191,5 +192,3 @@ def reach_specific_metrics(pred_file, obs_file_temp, obs_file_flow, outdir, tag,
     reach_metrics_flow = flow_data.groupby('seg_id_nat').apply(calc_reach_specific_metrics).reset_index()
     reach_metrics_temp.to_feather(os.path.join(outdir, f'{tag}_temp_reach_metrics{run_tag}.feather'))
     reach_metrics_flow.to_feather(os.path.join(outdir, f'{tag}_flow_reach_metrics{run_tag}.feather'))
-#
-# calc_metrics('../../experiments/A/Av1/A4/tst_preds.feather', '../../data/obs_temp.feather', '../../data/obs_flow.feather', '', '', '')

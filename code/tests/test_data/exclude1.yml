@@ -1,0 +1,8 @@
+test_12:
+    seg_id_nats_ex:
+        - 2007
+    start_date: '2005-03-15'
+test_13:
+    seg_id_nats_ex:
+        - 2012
+    end_date: '2005-03-15'

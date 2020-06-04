@@ -1,92 +1,9 @@
-import os
 import pandas as pd
 import numpy as np
 import yaml
 import xarray as xr
 import datetime
 from dateutil.relativedelta import relativedelta
-
-
-def get_non_varying_cols(df, std_thresh=1e-5):
-    """
-    get columns that don't vary at all
-    :param df: [dataframe] dataframe of input/output data
-    :param std_thresh: [float] when a variable (column) has a std deviation
-    below the std_thresh it will be counted as "non-varying" 
-    :return: index of columns (like a list of column names) that have a std
-    below the threshold
-    """
-    st_dev = df.std()
-    sml_std = st_dev[st_dev < std_thresh]
-    print(f"the {sml_std.index} columns were removed b/c they had small std\
-            deviations")
-    return sml_std.index.to_list()
-
-
-def get_unwanted_cols(df):
-    """
-    get the columns that should be removed in the input data including
-    1) columns that don't vary at all, 2) columns that are for the model but
-    aren't actually predictors like seg_id_nat and 3) columns that are too
-    strong of predictors?
-    """
-    # non_varying_cols = get_non_varying_cols(df)
-    # sntemp_cols = ['model_idx', 'date']
-    # unwanted_cols = ['seg_upstream_inflow', 'seginc_gwflow', 'seg_width']
-    # first lets just try taking the flow and temp out since that is what
-    # xiaowei did 
-    # unwanted_cols = []
-    # non_varying_cols = []
-    # unwanted_cols.extend(non_varying_cols)
-    # unwanted_cols.extend(sntemp_cols)
-    return ['model_idx', 'date']
-
-
-def convert_to_np_arr(df):
-    """
-    convert dataframe to numpy arrays with dimensions [nseg, ndate, nfeat]
-    :param df: [dataframe] input or output data
-    :return: numpy array
-    """
-    df = df.reset_index()
-    seg_id_groups = df.groupby('seg_id_nat')
-    # this should work, but it raises an error
-    # data_by_seg_id = seg_id_groups.apply(pd.DataFrame.to_numpy)
-    seg_id_arrays = []
-    for seg_id, seg_id_df in seg_id_groups:
-        del seg_id_df['seg_id_nat']
-        seg_id_arrays.append(seg_id_df.to_numpy())
-    array_for_all_seg_ids = np.array(seg_id_arrays)
-    return array_for_all_seg_ids
-
-
-def filter_unwanted_cols(df):
-    """
-    filter out unwanted columns
-    :param df: [dataframe] unfiltered data
-    :return: [dataframe] filtered data
-    """
-    unwanted_cols = get_unwanted_cols(df)
-    wanted_cols = [c for c in df.columns if c not in unwanted_cols]
-    return df[wanted_cols]
-
-
-def sep_x_y(ds, predictor_vars=None):
-    """
-    separate into input and output
-    :param ds: [xr dataset] the raw input and output data
-    :param predictor_vars: [list] list of predictor column names
-    :return: [tuple] df of predictors (x), df of targets (y)
-    """
-    target_vars = ['seg_tave_water', 'seg_outflow']
-    if not predictor_vars:
-        predictor_vars = [v for v in ds.data_vars if v not in target_vars]
-    return ds[predictor_vars], ds[target_vars]
-
-
-def get_df_for_rand_seg(df, seg_id):
-    df_seg = df[df['seg_id_nat'] == seg_id]
-    return df_seg
 
 
 def scale(data_arr, std=None, mean=None):
@@ -104,20 +21,9 @@ def scale(data_arr, std=None, mean=None):
         mean = data_arr.mean(skipna=True)
     # adding small number in case there is a std of zero
     scaled = (data_arr - mean)/(std + 1e-10)
+    check_if_finite(std)
+    check_if_finite(mean)
     return scaled, std, mean
-
-
-def get_format_preds(model, x, unscale=False, y_std=None, y_mean=None):
-    preds = model.predict(x)
-    preds = pd.Series([p[0] for p in preds])
-    if unscale:
-        return unscale_data(preds, y_std, y_mean)
-    else:
-        return preds
-
-
-def unscale_data(df, std, mean):
-    return (df * std) + mean
 
 
 def separate_trn_tst(dataset, test_start, n_test_years):
@@ -127,7 +33,7 @@ def separate_trn_tst(dataset, test_start, n_test_years):
     the dates that are not in the training are in the testing.
     :param dataset: [xr dataset] input or output data with dims
     :param test_start: [str] date where training data should start
-    :param test_end: [str] date where training data should end
+    :param n_test_years: [int] number of years to take for the test period
     """
     start_date = datetime.datetime.strptime(test_start, '%Y-%m-%d')
     test_end = start_date + relativedelta(years=n_test_years)
@@ -152,11 +58,11 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     combined = []
     for i in range(int(1/offset)):
         start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1],
+        idx = np.arange(start=start, stop=data_array.shape[1]+1,
                         step=seq_len)
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
-        combined.extend(split[1:-1])
+        combined.extend([s for s in split if s.shape[1] == seq_len])
     combined = np.asarray(combined)
     return combined
 
@@ -183,14 +89,40 @@ def read_format_data(filename):
     return ds
 
 
-def read_multiple_obs(obs_files, x_data):
+def get_unique_dates(partition, x_data_file):
     """
-    read and format multiple observation files
+    get the unique dates for a partition
+    :param partition: [str] 'tst', 'trn', or 'both'
+    :param x_data_file: [str] path to x_data_file
+    :return: [np array] unique dates
+    """
+    return np.sort(np.unique(np.load(x_data_file)[f'dates_{partition}']))
+
+
+def get_dates(partition, x_data_file):
+    """
+    get the dates for a certain partition
+    :param partition: [str] 'tst', 'trn', or 'both'
+    :param x_data_file: [str] path to x_data_file
+    :return: [array] dates
+    """
+    if partition == 'both':
+        trn_dates = get_unique_dates('trn', x_data_file)
+        tst_dates = get_unique_dates('tst', x_data_file)
+        return np.sort(np.concatenate([trn_dates, tst_dates]))
+    else:
+        return get_unique_dates(partition, x_data_file)
+
+
+def read_multiple_obs(obs_files, pre_train_file):
+    """
+    read and format multiple observation files. we read in the pretrain data to
+    make sure we have the same indexing.
     :param obs_files: [list] list of filenames of observation files
-    :param x_data:
-    :return:
+    :param pre_train_file: [str] the file of pre_training data
+    :return: [xr dataset] the observations in the same time
     """
-    obs = [x_data]
+    obs = [xr.open_zarr(pre_train_file).sortby(['seg_id_nat', 'date'])]
     for filename in obs_files:
         ds = read_format_data(filename)
         obs.append(ds)
@@ -223,69 +155,100 @@ def exclude_segments(weights, exclude_segs):
     for seg_grp in exclude_segs:
         start = seg_grp.get('start_date')
         if start:
-            start = datetime.datetime.strptime(start[0], '%Y-%m-%d')
+            start = datetime.datetime.strptime(start, '%Y-%m-%d')
 
         end = seg_grp.get('end_date')
         if end:
-            end = datetime.datetime.strptime(end[0], '%Y-%m-%d')
+            end = datetime.datetime.strptime(end, '%Y-%m-%d')
 
-        weights.seg_tave_water.loc[seg_grp['seg_id_nats'], start:end] = 0
-        weights.seg_outflow.loc[seg_grp['seg_id_nats'], start:end] = 0
+        for v in weights.data_vars:
+            weights[v].load()
+            if 'seg_id_nats_ex' in seg_grp.keys():
+                ex_segs = seg_grp['seg_id_nats_ex']
+            elif 'seg_id_nats_in' in seg_grp.keys():
+                ex_mask = ~weights.seg_id_nat.isin(seg_grp['seg_id_nats_in'])
+                ex_segs = weights.seg_id_nat[ex_mask]
+            else:
+                raise ValueError('exclude grp needs either "seg_id_nats_in" or'
+                                 '"seg_id_nats_ex')
+            weights[v].loc[ex_segs, start:end] = 0
     return weights
 
 
-def initialize_weights_1(y_data):
+def initialize_weights(y_data, initial_val=1):
     """
-    initialize all weights as ones. 
+    initialize all weights with a value.
     :param y_data:[xr dataset] y data. this is used to get the dimensions
-    correct
+    :param initial_val: [num] a number to initialize the weights with. should
+    be between 0 and 1 (inclusive)
+    :return: [xr dataset] dataset weights initialized with a uniform value
     """
     weights = y_data.copy(deep=True)
-    # assume all weights will be one (fully counted)
-    weights.seg_tave_water.loc[:, :] = 1
-    weights.seg_outflow.loc[:, :] = 1
+    for v in y_data.data_vars:
+        weights[v].load()
+        weights[v].loc[:, :] = initial_val
     return weights
 
 
-def change_weights_by_outcols(weights, out_cols):
+def create_pretrain_weights(y_pre_data):
     """
-    modify the weights by the outcolumns
-    :param weights:[xr dataset] weights
-    :param outcols:[str] which columns you will be looking at. should be
-    'temp', 'flow', or 'both'
-    :returns: [xr dataset] modified weights
+    create pretrain weights with the same shape as the pretrain data with all
+    one's. Assuming here that we want all of the segments and variables to
+    count equally in the pretraining.
+    :param y_pre_data: [xr dataset] the pretraining data
+    :return: [xr dataset] dataset of all one's with the same shape as y_pre_data
     """
-    if out_cols == "both":
-        pass
-    elif out_cols == 'temp':
-        weights.seg_outflow.loc[:, :] = 0
-    elif out_cols == 'flow':
-        weights.seg_tave_water.loc[:, :] = 0
-    else:
-        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
-    return weights
+    pretrain_wgts = initialize_weights(y_pre_data, 1)
+    return pretrain_wgts
 
 
-def create_weight_vectors(y_data, out_cols, exclude_segs, pretrain=False):
+def initialize_ft_data(y_pre_data, y_trn_data):
+    """
+    here we are replacing the pretrain data vars with observations where we have
+    observations
+    :param y_pre_data: [xr dataset] the pretraining dataset
+    :param y_trn_data: [xr dataset] the observation dataset
+    :return: [xr dataset] dataset with the same dimensions as the pretrain set
+    """
+    ft_data = initialize_weights(y_pre_data, np.nan)
+    for data_var in y_trn_data.data_vars:
+        ft_data[data_var] = y_trn_data[data_var]
+    return ft_data
+
+
+def mask_ft_wgts_data(y_pre_data, y_trn_data):
+    """
+    mask the finetune (obs) weights and data. the result is two datasets.
+    ft_wgts are weights of 0 where there are no observations and 1 where there
+    are observations. ft_data is the pretrain data where we have no observations
+    and the observations where we have observations
+    :param y_pre_data: [xr dataset] the pretraining dataset
+    :param y_trn_data: [xr dataset] the observation dataset
+    :return: [tuple of xr datasets] the ft weights and data
+    """
+    ft_wgts = initialize_weights(y_pre_data, 0)
+    ft_data = initialize_ft_data(y_pre_data, y_trn_data)
+    ft_wgts = ft_wgts.where(ft_data.isnull(), other=1)
+    ft_data = ft_data.where(ft_data.notnull(), other=y_pre_data)
+    return ft_wgts, ft_data
+
+
+def create_finetune_weights_data(y_pre_data, y_trn_data, exclude_segs):
     """
     filter out either flow, temperature, or neither in the pre-training and 
-    finetune y data
-    :param y_data: [xr dataset]
-    :param out_cols: [str] which columns to have count in the loss function;
-    either 'temp', 'flow', or 'both'
+    finetune y data.
+    **I AM MAKING A SIGNIFICANT ASSUMPTION HERE: THE FINETUNE
+    VARIABLES WILL BE IN THE PRETRAINING VARIABLES
+    :param y_pre_data: [xr dataset] the pretraining dataset
+    :param y_trn_data: [xr dataset] the observation dataset
     :param exclude_segs: [list] list of segment ids to exclude from the loss
     function
     :return: [xr dataset] dataset of weights between one and zero
     """
-    initial_weights = initialize_weights_1(y_data)
-
-    if pretrain:
-        return initial_weights
-    else:
-        weights = change_weights_by_outcols(initial_weights, out_cols)
-        if exclude_segs:
-            weights = exclude_segments(weights, exclude_segs)
-        return weights
+    ft_wgts, ft_data = mask_ft_wgts_data(y_pre_data, y_trn_data)
+    if exclude_segs:
+        ft_wgts = exclude_segments(ft_wgts, exclude_segs)
+    return ft_wgts, ft_data
 
 
 def convert_batch_reshape(dataset):
@@ -325,40 +288,111 @@ def check_if_finite(xarr):
     assert np.isfinite(xarr.to_array().values).all()
 
 
-def read_process_data(data_dir='data/in/', subset=True,
-                      pretrain_out_vars="both", finetune_out_vars="both",
-                      dist_type='upstream', test_start_date='2004-09-30',
-                      n_test_yr=12, exclude_file=None, log_q=False):
+def prep_x(in_file, x_vars, test_start_date='2004-09-30', n_test_yr=12,
+           out_file=None):
+    """
+    prepare input data for DL model training
+    :param in_file: [str] zarr file of input data
+    :param x_vars: [list] variables that should be used as input
+    :param test_start_date: [str] the date to start for the test period
+    :param n_test_yr: [int] number of years to take for the test period
+    :param out_file: [str] where the data should be written to
+    :return:
+    """
+    ds = xr.open_zarr(in_file)
+    ds_sel = ds[x_vars]
+    x_trn, x_tst = separate_trn_tst(ds_sel, test_start_date, n_test_yr)
+
+    x_scl, x_std, x_mean = scale(ds_sel)
+
+    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
+    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+    data = {'x_trn': convert_batch_reshape(x_trn_scl),
+            'x_tst': convert_batch_reshape(x_tst_scl),
+            'x_std': x_std.to_array().values,
+            'x_mean': x_mean.to_array().values,
+            'x_cols': np.array(x_vars),
+            'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
+            'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
+            'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
+            'dates_tst': coord_as_reshaped_array(x_tst, 'date')}
+    if out_file:
+        np.savez_compressed(out_file, **data)
+    return data
+
+
+def log_discharge(y):
+    """
+    take the log of discharge
+    :param y: [xr dataset] the y data
+    :return: [xr dataset] the data logged
+    """
+    y['seg_outflow'].loc[:, :] = y['seg_outflow'] + 1e-6
+    y['seg_outflow'].loc[:, :] = xr.ufuncs.log(y['seg_outflow'])
+    return y
+
+
+def get_y_partition(ds_y, x_data_file, partition):
+    """
+    get the parition for a y dataset
+    :param ds_y: [xr dataset] an xarray dataset of the y
+    :param x_data_file: [str] path to x_data_file
+    :param partition: [str] 'trn' or 'tst'
+    :return: partitioned data
+    """
+    dates = get_unique_dates(partition, x_data_file)
+    return ds_y.sel(date=dates)
+
+
+def get_y_obs(obs_files, pretrain_file, x_data_file, finetune_vars):
+    """
+    get y_obs_trn and y_obs_tst
+    :param obs_files: [list] observation files
+    :param x_data_file: [str] path to x_data_file
+    :param pretrain_file: [str] path to pretrain file
+    :param finetune_vars: [list] variables that will be used in finetuning
+    :return: [xr datasets]
+    """
+    ds_y_obs = read_multiple_obs(obs_files, pretrain_file)
+    ds_y_obs = ds_y_obs[finetune_vars]
+    y_obs_trn = get_y_partition(ds_y_obs, x_data_file, 'trn')
+    y_obs_tst = get_y_partition(ds_y_obs, x_data_file, 'tst')
+    return y_obs_trn, y_obs_tst
+
+
+def get_y_pre(pretrain_file, x_data_file, pretrain_vars):
+    """
+    get the y data for pretraining
+    :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
+    :param x_data_file: [str] the file withe the prepared x_data. this is used
+    :param pretrain_vars: [list] variables that will be used for pretraining
+    :return: [xr dataset] the pretraining output data (only the variables
+    specified)
+    """
+    ds_pre = xr.open_zarr(pretrain_file).sortby(['seg_id_nat', 'date'])
+    y_pre = ds_pre[pretrain_vars]
+    return get_y_partition(y_pre, x_data_file, 'trn')
+
+
+def prep_y(obs_temper_file, obs_flow_file, pretrain_file, x_data_file,
+           pretrain_vars, finetune_vars, exclude_file=None, log_q=False,
+           out_file=None):
     """
     read in and process data into training and testing datasets. the training 
     and testing data are scaled to have a std of 1 and a mean of zero
-    :param data_dir:
-    :param subset: [bool] whether you want data for the subsection (True) or
-    for the entire DRB (false)
-    :param trn_ratio: [float] ratio of training data. as pecentage (i.e., 0.8 )
-    would mean that 80% of the data would be for training and the rest for test
-    :param batch_offset:
-    observations. if False, the mask for all discharge values will be False
-    :param pretrain_out_vars: [str] which parameters to fine tune on should be
-    "temp", "flow" or "both"
-    :param finetune_out_vars: [str] which parameters to fine tune on should be
-    "temp", "flow" or "both"
-    :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
     "updown")
-    :param test_start_date: the date to start for the test period
-    :param n_test_yr: number of years to take for the test period
-    :param exclude_file: [str] path to exclude file 
-    :param log_q: whether or not to take the log of discharge in training
+    :param obs_temper_file: [str] temperature observations file (csv)
+    :param obs_flow_file:[str] discharge observations file (csv)
+    :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
+    :param x_data_file: [str] the file withe the prepared x_data. this is used
+    for the determining of the training and testing periods
+    :param pretrain_vars: [list] variables that will be used for pretraining
+    :param finetune_vars: [list] variables that will be used for finetuning
+    :param exclude_file: [str] path to exclude file
+    :param log_q: [bool] whether or not to take the log of discharge in training
+    :param out_file: [str] file to where the values will be written
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
-            'x_trn': batched, input data for the training period scaled and
-                     centred using the std and mean from entire period of record
-                     [n_samples, seq_len, n_feat]
-            'x_tst': un-batched input data for the test period scaled and
-                     centered using the std and mean from entire period of
-                     record
-            'x_trn_pre': batched, scaled, centered input data for entire period
-                         of record of SNTemp
             'y_trn_pre': batched, scaled, and centered output data for entire
                          period of record of SNTemp [n_samples, seq_len, n_out]
             'y_obs_trn': batched, scaled, and centered output observation data
@@ -373,85 +407,40 @@ def read_process_data(data_dir='data/in/', subset=True,
             'dates_ids_tst: un-batched dates and national seg ids for testing
                             data [n_yrs, n_seg, len_seq, 2]
     """
-    if subset:
-        pretrain_file = os.path.join(
-            data_dir, f'uncal_sntemp_input_output_subset.feather')
-        obs_files = [os.path.join(data_dir, f'obs_temp_subset.csv'),
-                     os.path.join(data_dir, f'obs_flow_subset.csv')]
-    else:
-        pretrain_file = os.path.join(data_dir,
-                                     f'uncal_sntemp_input_output.feather')
-        obs_files = [os.path.join(data_dir, f'obs_temp_full.csv'),
-                     os.path.join(data_dir, f'obs_flow_full.csv')]
-
-    # read, y_pretrain
-    ds_pre = read_format_data(pretrain_file)
-    # set seg_shade to all zeros b/c there are some nan in full sntemp io
-    # note: in the sntemp_input_output data, seg_shade is always zero except
-    # when it's 'nan'
-    ds_pre.seg_shade.loc[:, :] = 0
-
     # read, filter observations for finetuning
-    ds_y_obs = read_multiple_obs(obs_files, ds_pre)
-
-    # separate trn_tst for fine-tuning;
-    pt_train, pt_test = separate_trn_tst(ds_pre, test_start_date, n_test_yr)
-    y_obs_train, y_obs_test = separate_trn_tst(ds_y_obs, test_start_date,
-                                               n_test_yr)
-    # dates_ids_trn, dates_ids_tst = separate_trn_tst(dates_ids, trn_ratio)
-
-    # separate x, y
-    x, y_pre = sep_x_y(ds_pre)
-    x_trn, _ = sep_x_y(pt_train)
-    x_tst, _ = sep_x_y(pt_test)
+    y_obs_trn, y_obs_tst = get_y_obs([obs_temper_file, obs_flow_file],
+                                     pretrain_file, x_data_file, finetune_vars)
+    y_pre_trn = get_y_pre(pretrain_file, x_data_file, pretrain_vars)
 
     if log_q:
-        y_obs_train['seg_outflow'].loc[:, :] = y_obs_train['seg_outflow'] + 1e-6
-        y_obs_train['seg_outflow'].loc[:, :] =\
-            xr.ufuncs.log(y_obs_train['seg_outflow'])
-        y_pre['seg_outflow'].loc[:, :] = y_pre['seg_outflow'] + 1e-6
-        y_pre['seg_outflow'].loc[:, :] = xr.ufuncs.log(y_pre['seg_outflow'])
+        y_obs_trn = log_discharge(y_obs_trn)
+        y_obs_tst = log_discharge(y_obs_tst)
 
     # filter pretrain/finetune y
     if exclude_file:
         exclude_segs = read_exclude_segs_file(exclude_file)
     else:
         exclude_segs = None
-    y_pre_weights = create_weight_vectors(y_pre, pretrain_out_vars,
-                                          exclude_segs, pretrain=True)
-    y_obs_weights = create_weight_vectors(y_obs_train, finetune_out_vars,
-                                          exclude_segs)
-
-    # scale on all x data
-    x_scl, x_std, x_mean = scale(x)
-    check_if_finite(x_std)
-    check_if_finite(x_mean)
-    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
-    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+    y_pre_wgts = create_pretrain_weights(y_pre_trn)
+    y_obs_wgts, y_obs_trn = create_finetune_weights_data(y_pre_trn, y_obs_trn,
+                                                         exclude_segs)
 
     # scale y training data and get the mean and std
-    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_train)
-    check_if_finite(y_trn_obs_std)
-    check_if_finite(y_trn_obs_mean)
+    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
     # for pre-training, keep everything together
-    y_trn_pre_scl, _, _ = scale(y_pre)
+    y_trn_pre_scl, _, _ = scale(y_pre_trn)
 
-    data = {'x_trn': convert_batch_reshape(x_trn_scl),
-            'x_tst': convert_batch_reshape(x_tst_scl),
-            'x_trn_pre': convert_batch_reshape(x_scl),
-            'y_trn_pre': convert_batch_reshape(y_trn_pre_scl),
+    data = {'y_pre_trn': convert_batch_reshape(y_trn_pre_scl),
             'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
-            'y_trn_obs_std': y_trn_obs_std.to_array().values,
-            'y_trn_obs_mean': y_trn_obs_mean.to_array().values,
-            'y_pre_wgts': convert_batch_reshape(y_pre_weights),
-            'y_obs_wgts': convert_batch_reshape(y_obs_weights),
-            'y_obs_tst': convert_batch_reshape(y_obs_test),
-            'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
-            'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
-            'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
-            'dates_tst': coord_as_reshaped_array(x_tst, 'date'),
-            'dist_matrix': process_adj_matrix(data_dir, dist_type, subset)
+            'y_obs_trn_std': y_trn_obs_std.to_array().values,
+            'y_obs_trn_mean': y_trn_obs_mean.to_array().values,
+            'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
+            'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
+            'y_vars': np.array(pretrain_vars),
+            'y_obs_tst': convert_batch_reshape(y_obs_tst),
             }
+    if out_file:
+        np.savez_compressed(out_file, **data)
     return data
 
 
@@ -466,21 +455,17 @@ def sort_dist_matrix(mat, row_col_names):
     return df
 
 
-def process_adj_matrix(data_dir, dist_type, subset=True):
+def prep_adj_matrix(infile, dist_type, out_file=None):
     """
     process adj matrix.
-    **The matrix is sorted by seg_id_nat **
+    **The resulting matrix is sorted by seg_id_nat **
+    :param infile:
     :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
     "updown")
-    :param subset: [bool] whether you want data for the subsection (True) or
-    for the entire DRB (False)
+    :param out_file:
     :return: [numpy array] processed adjacency matrix
     """
-    if subset:
-        data_file = os.path.join(data_dir, f'distance_matrix_subset.npz')
-    else:
-        data_file = os.path.join(data_dir, f'distance_matrix.npz')
-    adj_matrices = np.load(data_file)
+    adj_matrices = np.load(infile)
     adj = adj_matrices[dist_type]
     adj = sort_dist_matrix(adj, adj_matrices['rowcolnames'])
     adj = np.where(np.isinf(adj), 0, adj)
@@ -497,6 +482,8 @@ def process_adj_matrix(data_dir, dist_type, subset=True):
     D_inv = D ** -1.0
     D_inv = np.diag(D_inv)
     A_hat = np.matmul(D_inv, A_hat)
+    if out_file:
+        np.savez_compressed(out_file, dist_matrix=A_hat)
     return A_hat
 
 
@@ -508,16 +495,13 @@ def read_exclude_segs_file(exclude_file):
     example exclude file:
 
     group_after_2017:
-        start_date:
-            - "2017-10-01"
+        start_date: "2017-10-01"
         seg_id_nats:
             - 1556
             - 1569
     group_2018_water_year:
-        start_date:
-            - "2017-10-01"
-        end_date:
-            - "2018-10-01"
+        start_date: "2017-10-01"
+        end_date: "2018-10-01"
         seg_id_nats:
             - 1653
     group_all_time:
@@ -527,10 +511,9 @@ def read_exclude_segs_file(exclude_file):
 
     --
     :param exclude_file: [str] exclude segs file
-    :return: [list] list of segments to exclude
+    :return: [list] list of dictionaries of segments to exclude. dict keys must
+    have 'seg_id_nats' and may also have 'start_date' and 'end_date'
     """
     with open(exclude_file, 'r') as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]
-
-

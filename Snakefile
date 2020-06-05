@@ -8,7 +8,7 @@ sys.path.insert(0, scripts_path)
 
 from preproc_utils import prep_x, prep_y, prep_adj_matrix
 from train import train_model
-from postproc_utils import predict
+from postproc_utils import predict, calc_metrics, reach_specific_metrics
 
 outdir = ''
 
@@ -86,17 +86,24 @@ rule make_predictions:
                 params.half_tst, wildcards.partition, output[0])
 
 
-rule Exp_A_evaluate:
+rule calc_overall_metrics:
+    input:
+         "{outdir}/{partition}_preds.feather",
+         "data/in/obs_{variable}_full.csv",
+    output:
+         "{outdir}/{partition}_{variable}_metrics.json"
+    run:
+         calc_metrics(input[0], input[1], output[0])
+
+
+rule calc_reach_specific_metrics:
     input: 
         "{outdir}/{partition}_preds.feather",
-         "data/in/obs_temp_full.csv",
-         "data/in/obs_flow_full.csv",
+         "data/in/obs_{variable}_full.csv",
     output:
-        "{outdir}/{partition}_metrics.json",
-        "{outdir}/{partition}_temp_reach_metrics.feather",
-        "{outdir}/{partition}_flow_reach_metrics.feather"
-    shell:
-        "python  {code_dir}\\eval.py -o experiments\\A\\{wildcards.a_vers}\\{wildcards.model_id}\\ -p {input[0]} -T {input[1]} -Q {input[2]} -s {wildcards.partition}"
+        "{outdir}/{partition}_{variable}_reach_metrics.feather",
+    run:
+        reach_specific_metrics(input[0], input[1], output[0])
 
 
 rule Exp_A_results:

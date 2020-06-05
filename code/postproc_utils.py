@@ -2,6 +2,8 @@ import os
 import json
 import pandas as pd
 import numpy as np
+from RGCN import RGCNModel
+from train import get_data_if_file
 
 
 def prepped_array_to_df(y_pred, dates, ids, col_names):
@@ -97,45 +99,54 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict(trained_model, x_data_file, y_col_names, half_tst, tag, outdir,
-            run_tag='', logged_q=False):
+def predict(model_weight_dir, x_data, y_data, dist_matrix, hidden_size,
+            half_tst, partition, outfile, logged_q=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
     predictions feather file.
-    :param trained_model:[tf model] model with trained weights loaded
-    :param x_data_file:[dict] dictionary with all the io data for x_trn, y_trn,
-    y_tst, etc.
-    :param y_col_names: [list] the y column names
+    :param model_weight_dir:
+    :param x_data: [dict] dictionary or .npz file with all the x_data
+    :param y_data: [dict] dictionary or .npz file with all the y_data
+    :param dist_matrix: [dict] dictionary or .npz file with all the dist_matrix
+    :param hidden_size: [int] the number of hidden units in model
     :param half_tst: [bool] whether or not to halve the testing data so some
     can be held out
-    :param tag: [str] must be 'trn' or 'tst'; whether you want to predict for
-    the train or the dev period
-    :param outdir: [str] the directory where the output data should be stored
-    :param run_tag: [str] the tag to append to the output files
+    :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
+    for the train or the dev period
+    :param outfile: [str] the file where the output data should be stored
     :param logged_q: [str] whether the discharge was logged in training. if True
     the exponent of the discharge will be taken in the model unscaling
     :return:[none]
     """
+    y_data = get_data_if_file(y_data)
+    x_data = get_data_if_file(x_data)
+    dist_matrix = get_data_if_file(dist_matrix)
+
+    out_size = len(y_data['y_vars'])
+    model = RGCNModel(hidden_size, out_size, A=dist_matrix['dist_matrix'])
+
+    model.load_weights(os.path.join(model_weight_dir))
+
     # evaluate training
-    if tag == 'trn' or tag == 'tst':
+    if partition == 'trn' or partition == 'tst':
         pass
     else:
-        raise ValueError('tag arg needs to be "trn" or "tst"')
+        raise ValueError('partition arg needs to be "trn" or "tst"')
 
-    num_segs = x_data_file['dist_matrix'].shape[0]
-    y_pred = trained_model.predict(x_data_file[f'x_{tag}'],
-                                   batch_size=num_segs)
-    y_pred_pp = prepped_array_to_df(y_pred, x_data_file[f'dates_{tag}'],
-                                    x_data_file[f'ids_{tag}'], y_col_names)
+    num_segs = x_data['dist_matrix'].shape[0]
+    y_pred = model.predict(x_data[f'x_{partition}'], batch_size=num_segs)
+    y_pred_pp = prepped_array_to_df(y_pred, x_data[f'dates_{partition}'],
+                                    x_data[f'ids_{partition}'],
+                                    y_data['y_vars'])
 
-    y_pred_pp = unscale_output(y_pred_pp, x_data_file['y_trn_obs_std'],
-                               x_data_file['y_trn_obs_mean'], logged_q)
+    y_pred_pp = unscale_output(y_pred_pp, x_data['y_trn_obs_std'],
+                               x_data['y_trn_obs_mean'], logged_q)
 
-    if half_tst and tag == 'tst':
+    if half_tst and partition == 'tst':
         y_pred_pp = take_first_half(y_pred_pp)
 
-    y_pred_pp.to_feather(os.path.join(outdir, f'{tag}_preds{run_tag}.feather'))
+    y_pred_pp.to_feather(outfile)
 
 
 def fmt_preds_obs(pred_file, obs_file, variable):

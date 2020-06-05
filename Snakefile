@@ -10,7 +10,13 @@ from preproc_utils import prep_x, prep_y, prep_adj_matrix
 from train import train_model
 from postproc_utils import predict, calc_metrics, reach_specific_metrics
 
-outdir = ''
+
+rule all:
+    input:
+         expand("data/out/test_new/{partition}_{variable}_metrics.json",
+                partition=['trn', 'tst'], variable=['flow', 'temp']),
+         expand("data/out/test_new/{partition}_{variable}_reach_metrics.feather",
+                partition=['trn', 'tst'], variable=['flow', 'temp'])
 
 rule prep_x_data:
     input:
@@ -35,8 +41,8 @@ rule prep_y_data:
     output:
         "{outdir}/y_prepped.npz"
     params:
-        pt_vars=['seg_tave_water', 'seg_tave_rain'],
-        ft_vars=['seg_tave_water', 'seg_tave_rain'],
+        pt_vars=['seg_tave_water', 'seg_outflow'],
+        ft_vars=['seg_tave_water', 'seg_outflow'],
     run:
         prep_y(input[0], input[1], input[2], input[3],
                pretrain_vars=params.pt_vars, finetune_vars=params.ft_vars,
@@ -63,11 +69,11 @@ rule train:
         directory("{outdir}/pretrained_weights")
     params:
         n_hidden=20,
-        pt_epochs=200,
-        ft_epochs=100,
+        pt_epochs=2,
+        ft_epochs=2,
     run:
         train_model(input[0], input[1], input[2], params.pt_epochs,
-                    params.ft_epochs, params.n_hidden, outdir)
+                    params.ft_epochs, params.n_hidden, wildcards.outdir)
 
 
 rule make_predictions:
@@ -104,23 +110,3 @@ rule calc_reach_specific_metrics:
         "{outdir}/{partition}_{variable}_reach_metrics.feather",
     run:
         reach_specific_metrics(input[0], input[1], output[0])
-
-
-rule Exp_A_results:
-    input:
-        expand("experiments\\A\\{a_vers}\\{model_id}\\tst_metrics.json",
-                model_id=utils.get_model_ids('A'), allow_missing=True)
-    output:
-        "experiments\\A\\{a_vers}\\summary.csv"
-    run:
-        utils.summarize_results(input, output[0])
-
-
-rule Exp_A_meta_results:
-    input:
-        expand("experiments\\A\\{a_vers}\\summary.csv", a_vers=a_versions)
-    output:
-        "experiments\\A\\meta_summary.csv"
-    run:
-        utils.meta_results(input, output[0])
-

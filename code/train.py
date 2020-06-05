@@ -38,6 +38,7 @@ def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
     start_time = datetime.datetime.now()
     x_data = get_data_if_file(x_data)
     y_data = get_data_if_file(y_data)
+    dist_matrix = get_data_if_file(dist_matrix)['dist_matrix']
 
     n_seg = dist_matrix.shape[0]
     out_size = len(y_data['y_vars'])
@@ -52,7 +53,7 @@ def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
 
     x_trn_pre = x_data['x_trn']
     # combine with weights to pass to loss function
-    y_trn_pre = np.concatenate([y_data['y_trn_pre'], y_data['y_pre_wgts']],
+    y_trn_pre = np.concatenate([y_data['y_pre_trn'], y_data['y_pre_wgts']],
                                axis=2)
 
     model.fit(x=x_trn_pre, y=y_trn_pre, epochs=pretrain_epochs,

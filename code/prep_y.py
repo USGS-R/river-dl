@@ -1,7 +1,7 @@
 import os
 import argparse
 import numpy as np
-from preproc_utils import read_process_data
+from preproc_utils import prep_y
 
 # read in arguments
 parser = argparse.ArgumentParser()

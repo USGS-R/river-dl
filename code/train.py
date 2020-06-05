@@ -5,13 +5,43 @@ import tensorflow as tf
 from RGCN import RGCNModel, rmse_masked
 
 
-def train_model(x_data, y_data, dist_matrix, prerain_epochs, finetune_epochs,
-                out_dir, hidden_units=20, seed=None, learning_rate_pre=0.005,
+def get_data_if_file(d):
+    """
+    rudimentary check if data .npz file is already loaded. if not, load it
+    :param d:
+    :return:
+    """
+    if isinstance(d, dict):
+        return d
+    else:
+        return np.load(d)
+
+
+def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
+                hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
                 learning_rate_ft=0.01):
+    """
+    train the rgcn
+    :param x_data: [dict or str] the data file or data dict of the x_data
+    :param y_data: [dict or str] the data file or data dict of the y_data
+    :param dist_matrix: [dict or str] data file or data dict of the dist_matrix
+    :param pretrain_epochs: [int] number of pretrain epochs
+    :param finetune_epochs: [int] number of finetune epochs
+    :param hidden_units: [int] number of hidden layers
+    :param out_dir: [str] directory where the output files should be written
+    :param seed: [int] random seed
+    :param learning_rate_pre: [float] the pretrain learning rate
+    :param learning_rate_ft: [float] the finetune learning rate
+    :return: [tf model]  finetuned model
+    """
 
     start_time = datetime.datetime.now()
+    x_data = get_data_if_file(x_data)
+    y_data = get_data_if_file(y_data)
+
     n_seg = dist_matrix.shape[0]
-    model = RGCNModel(hidden_units, 2, A=dist_matrix, rand_seed=seed)
+    out_size = len(y_data['y_vars'])
+    model = RGCNModel(hidden_units, out_size, A=dist_matrix, rand_seed=seed)
 
     # pretrain
     optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
@@ -25,8 +55,8 @@ def train_model(x_data, y_data, dist_matrix, prerain_epochs, finetune_epochs,
     y_trn_pre = np.concatenate([y_data['y_trn_pre'], y_data['y_pre_wgts']],
                                axis=2)
 
-    model.fit(x=x_trn_pre, y=y_trn_pre, epochs=prerain_epochs, batch_size=n_seg,
-              callbacks=[csv_log_pre])
+    model.fit(x=x_trn_pre, y=y_trn_pre, epochs=pretrain_epochs,
+              batch_size=n_seg, callbacks=[csv_log_pre])
 
     pre_train_time = datetime.datetime.now()
     pre_train_time_elapsed = pre_train_time - start_time

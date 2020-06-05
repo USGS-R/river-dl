@@ -17,7 +17,7 @@ def get_data_if_file(d):
         return np.load(d)
 
 
-def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
+def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
                 learning_rate_ft=0.01):
     """
@@ -36,12 +36,11 @@ def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
     """
 
     start_time = datetime.datetime.now()
-    x_data = get_data_if_file(x_data)
-    y_data = get_data_if_file(y_data)
+    io_data = get_data_if_file(io_data)
     dist_matrix = get_data_if_file(dist_matrix)['dist_matrix']
 
     n_seg = dist_matrix.shape[0]
-    out_size = len(y_data['y_vars'])
+    out_size = len(io_data['y_vars'])
     model = RGCNModel(hidden_units, out_size, A=dist_matrix, rand_seed=seed)
 
     # pretrain
@@ -51,9 +50,9 @@ def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
     csv_log_pre = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, f'pretrain_log.csv'))
 
-    x_trn_pre = x_data['x_trn']
+    x_trn_pre = io_data['x_trn']
     # combine with weights to pass to loss function
-    y_trn_pre = np.concatenate([y_data['y_pre_trn'], y_data['y_pre_wgts']],
+    y_trn_pre = np.concatenate([io_data['y_pre_trn'], io_data['y_pre_wgts']],
                                axis=2)
 
     model.fit(x=x_trn_pre, y=y_trn_pre, epochs=pretrain_epochs,
@@ -75,8 +74,8 @@ def train_model(x_data, y_data, dist_matrix, pretrain_epochs, finetune_epochs,
     csv_log_ft = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, 'finetune_log.csv'))
 
-    x_trn_obs = x_data['x_trn']
-    y_trn_obs = np.concatenate([y_data['y_obs_trn'], y_data['y_obs_wgts']],
+    x_trn_obs = io_data['x_trn']
+    y_trn_obs = np.concatenate([io_data['y_obs_trn'], io_data['y_obs_wgts']],
                                axis=2)
 
     model.fit(x=x_trn_obs, y=y_trn_obs, epochs=finetune_epochs,

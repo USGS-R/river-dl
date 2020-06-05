@@ -290,39 +290,6 @@ def check_if_finite(xarr):
     assert np.isfinite(xarr.to_array().values).all()
 
 
-def prep_x(in_file, x_vars, test_start_date='2004-09-30', n_test_yr=12,
-           out_file=None):
-    """
-    prepare input data for DL model training
-    :param in_file: [str] zarr file of input data
-    :param x_vars: [list] variables that should be used as input
-    :param test_start_date: [str] the date to start for the test period
-    :param n_test_yr: [int] number of years to take for the test period
-    :param out_file: [str] where the data should be written to
-    :return:
-    """
-    ds = xr.open_zarr(in_file)
-    ds_sel = ds[x_vars]
-    x_trn, x_tst = separate_trn_tst(ds_sel, test_start_date, n_test_yr)
-
-    x_scl, x_std, x_mean = scale(ds_sel)
-
-    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
-    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
-    data = {'x_trn': convert_batch_reshape(x_trn_scl),
-            'x_tst': convert_batch_reshape(x_tst_scl),
-            'x_std': x_std.to_array().values,
-            'x_mean': x_mean.to_array().values,
-            'x_cols': np.array(x_vars),
-            'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
-            'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
-            'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
-            'dates_tst': coord_as_reshaped_array(x_tst, 'date')}
-    if out_file:
-        np.savez_compressed(out_file, **data)
-    return data
-
-
 def log_discharge(y):
     """
     take the log of discharge
@@ -346,7 +313,7 @@ def get_y_partition(ds_y, x_data_file, partition):
     return ds_y.sel(date=dates)
 
 
-def get_y_obs(obs_files, pretrain_file, x_data_file, finetune_vars):
+def get_y_obs(obs_files, pretrain_file, finetune_vars):
     """
     get y_obs_trn and y_obs_tst
     :param obs_files: [list] observation files
@@ -357,39 +324,24 @@ def get_y_obs(obs_files, pretrain_file, x_data_file, finetune_vars):
     """
     ds_y_obs = read_multiple_obs(obs_files, pretrain_file)
     ds_y_obs = ds_y_obs[finetune_vars]
-    y_obs_trn = get_y_partition(ds_y_obs, x_data_file, 'trn')
-    y_obs_tst = get_y_partition(ds_y_obs, x_data_file, 'tst')
-    return y_obs_trn, y_obs_tst
+    return ds_y_obs
 
 
-def get_y_pre(pretrain_file, x_data_file, pretrain_vars):
+def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
+           pretrain_vars, finetune_vars, test_start_date='2004-09-30',
+           n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
     """
-    get the y data for pretraining
-    :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
-    :param x_data_file: [str] the file withe the prepared x_data. this is used
-    :param pretrain_vars: [list] variables that will be used for pretraining
-    :return: [xr dataset] the pretraining output data (only the variables
-    specified)
-    """
-    ds_pre = xr.open_zarr(pretrain_file).sortby(['seg_id_nat', 'date'])
-    y_pre = ds_pre[pretrain_vars]
-    return get_y_partition(y_pre, x_data_file, 'trn')
-
-
-def prep_y(obs_temper_file, obs_flow_file, pretrain_file, x_data_file,
-           pretrain_vars, finetune_vars, exclude_file=None, log_q=False,
-           out_file=None):
-    """
-    read in and process data into training and testing datasets. the training 
-    and testing data are scaled to have a std of 1 and a mean of zero
-    "updown")
+    prepare input and output data for DL model training read in and process
+    data into training and testing datasets. the training and testing data are
+    scaled to have a std of 1 and a mean of zero
     :param obs_temper_file: [str] temperature observations file (csv)
     :param obs_flow_file:[str] discharge observations file (csv)
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
-    :param x_data_file: [str] the file withe the prepared x_data. this is used
-    for the determining of the training and testing periods
+    :param x_vars: [list] variables that should be used as input
     :param pretrain_vars: [list] variables that will be used for pretraining
     :param finetune_vars: [list] variables that will be used for finetuning
+    :param test_start_date: [str] the date to start for the test period
+    :param n_test_yr: [int] number of years to take for the test period
     :param exclude_file: [str] path to exclude file
     :param log_q: [bool] whether or not to take the log of discharge in training
     :param out_file: [str] file to where the values will be written
@@ -409,10 +361,22 @@ def prep_y(obs_temper_file, obs_flow_file, pretrain_file, x_data_file,
             'dates_ids_tst: un-batched dates and national seg ids for testing
                             data [n_yrs, n_seg, len_seq, 2]
     """
+
+    ds_pre = xr.open_zarr(pretrain_file)
+    x_data = ds_pre[x_vars]
+    x_trn, x_tst = separate_trn_tst(x_data, test_start_date, n_test_yr)
+
+    x_scl, x_std, x_mean = scale(x_data)
+
+    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
+    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+
     # read, filter observations for finetuning
-    y_obs_trn, y_obs_tst = get_y_obs([obs_temper_file, obs_flow_file],
-                                     pretrain_file, x_data_file, finetune_vars)
-    y_pre_trn = get_y_pre(pretrain_file, x_data_file, pretrain_vars)
+    y_obs = get_y_obs([obs_temper_file, obs_flow_file], pretrain_file,
+                      finetune_vars)
+    y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
+    y_pre = ds_pre[pretrain_vars]
+    y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)
 
     if log_q:
         y_obs_trn = log_discharge(y_obs_trn)
@@ -432,7 +396,16 @@ def prep_y(obs_temper_file, obs_flow_file, pretrain_file, x_data_file,
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre_trn)
 
-    data = {'y_pre_trn': convert_batch_reshape(y_trn_pre_scl),
+    data = {'x_trn': convert_batch_reshape(x_trn_scl),
+            'x_tst': convert_batch_reshape(x_tst_scl),
+            'x_std': x_std.to_array().values,
+            'x_mean': x_mean.to_array().values,
+            'x_cols': np.array(x_vars),
+            'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
+            'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
+            'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
+            'dates_tst': coord_as_reshaped_array(x_tst, 'date'),
+            'y_pre_trn': convert_batch_reshape(y_trn_pre_scl),
             'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
             'y_obs_trn_std': y_trn_obs_std.to_array().values,
             'y_obs_trn_mean': y_trn_obs_mean.to_array().values,

@@ -98,7 +98,7 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
+def predict(model_weight_dir, io_data, dist_matrix, hidden_size, partition, outfile,
         logged_q=False, half_tst=False):
     """
     use trained model to make predictions and then evaluate those predictions.
@@ -119,9 +119,10 @@ def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
     :return:[none]
     """
     io_data = get_data_if_file(io_data)
+    dist_matrix = get_data_if_file(dist_matrix)
 
     out_size = len(io_data['y_vars'])
-    model = RGCNModel(hidden_size, out_size, A=io_data['dist_matrix'])
+    model = RGCNModel(hidden_size, out_size, A=dist_matrix['dist_matrix'])
 
     model.load_weights(os.path.join(model_weight_dir))
 
@@ -131,14 +132,14 @@ def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
     else:
         raise ValueError('partition arg needs to be "trn" or "tst"')
 
-    num_segs = io_data['dist_matrix'].shape[0]
+    num_segs = dist_matrix['dist_matrix'].shape[0]
     y_pred = model.predict(io_data[f'x_{partition}'], batch_size=num_segs)
     y_pred_pp = prepped_array_to_df(y_pred, io_data[f'dates_{partition}'],
                                     io_data[f'ids_{partition}'],
                                     io_data['y_vars'])
 
-    y_pred_pp = unscale_output(y_pred_pp, io_data['y_trn_obs_std'],
-                               io_data['y_trn_obs_mean'], io_data['y_vars'],
+    y_pred_pp = unscale_output(y_pred_pp, io_data['y_obs_trn_std'],
+                               io_data['y_obs_trn_mean'], io_data['y_vars'],
                                logged_q)
 
     if half_tst and partition == 'tst':

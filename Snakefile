@@ -77,7 +77,7 @@ rule make_predictions:
     output:
         "{outdir}/{partition}_preds.feather",
     run:
-        predict(input[0], input[1], input[2], input[3], params.hidden_size,
+        predict(input[0], input[1], input[2], params.hidden_size,
                 wildcards.partition, output[0], half_tst=params.half_tst)
 
 

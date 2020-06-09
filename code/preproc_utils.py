@@ -230,6 +230,8 @@ def mask_ft_wgts_data(y_pre_data, y_trn_data):
     ft_data = initialize_ft_data(y_pre_data, y_trn_data)
     ft_wgts = ft_wgts.where(ft_data.isnull(), other=1)
     ft_data = ft_data.where(ft_data.notnull(), other=y_pre_data)
+    # make sure the finetune weights are not all zero
+    assert np.sum(ft_wgts.to_array().values) > 0
     return ft_wgts, ft_data
 
 

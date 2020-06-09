@@ -44,23 +44,23 @@ def take_first_half(df):
     return df_first_half
 
 
-def unscale_output(y_scl, y_std, y_mean, logged_q=False):
+def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
     """
     unscale output data given a standard deviation and a mean value for the
     outputs
     :param y_scl: [pd dataframe] scaled output data (predicted or observed)
     :param y_std:[numpy array] array of standard deviation of variables [n_out]
     :param y_mean:[numpy array] array of variable means [n_out]
+    :param data_cols:
     :param logged_q: [bool] whether the model predicted log of discharge. if
     true, the exponent of the discharge will be executed
     :return:
     """
-    data_cols = ['temp_c', 'discharge_cms']
     yscl_data = y_scl[data_cols]
     y_unscaled_data = (yscl_data * y_std) + y_mean
     y_scl[data_cols] = y_unscaled_data
     if logged_q:
-        y_scl['discharge_cms'] = np.exp(y_scl['discharge_cms'])
+        y_scl['seg_outflow'] = np.exp(y_scl['seg_outflow'])
     return y_scl
 
 
@@ -71,8 +71,7 @@ def rmse_masked(y_true, y_pred):
     observations) so we're only looking at predictions with corresponding
     observations available
     (credit: @aappling-usgs)
-    :param data: [tensor] true (observed) y values. these may have nans and 
-    sample weights
+    :param y_true: [tensor] observed y values
     :param y_pred: [tensor] predicted y values
     :return: rmse (one value for each training sample)
     """
@@ -100,7 +99,7 @@ def nse(y_true, y_pred):
 
 
 def predict(model_weight_dir, x_data, y_data, dist_matrix, hidden_size,
-            half_tst, partition, outfile, logged_q=False):
+            partition, outfile, logged_q=False, half_tst=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -134,14 +133,15 @@ def predict(model_weight_dir, x_data, y_data, dist_matrix, hidden_size,
     else:
         raise ValueError('partition arg needs to be "trn" or "tst"')
 
-    num_segs = x_data['dist_matrix'].shape[0]
+    num_segs = dist_matrix['dist_matrix'].shape[0]
     y_pred = model.predict(x_data[f'x_{partition}'], batch_size=num_segs)
     y_pred_pp = prepped_array_to_df(y_pred, x_data[f'dates_{partition}'],
                                     x_data[f'ids_{partition}'],
                                     y_data['y_vars'])
 
-    y_pred_pp = unscale_output(y_pred_pp, x_data['y_trn_obs_std'],
-                               x_data['y_trn_obs_mean'], logged_q)
+    y_pred_pp = unscale_output(y_pred_pp, y_data['y_obs_trn_std'],
+                               y_data['y_obs_trn_mean'], y_data['y_vars'],
+                               logged_q)
 
     if half_tst and partition == 'tst':
         y_pred_pp = take_first_half(y_pred_pp)
@@ -149,39 +149,51 @@ def predict(model_weight_dir, x_data, y_data, dist_matrix, hidden_size,
     y_pred_pp.to_feather(outfile)
 
 
-def fmt_preds_obs(pred_file, obs_file):
+def get_var_names(variable):
+    """
+
+    :param variable: [str] either 'flow' or 'temp'
+    :return:
+    """
+    if variable == 'flow':
+        obs_var = 'discharge_cms'
+        seg_var = 'seg_outflow'
+    elif variable == 'temp':
+        obs_var = 'temp_c'
+        seg_var = 'seg_tave_water'
+    else:
+        raise ValueError('variable param must be "flow" or "temp"')
+    return obs_var, seg_var
+
+
+def fmt_preds_obs(pred_file, obs_file, variable):
     """
     combine predictions and observations in one dataframe
-    :param pred_file:[str] filepath to the predictions file 
+    :param pred_file:[str] filepath to the predictions file
     :param obs_file:[str] filepath to the observations file
+    :param variable: [str] either 'flow' or 'temp'
     """
+    obs_var, seg_var = get_var_names(variable)
     pred_data = pd.read_feather(pred_file)
     pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
     obs = pd.read_csv(obs_file, parse_dates=['date'],
                       infer_datetime_format=True,
                       index_col=['date', 'seg_id_nat'])
-    variable = obs.columns[0]
-    obs_cln = obs[[variable]]
+    obs_cln = obs[[obs_var]]
     obs_cln.columns = ['obs']
-    preds = pred_data[[variable]]
+    preds = pred_data[[seg_var]]
     preds.columns = ['pred']
     combined = preds.join(obs_cln)
     return combined
 
 
-def calc_metrics(pred_file, obs_file, outfile):
-    data = fmt_preds_obs(pred_file, obs_file)
-
-    rmse_data = rmse_masked(data['obs'], data['pred'])
-    nse_data = nse(data['obs'], data['pred'])
-
-    metrics_data = {'rmse': str(rmse_data), 'nse': str(nse_data)}
-    # save files
-    with open(outfile) as f:
-        json.dump(metrics_data, f)
-
-
-def calc_reach_specific_metrics(df):
+def calc_metrics(df):
+    """
+    calculate metrics (rmse and nse) on one reach
+    :param df:[pd dataframe] dataframe of observations and predictions for 
+    one reach
+    :return: [pd Series] the rmse and nse for that one reach
+    """
     if df['obs'].count() > 10:
         reach_rmse = rmse_masked(df['obs'], df['pred'])
         reach_nse = nse(df['obs'].values, df['pred'].values)
@@ -190,8 +202,33 @@ def calc_reach_specific_metrics(df):
         return pd.Series(dict(rmse=np.nan, nse=np.nan))
 
 
-def reach_specific_metrics(pred_file, obs_file, outfile):
-    data = fmt_preds_obs(pred_file, obs_file)
+
+def overall_metrics(pred_file, obs_file, outfile, variable):
+    """
+    calculate overall metrics 
+    :param pred_file: [str] path to predictions feather file
+    :param obs_file: [str] path to observations csv file
+    :param outfile: [str] file where the metrics should be written
+    :param variable: [str] either 'flow' or 'temp'
+    :return: [pd Series] the overall metrics
+    """
+    data = fmt_preds_obs(pred_file, obs_file, variable)
+    metrics = calc_metrics(data)
+    metrics.to_csv(outfile)
+    return metrics
+
+
+def reach_specific_metrics(pred_file, obs_file, outfile, variable):
+    """
+    calculate reach-specific metrics 
+    :param pred_file: [str] path to predictions feather file
+    :param obs_file: [str] path to observations csv file
+    :param outfile: [str] file where the metrics should be written
+    :param variable: [str] either 'flow' or 'temp'
+    :return: [pd DataFrame] the reach-specific metrics
+    """
+    data = fmt_preds_obs(pred_file, obs_file, variable)
     reach_metrics = data.groupby('seg_id_nat').apply(
-        calc_reach_specific_metrics).reset_index()
+            calc_metrics).reset_index()
     reach_metrics.to_feather(outfile)
+    return reach_metrics

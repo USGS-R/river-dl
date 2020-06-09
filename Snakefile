@@ -8,7 +8,7 @@ sys.path.insert(0, scripts_path)
 
 from preproc_utils import prep_x, prep_y, prep_adj_matrix
 from train import train_model
-from postproc_utils import predict, calc_metrics, reach_specific_metrics
+from postproc_utils import predict, overall_metrics, reach_specific_metrics
 
 
 rule all:
@@ -65,8 +65,8 @@ rule train:
         "{outdir}/y_prepped.npz",
         "{outdir}/dist_matrix.npz",
     output:
-        directory("{outdir}/trained_weights"),
-        directory("{outdir}/pretrained_weights")
+        directory("{outdir}/trained_weights/"),
+        directory("{outdir}/pretrained_weights/")
     params:
         n_hidden=20,
         pt_epochs=2,
@@ -78,7 +78,7 @@ rule train:
 
 rule make_predictions:
     input: 
-        "{outdir}/trained_weights",
+        "{outdir}/trained_weights/",
         "{outdir}/x_prepped.npz",
         "{outdir}/y_prepped.npz",
         "{outdir}/dist_matrix.npz"
@@ -89,7 +89,7 @@ rule make_predictions:
         "{outdir}/{partition}_preds.feather",
     run:
         predict(input[0], input[1], input[2], input[3], params.hidden_size,
-                params.half_tst, wildcards.partition, output[0])
+                wildcards.partition, output[0], half_tst=params.half_tst)
 
 
 rule calc_overall_metrics:
@@ -99,7 +99,7 @@ rule calc_overall_metrics:
     output:
          "{outdir}/{partition}_{variable}_metrics.json"
     run:
-         calc_metrics(input[0], input[1], output[0])
+         overall_metrics(input[0], input[1], output[0], wildcards.variable)
 
 
 rule calc_reach_specific_metrics:
@@ -109,4 +109,5 @@ rule calc_reach_specific_metrics:
     output:
         "{outdir}/{partition}_{variable}_reach_metrics.feather",
     run:
-        reach_specific_metrics(input[0], input[1], output[0])
+        reach_specific_metrics(input[0], input[1], output[0],
+                               wildcards.variable)

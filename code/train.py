@@ -34,6 +34,10 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
     """
+    if tf.test.gpu_device_name(): 
+        print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+    else:
+       print("Please install GPU version of TF")
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)

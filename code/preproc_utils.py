@@ -1,3 +1,4 @@
+from prefect import task
 import pandas as pd
 import numpy as np
 import yaml
@@ -67,28 +68,6 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     return combined
 
 
-def read_format_data(filename):
-    """
-    read in data into a dataframe, then format the dates and sort
-    :param filename: [str] filename that has the data
-    :return: [dataframe] formatted/sorted data
-    """
-    # read in x, y_pretrain data
-    if filename.endswith('csv'):
-        df = pd.read_csv(filename)
-    elif filename.endswith('feather'):
-        df = pd.read_feather(filename)
-        del df['model_idx']
-    else:
-        raise ValueError('file_format should be "feather" or "csv"')
-    df['date'] = pd.to_datetime(df['date'])
-    df['seg_id_nat'] = pd.to_numeric(df['seg_id_nat'])
-    df = df.sort_values(['date', 'seg_id_nat'])
-    df = df.set_index(['seg_id_nat', 'date'])
-    ds = df.to_xarray()
-    return ds
-
-
 def get_unique_dates(partition, x_data_file):
     """
     get the unique dates for a partition
@@ -124,7 +103,7 @@ def read_multiple_obs(obs_files, pre_train_file):
     """
     obs = [xr.open_zarr(pre_train_file).sortby(['seg_id_nat', 'date'])]
     for filename in obs_files:
-        ds = read_format_data(filename)
+        ds = xr.open_zarr(filename)
         obs.append(ds)
     obs = xr.merge(obs, join='left')
     obs = obs[['temp_c', 'discharge_cms']]
@@ -327,6 +306,7 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
+@task
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
            pretrain_vars, finetune_vars, test_start_date='2004-09-30',
            n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
@@ -430,6 +410,7 @@ def sort_dist_matrix(mat, row_col_names):
     return df
 
 
+@task
 def prep_adj_matrix(infile, dist_type, out_file=None):
     """
     process adj matrix.
@@ -459,7 +440,7 @@ def prep_adj_matrix(infile, dist_type, out_file=None):
     A_hat = np.matmul(D_inv, A_hat)
     if out_file:
         np.savez_compressed(out_file, dist_matrix=A_hat)
-    return A_hat
+    return {'dist_matrix': A_hat}
 
 
 def read_exclude_segs_file(exclude_file):

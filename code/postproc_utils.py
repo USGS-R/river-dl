@@ -1,9 +1,9 @@
+from prefect import task
 import os
-import json
 import pandas as pd
 import numpy as np
 from RGCN import RGCNModel
-from train import get_data_if_file
+import xarray as xr
 
 
 def prepped_array_to_df(y_pred, dates, ids, col_names):
@@ -98,41 +98,60 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict(model_weight_dir, io_data, dist_matrix, hidden_size, partition, outfile,
-        logged_q=False, half_tst=False):
+def predict_from_file(model_weights_dir, io_file, dist_matrix_file, hidden_size,
+                      partition, outfile, logged_q=False, half_tst=False):
     """
-    use trained model to make predictions and then evaluate those predictions.
-    nothing is returned but three files are saved an rmse_flow, rmse_temp, and
-    predictions feather file.
-    :param model_weight_dir:
-    :param x_data: [dict] dictionary or .npz file with all the x_data
-    :param y_data: [dict] dictionary or .npz file with all the y_data
-    :param dist_matrix: [dict] dictionary or .npz file with all the dist_matrix
+    make predictions from trained model
+    :param model_weights_dir:
+    :param io_file:
+    :param dist_matrix_file: [str] path to .npz file with all the dist_matrix
     :param hidden_size: [int] the number of hidden units in model
-    :param half_tst: [bool] whether or not to halve the testing data so some
-    can be held out
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
     :param logged_q: [str] whether the discharge was logged in training. if True
     the exponent of the discharge will be taken in the model unscaling
-    :return:[none]
+    :param half_tst: [bool] whether or not to halve the testing data so some
+    can be held out
+    :return:
     """
-    io_data = get_data_if_file(io_data)
-    dist_matrix = get_data_if_file(dist_matrix)
+    io_data = np.load(io_file)
+    dist_matrix = np.load(dist_matrix_file)
 
     out_size = len(io_data['y_vars'])
     model = RGCNModel(hidden_size, out_size, A=dist_matrix['dist_matrix'])
 
-    model.load_weights(os.path.join(model_weight_dir))
+    model.load_weights(os.path.join(model_weights_dir))
+    preds = predict(model, io_data, partition, outfile,
+                    num_segs=dist_matrix.shape[0], logged_q=logged_q,
+                    half_tst=half_tst)
+    return preds
 
-    # evaluate training
+
+@task
+def predict(model, io_data, partition, outfile, num_segs, logged_q=False,
+            half_tst=False):
+    """
+    use trained model to make predictions.
+    :param model: [str] loaded model
+    :param io_data: [dict] data dictionary or .npz file with all the
+    x and y data
+    :param half_tst: [bool] whether or not to halve the testing data so some
+    can be held out
+    :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
+    for the train or the dev period
+    :param outfile: [str] the file where the output data should be stored
+    :param num_segs: [int] number of segments in the network (used for batching)
+    :param logged_q: [str] whether the discharge was logged in training. if True
+    the exponent of the discharge will be taken in the model unscaling
+    :return:[none]
+    """
+
     if partition == 'trn' or partition == 'tst':
         pass
     else:
         raise ValueError('partition arg needs to be "trn" or "tst"')
 
-    num_segs = dist_matrix['dist_matrix'].shape[0]
     y_pred = model.predict(io_data[f'x_{partition}'], batch_size=num_segs)
     y_pred_pp = prepped_array_to_df(y_pred, io_data[f'dates_{partition}'],
                                     io_data[f'ids_{partition}'],
@@ -146,6 +165,7 @@ def predict(model_weight_dir, io_data, dist_matrix, hidden_size, partition, outf
         y_pred_pp = take_first_half(y_pred_pp)
 
     y_pred_pp.to_feather(outfile)
+    return y_pred_pp
 
 
 def get_var_names(variable):
@@ -165,7 +185,7 @@ def get_var_names(variable):
     return obs_var, seg_var
 
 
-def fmt_preds_obs(pred_file, obs_file, variable):
+def fmt_preds_obs(pred_data, obs_file, variable):
     """
     combine predictions and observations in one dataframe
     :param pred_file:[str] filepath to the predictions file
@@ -173,11 +193,9 @@ def fmt_preds_obs(pred_file, obs_file, variable):
     :param variable: [str] either 'flow' or 'temp'
     """
     obs_var, seg_var = get_var_names(variable)
-    pred_data = pd.read_feather(pred_file)
+    # pred_data = pd.read_feather(pred_file)
     pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
-    obs = pd.read_csv(obs_file, parse_dates=['date'],
-                      infer_datetime_format=True,
-                      index_col=['date', 'seg_id_nat'])
+    obs = xr.open_zarr(obs_file).to_dataframe()
     obs_cln = obs[[obs_var]]
     obs_cln.columns = ['obs']
     preds = pred_data[[seg_var]]
@@ -201,8 +219,8 @@ def calc_metrics(df):
         return pd.Series(dict(rmse=np.nan, nse=np.nan))
 
 
-
-def overall_metrics(pred_file, obs_file, outfile, variable):
+@task
+def overall_metrics(pred_data, obs_file, outfile, variable):
     """
     calculate overall metrics 
     :param pred_file: [str] path to predictions feather file
@@ -211,13 +229,14 @@ def overall_metrics(pred_file, obs_file, outfile, variable):
     :param variable: [str] either 'flow' or 'temp'
     :return: [pd Series] the overall metrics
     """
-    data = fmt_preds_obs(pred_file, obs_file, variable)
+    data = fmt_preds_obs(pred_data, obs_file, variable)
     metrics = calc_metrics(data)
     metrics.to_csv(outfile)
     return metrics
 
 
-def reach_specific_metrics(pred_file, obs_file, outfile, variable):
+@task
+def reach_specific_metrics(pred_data, obs_file, outfile, variable):
     """
     calculate reach-specific metrics 
     :param pred_file: [str] path to predictions feather file
@@ -226,7 +245,7 @@ def reach_specific_metrics(pred_file, obs_file, outfile, variable):
     :param variable: [str] either 'flow' or 'temp'
     :return: [pd DataFrame] the reach-specific metrics
     """
-    data = fmt_preds_obs(pred_file, obs_file, variable)
+    data = fmt_preds_obs(pred_data, obs_file, variable)
     reach_metrics = data.groupby('seg_id_nat').apply(
             calc_metrics).reset_index()
     reach_metrics.to_feather(outfile)

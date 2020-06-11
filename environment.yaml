@@ -5,8 +5,10 @@ channels:
 dependencies:
     - dvc
     - ipython
-    - matplotlib
     - pandas
     - pyarrow
+    - prefect
     - scikit-learn
     - tensorflow >= 2.0
+    - xarray
+    - zarr

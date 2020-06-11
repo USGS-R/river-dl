@@ -1,3 +1,4 @@
+from prefect import task
 import os
 import numpy as np
 import datetime
@@ -17,6 +18,7 @@ def get_data_if_file(d):
         return np.load(d)
 
 
+@task
 def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
                 learning_rate_ft=0.01):

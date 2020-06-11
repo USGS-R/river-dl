@@ -9,6 +9,7 @@ sys.path.insert(0, scripts_path)
 from preproc_utils import prep_data, prep_adj_matrix
 from train import train_model
 from postproc_utils import predict, overall_metrics, reach_specific_metrics
+data_dir = "/home/jsadler/drb-dl-model/data/in"
 
 
 rule all:
@@ -20,9 +21,9 @@ rule all:
 
 rule prep_io_data:
     input:
-         "data/in/obs_temp_full.csv",
-         "data/in/obs_flow_full.csv",
-         "data/in/uncal_sntemp_input_output",
+         f"{data_dir}/obs_temp_full.csv",
+         f"{data_dir}/obs_flow_full.csv",
+         f"{data_dir}/uncal_sntemp_input_output",
     output:
         "{outdir}/prepped.npz"
     params:
@@ -41,7 +42,7 @@ rule prep_io_data:
 
 rule prep_adj_matrix_data:
     input:
-        "data/in/distance_matrix.npz"
+        f"{data_dir}/distance_matrix.npz"
     output:
         "{outdir}/dist_matrix.npz"
     params:
@@ -84,7 +85,7 @@ rule make_predictions:
 rule calc_overall_metrics:
     input:
          "{outdir}/{partition}_preds.feather",
-         "data/in/obs_{variable}_full.csv",
+         expand("{data_dir}/obs_{variable}_full.csv", data_dir=data_dir, allow_missing=True)
     output:
          "{outdir}/{partition}_{variable}_metrics.json"
     run:
@@ -94,7 +95,7 @@ rule calc_overall_metrics:
 rule calc_reach_specific_metrics:
     input: 
         "{outdir}/{partition}_preds.feather",
-         "data/in/obs_{variable}_full.csv",
+        expand("{data_dir}/obs_{variable}_full.csv", data_dir=data_dir, allow_missing=True)
     output:
         "{outdir}/{partition}_{variable}_reach_metrics.feather",
     run:

@@ -1,3 +1,4 @@
+from prefect.engine.results import LocalResult
 from prefect import task
 import pandas as pd
 import numpy as np
@@ -306,7 +307,7 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
-@task
+@task(target="prep.txt", checkpoint=True, result=LocalResult(dir="~/.prefect"))
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
            pretrain_vars, finetune_vars, test_start_date='2004-09-30',
            n_test_yr=12, exclude_file=None, log_q=False, out_file=None):

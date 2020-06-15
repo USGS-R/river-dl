@@ -1,3 +1,4 @@
+from prefect.engine.results import LocalResult
 from prefect import task
 import os
 import pandas as pd
@@ -98,7 +99,8 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict_from_file(model_weights_dir, io_file, dist_matrix_file, hidden_size,
+@task(checkpoint=True, result=LocalResult(dir="~/.prefect"))
+def predict_from_file(model_weights_dir, io_data, dist_matrix, hidden_size,
                       partition, outfile, logged_q=False, half_tst=False):
     """
     make predictions from trained model
@@ -115,20 +117,17 @@ def predict_from_file(model_weights_dir, io_file, dist_matrix_file, hidden_size,
     can be held out
     :return:
     """
-    io_data = np.load(io_file)
-    dist_matrix = np.load(dist_matrix_file)
-
     out_size = len(io_data['y_vars'])
     model = RGCNModel(hidden_size, out_size, A=dist_matrix['dist_matrix'])
 
-    model.load_weights(os.path.join(model_weights_dir))
+    model.load_weights(model_weights_dir)
     preds = predict(model, io_data, partition, outfile,
-                    num_segs=dist_matrix.shape[0], logged_q=logged_q,
+                    num_segs=dist_matrix['dist_matrix'].shape[0], logged_q=logged_q,
                     half_tst=half_tst)
     return preds
 
 
-@task
+#@task
 def predict(model, io_data, partition, outfile, num_segs, logged_q=False,
             half_tst=False):
     """
@@ -193,8 +192,9 @@ def fmt_preds_obs(pred_data, obs_file, variable):
     :param variable: [str] either 'flow' or 'temp'
     """
     obs_var, seg_var = get_var_names(variable)
-    # pred_data = pd.read_feather(pred_file)
-    pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
+    # check to see if the index cols are in the columns
+    if set(['date', 'seg_id_nat']).issubset(pred_data.columns):
+        pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
     obs = xr.open_zarr(obs_file).to_dataframe()
     obs_cln = obs[[obs_var]]
     obs_cln.columns = ['obs']

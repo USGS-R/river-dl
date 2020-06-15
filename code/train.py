@@ -1,3 +1,4 @@
+from prefect.engine.results import LocalResult
 from prefect import task
 import os
 import numpy as np
@@ -18,7 +19,7 @@ def get_data_if_file(d):
         return np.load(d)
 
 
-@task
+@task(checkpoint=True, result=LocalResult(dir="~/.prefect"))
 def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
                 learning_rate_ft=0.01):
@@ -89,6 +90,7 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
         f.write(f'elapsed time finetune:\
                  {finetune_time_elapsed} \n')
 
-    model.save_weights(os.path.join(out_dir, f'trained_weights/'))
-    return model
+    trained_path = os.path.join(out_dir, f'trained_weights/')
+    model.save_weights(trained_path)
+    return trained_path
 

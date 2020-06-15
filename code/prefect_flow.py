@@ -2,7 +2,8 @@ import os
 from prefect import task, Flow, Parameter
 from preproc_utils import prep_data, prep_adj_matrix
 from train import train_model
-from postproc_utils import overall_metrics, reach_specific_metrics, predict
+from postproc_utils import overall_metrics, reach_specific_metrics, predict_from_file
+
 
 with Flow("run_model") as flow:
     in_dir = '../data/in'
@@ -30,14 +31,19 @@ with Flow("run_model") as flow:
     dist_matrix = prep_adj_matrix(dist_file, dist_type)
 
     for i in range(1):
-        model = train_model(prepped_data, dist_matrix, pt_epochs, ft_epochs,
-                            h_units, out_dir=out_dir)
-        preds_trn_file = os.path.join(out_dir, 'preds_trn.feather')
+        model_weights = train_model(prepped_data, dist_matrix, pt_epochs,
+                                    ft_epochs, h_units, out_dir=out_dir, 
+                                    task_args=dict(target=f"model{i}"))
+        preds_trn_file = os.path.join(out_dir, 'preds_trn.feather') 
         preds_tst_file = os.path.join(out_dir, 'preds_tst.feather')
-        preds_trn = predict(model, prepped_data, 'trn', preds_trn_file,
-                            num_segs=456)
-        preds_tst = predict(model, prepped_data, 'tst', preds_tst_file,
-                            num_segs=456)
+        preds_trn = predict_from_file(model_weights, prepped_data, dist_matrix,
+                                      h_units, 'trn', preds_trn_file,
+                                      task_args=dict(target=f"pred_trn{i}"))
+        preds_tst = predict_from_file(model_weights, prepped_data, dist_matrix,
+                                      h_units, 'tst', preds_tst_file,
+                                      task_args=dict(target=f"pred_tst{i}"))
+        print(preds_tst)
+        print(preds_trn)
         overall_trn_temp = overall_metrics(preds_trn, obs_temp_file,
                                            'temp_trn_metrics.json', 'temp')
         overall_tst_temp = overall_metrics(preds_tst, obs_temp_file,

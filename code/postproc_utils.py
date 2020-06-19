@@ -1,4 +1,3 @@
-from prefect.engine.results import LocalResult
 from prefect import task
 import os
 import pandas as pd
@@ -99,7 +98,7 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-@task(checkpoint=True, result=LocalResult(dir="~/.prefect"))
+@task(checkpoint=True)
 def predict_from_file(model_weights_dir, io_data, dist_matrix, hidden_size,
                       partition, outfile, logged_q=False, half_tst=False):
     """
@@ -219,19 +218,22 @@ def calc_metrics(df):
         return pd.Series(dict(rmse=np.nan, nse=np.nan))
 
 
-@task
-def overall_metrics(pred_data, obs_file, outfile, variable):
+def overall_metrics(pred_data, obs_file, variable, partition, outfile=None):
     """
     calculate overall metrics 
     :param pred_file: [str] path to predictions feather file
     :param obs_file: [str] path to observations csv file
     :param outfile: [str] file where the metrics should be written
     :param variable: [str] either 'flow' or 'temp'
+    :param partition: [str] either 'trn' or 'tst'
     :return: [pd Series] the overall metrics
     """
     data = fmt_preds_obs(pred_data, obs_file, variable)
     metrics = calc_metrics(data)
-    metrics.to_csv(outfile)
+    metrics['variable'] = variable
+    metrics['partition'] = partition
+    if outfile:
+        metrics.to_csv(outfile)
     return metrics
 
 
@@ -250,3 +252,21 @@ def reach_specific_metrics(pred_data, obs_file, outfile, variable):
             calc_metrics).reset_index()
     reach_metrics.to_feather(outfile)
     return reach_metrics
+
+
+@task
+def all_overall(pred_trn, pred_tst, obs_temp, obs_flow, variables):
+    df_all = []
+    if 'seg_tave_water' in variables:
+        trn_temp = overall_metrics(pred_trn, obs_temp, 'temp', 'trn')
+        tst_temp = overall_metrics(pred_tst, obs_temp, 'temp', 'tst')
+        df_all.append(trn_temp)
+        df_all.append(tst_temp)
+    if 'seg_outflow' in variables:
+        trn_flow = overall_metrics(pred_trn, obs_flow, 'flow', 'trn')
+        tst_flow = overall_metrics(pred_tst, obs_flow, 'flow', 'tst')
+        df_all.append(trn_flow)
+        df_all.append(tst_flow)
+    df_all = pd.concat(df_all, axis=1).T
+    return df_all
+

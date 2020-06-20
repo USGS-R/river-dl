@@ -136,7 +136,7 @@ class RGCNModel(tf.keras.Model):
         return output
 
 
-def rmse_masked(data, y_pred):
+def rmse_masked(data, y_pred, num_vars):
     """
     Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
     with 0 when y_s is nan; num_y_s is a count of just those non-nan
@@ -148,8 +148,8 @@ def rmse_masked(data, y_pred):
     :param y_pred: [tensor] predicted y values
     :return: rmse (one value for each training sample)
     """
-    weights = data[:, :, -2:]
-    y_true = data[:, :, :-2]
+    weights = data[:, :, num_vars:]
+    y_true = data[:, :, :num_vars]
 
     # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)
@@ -171,5 +171,11 @@ def rmse_masked(data, y_pred):
     sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
     rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss
+
+
+def rmse_loss(num_vars):
+    def rmse_loss_masked(data, y_pred):
+        return rmse_masked(data, y_pred, num_vars)
+    return rmse_loss_masked
 
 

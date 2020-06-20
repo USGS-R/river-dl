@@ -3,7 +3,7 @@ import os
 import numpy as np
 import datetime
 import tensorflow as tf
-from RGCN import RGCNModel, rmse_masked
+from RGCN import RGCNModel, rmse_loss
 
 
 def get_data_if_file(d):
@@ -18,7 +18,7 @@ def get_data_if_file(d):
         return np.load(d)
 
 
-@task
+@task(checkpoint=True)
 def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
                 learning_rate_ft=0.01):
@@ -47,7 +47,8 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
 
     # pretrain
     optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
-    model.compile(optimizer_pre, loss=rmse_masked)
+    rmse_fxn = rmse_loss(out_size)
+    model.compile(optimizer_pre, loss=rmse_fxn)
 
     csv_log_pre = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, f'pretrain_log.csv'))
@@ -71,7 +72,7 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
 
     # finetune
     optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-    model.compile(optimizer_ft, loss=rmse_masked)
+    model.compile(optimizer_ft, loss=rmse_fxn)
 
     csv_log_ft = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, 'finetune_log.csv'))
@@ -89,6 +90,7 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
         f.write(f'elapsed time finetune:\
                  {finetune_time_elapsed} \n')
 
-    model.save_weights(os.path.join(out_dir, f'trained_weights/'))
-    return model
+    trained_path = os.path.join(out_dir, f'trained_weights/')
+    model.save_weights(trained_path)
+    return trained_path
 

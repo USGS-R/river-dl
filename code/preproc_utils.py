@@ -150,7 +150,7 @@ def exclude_segments(weights, exclude_segs):
             else:
                 raise ValueError('exclude grp needs either "seg_id_nats_in" or'
                                  '"seg_id_nats_ex')
-            weights[v].loc[ex_segs, start:end] = 0
+            weights[v].loc[start:end, ex_segs] = 0
     return weights
 
 
@@ -306,7 +306,7 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
-@task()
+@task(target="prep.txt", checkpoint=True)
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
               pretrain_vars, finetune_vars, test_start_date='2004-09-30',
               n_test_yr=12, segment_id=None, exclude_file=None, log_q=False,

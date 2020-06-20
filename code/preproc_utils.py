@@ -21,7 +21,7 @@ def scale(data_arr, std=None, mean=None):
         std = data_arr.std(skipna=True)
         mean = data_arr.mean(skipna=True)
     # adding small number in case there is a std of zero
-    scaled = (data_arr - mean)/(std + 1e-10)
+    scaled = (data_arr - mean) / (std + 1e-10)
     check_if_finite(std)
     check_if_finite(mean)
     return scaled, std, mean
@@ -57,9 +57,9 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     (batch_size), nfeat]
     """
     combined = []
-    for i in range(int(1/offset)):
+    for i in range(int(1 / offset)):
         start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1]+1,
+        idx = np.arange(start=start, stop=data_array.shape[1] + 1,
                         step=seq_len)
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
@@ -120,7 +120,7 @@ def reshape_for_training(data):
     :return: reshaped data [nbatch * nseg, len_seq, nfeat/nout]
     """
     n_batch, n_seg, seq_len, n_feat = data.shape
-    return np.reshape(data, [n_batch*n_seg, seq_len, n_feat])
+    return np.reshape(data, [n_batch * n_seg, seq_len, n_feat])
 
 
 def exclude_segments(weights, exclude_segs):
@@ -306,10 +306,11 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
-@task
+@task()
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
-           pretrain_vars, finetune_vars, test_start_date='2004-09-30',
-           n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
+              pretrain_vars, finetune_vars, test_start_date='2004-09-30',
+              n_test_yr=12, segment_id=None, exclude_file=None, log_q=False,
+              out_file=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -323,6 +324,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
     :param test_start_date: [str] the date to start for the test period
     :param n_test_yr: [int] number of years to take for the test period
     :param exclude_file: [str] path to exclude file
+    :param segment_id: [int] specify a 'segment_id' if you just want the data
+    for one segment (for training a simple model)
     :param log_q: [bool] whether or not to take the log of discharge in training
     :param out_file: [str] file to where the values will be written
     :returns: training and testing data along with the means and standard
@@ -346,11 +349,6 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
     x_data = ds_pre[x_vars]
     x_trn, x_tst = separate_trn_tst(x_data, test_start_date, n_test_yr)
 
-    x_scl, x_std, x_mean = scale(x_data)
-
-    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
-    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
-
     # read, filter observations for finetuning
     y_obs = get_y_obs([obs_temper_file, obs_flow_file], pretrain_file,
                       finetune_vars)
@@ -371,7 +369,21 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
     y_obs_wgts, y_obs_trn = create_finetune_weights_data(y_pre_trn, y_obs_trn,
                                                          exclude_segs)
 
-    # scale y training data and get the mean and std
+    if segment_id:
+        x_trn = x_trn.sel(seg_id_nat=[segment_id])
+        x_tst = x_tst.sel(seg_id_nat=[segment_id])
+        y_pre_trn = y_pre_trn.sel(seg_id_nat=[segment_id])
+        y_obs_trn = y_obs_trn.sel(seg_id_nat=[segment_id])
+        y_obs_tst = y_obs_tst.sel(seg_id_nat=[segment_id])
+        y_pre_wgts = y_pre_wgts.sel(seg_id_nat=[segment_id])
+        y_obs_wgts = y_obs_wgts.sel(seg_id_nat=[segment_id])
+
+    # scale x and y training data and get the mean and std
+    x_scl, x_std, x_mean = scale(x_data)
+
+    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
+    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+
     y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
     # for pre-training, keep everything together
     y_trn_pre_scl, _, _ = scale(y_pre_trn)

@@ -67,28 +67,6 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     return combined
 
 
-def read_format_data(filename):
-    """
-    read in data into a dataframe, then format the dates and sort
-    :param filename: [str] filename that has the data
-    :return: [dataframe] formatted/sorted data
-    """
-    # read in x, y_pretrain data
-    if filename.endswith('csv'):
-        df = pd.read_csv(filename)
-    elif filename.endswith('feather'):
-        df = pd.read_feather(filename)
-        del df['model_idx']
-    else:
-        raise ValueError('file_format should be "feather" or "csv"')
-    df['date'] = pd.to_datetime(df['date'])
-    df['seg_id_nat'] = pd.to_numeric(df['seg_id_nat'])
-    df = df.sort_values(['date', 'seg_id_nat'])
-    df = df.set_index(['seg_id_nat', 'date'])
-    ds = df.to_xarray()
-    return ds
-
-
 def get_unique_dates(partition, x_data_file):
     """
     get the unique dates for a partition
@@ -124,7 +102,7 @@ def read_multiple_obs(obs_files, pre_train_file):
     """
     obs = [xr.open_zarr(pre_train_file).sortby(['seg_id_nat', 'date'])]
     for filename in obs_files:
-        ds = read_format_data(filename)
+        ds = xr.open_zarr(filename)
         obs.append(ds)
     obs = xr.merge(obs, join='left')
     obs = obs[['temp_c', 'discharge_cms']]

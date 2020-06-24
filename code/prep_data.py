@@ -4,7 +4,7 @@ from preproc_utils import prep_data
 
 # read in arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("-o", "--file", help='file where the output should be'
+parser.add_argument("-o", "--outfile", help='file where the output should be'
                                          'written')
 parser.add_argument("-f", "--finetune_vars", help='whether to finetune on\
                     temp, flow, or both', choices=['temp', 'flow', 'both'],
@@ -18,7 +18,7 @@ parser.add_argument("-l", "--log_q", help='whether or not to log discharge for\
                     training', action='store_true')
 args = parser.parse_args()
 
-out_dir = args.outdir
+out_file = args.outfile
 pt_vars = args.pretrain_vars
 ft_vars = args.finetune_vars
 log_q = args.log_q
@@ -38,5 +38,5 @@ data = prep_data(obs_temper_file=obs_temper, obs_flow_file=obs_flow,
                  pretrain_file=sntemp, distfile=distfile, x_vars=x_vars,
                  pretrain_vars=pt_vars, finetune_vars=ft_vars,
                  n_test_yr=test_yrs, test_start_date=test_start,
-                 exclude_file=exclude_file, log_q=log_q)
+                 exclude_file=exclude_file, log_q=log_q, out_file=out_file)
 

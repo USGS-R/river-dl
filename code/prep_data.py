@@ -16,6 +16,7 @@ parser.add_argument("-x", "--exclude_segs_file", help='yml file that contains\
                     segments to exclude', default=None)
 parser.add_argument("-l", "--log_q", help='whether or not to log discharge for\
                     training', action='store_true')
+parser.add_argument("-i", "--in_data_dir", help='input data directory')
 args = parser.parse_args()
 
 out_file = args.outfile
@@ -23,7 +24,7 @@ pt_vars = args.pretrain_vars
 ft_vars = args.finetune_vars
 log_q = args.log_q
 exclude_file = args.exclude_segs_file
-data_dir = '../data/in/'
+data_dir = args.in_data_dir
 obs_temper = os.path.join(data_dir, 'obs_temp_full')
 obs_flow = os.path.join(data_dir, 'obs_flow_full')
 sntemp = os.path.join(data_dir, 'uncal_sntemp_input_output')

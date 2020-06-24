@@ -98,16 +98,14 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
-            logged_q=False, half_tst=False):
+def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
     predictions feather file.
-    :param model_weight_dir:
+    :param model: the trained TF model
     :param io_data: [dict] dictionary or .npz file with all x_data, y_data,
     and dist matrix
-    :param hidden_size: [int] the number of hidden units in model
     :param half_tst: [bool] whether or not to halve the testing data so some
     can be held out
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
@@ -119,11 +117,6 @@ def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
     """
     io_data = get_data_if_file(io_data)
     dist_matrix = io_data['dist_matrix']
-
-    out_size = len(io_data['y_vars'])
-    model = RGCNModel(hidden_size, out_size, A=dist_matrix)
-
-    model.load_weights(os.path.join(model_weight_dir))
 
     # evaluate training
     if partition == 'trn' or partition == 'tst':
@@ -145,6 +138,7 @@ def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
         y_pred_pp = take_first_half(y_pred_pp)
 
     y_pred_pp.to_feather(outfile)
+    return y_pred_pp
 
 
 def get_var_names(variable):
@@ -164,16 +158,16 @@ def get_var_names(variable):
     return obs_var, seg_var
 
 
-def fmt_preds_obs(pred_file, obs_file, variable):
+def fmt_preds_obs(pred_data, obs_file, variable):
     """
     combine predictions and observations in one dataframe
-    :param pred_file:[str] filepath to the predictions file
+    :param pred_data:[str] filepath to the predictions file
     :param obs_file:[str] filepath to the observations file
     :param variable: [str] either 'flow' or 'temp'
     """
     obs_var, seg_var = get_var_names(variable)
-    pred_data = pd.read_feather(pred_file)
-    pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
+    if {'date', 'seg_id_nat'}.issubset(pred_data.columns):
+        pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
     obs = pd.read_csv(obs_file, parse_dates=['date'],
                       infer_datetime_format=True,
                       index_col=['date', 'seg_id_nat'])
@@ -200,32 +194,53 @@ def calc_metrics(df):
         return pd.Series(dict(rmse=np.nan, nse=np.nan))
 
 
-def overall_metrics(pred_file, obs_file, outfile, variable):
+def overall_metrics(pred_data, obs_file, variable, partition, outfile=None):
     """
     calculate overall metrics
-    :param pred_file: [str] path to predictions feather file
+    :param pred_data: [str] path to predictions feather file
     :param obs_file: [str] path to observations csv file
     :param outfile: [str] file where the metrics should be written
     :param variable: [str] either 'flow' or 'temp'
+    :param partition: [str] either 'trn' or 'temp'
     :return: [pd Series] the overall metrics
     """
-    data = fmt_preds_obs(pred_file, obs_file, variable)
+    data = fmt_preds_obs(pred_data, obs_file, variable)
     metrics = calc_metrics(data)
-    metrics.to_csv(outfile)
+    metrics['variable'] = variable
+    metrics['partition'] = partition
+    if outfile:
+        metrics.to_csv(outfile)
     return metrics
 
 
-def reach_specific_metrics(pred_file, obs_file, outfile, variable):
+def reach_specific_metrics(pred_data, obs_file, variable, outfile=None):
     """
     calculate reach-specific metrics
-    :param pred_file: [str] path to predictions feather file
+    :param pred_data: [str] path to predictions feather file
     :param obs_file: [str] path to observations csv file
     :param outfile: [str] file where the metrics should be written
     :param variable: [str] either 'flow' or 'temp'
     :return: [pd DataFrame] the reach-specific metrics
     """
-    data = fmt_preds_obs(pred_file, obs_file, variable)
+    data = fmt_preds_obs(pred_data, obs_file, variable)
     reach_metrics = data.groupby('seg_id_nat').apply(
             calc_metrics).reset_index()
-    reach_metrics.to_feather(outfile)
+    if outfile:
+        reach_metrics.to_feather(outfile)
     return reach_metrics
+
+
+def all_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
+    df_all = []
+    trn_temp = overall_metrics(pred_trn, obs_temp, 'temp', 'trn')
+    tst_temp = overall_metrics(pred_tst, obs_temp, 'temp', 'tst')
+    trn_flow = overall_metrics(pred_trn, obs_flow, 'flow', 'trn')
+    tst_flow = overall_metrics(pred_tst, obs_flow, 'flow', 'tst')
+    df_all.append(trn_temp)
+    df_all.append(tst_temp)
+    df_all.append(trn_flow)
+    df_all.append(tst_flow)
+    df_all = pd.concat(df_all, axis=1).T
+    if outfile:
+        df_all.to_csv(outfile)
+    return df_all

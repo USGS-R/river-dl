@@ -126,7 +126,7 @@ def predict_from_file(model_weights_dir, io_data, dist_matrix, hidden_size,
     return preds
 
 
-#@task
+@task
 def predict(model, io_data, partition, outfile, num_segs, logged_q=False,
             half_tst=False):
     """

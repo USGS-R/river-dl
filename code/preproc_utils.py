@@ -300,7 +300,7 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
-def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
+def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
               pretrain_vars, finetune_vars, test_start_date='2004-09-30',
               n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
     """
@@ -387,6 +387,7 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
             'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
             'y_vars': np.array(y_vars),
             'y_obs_tst': convert_batch_reshape(y_obs_tst),
+            'dist_matrix': prep_adj_matrix(distfile, 'upstream')
             }
     if out_file:
         np.savez_compressed(out_file, **data)

@@ -84,7 +84,7 @@ def rmse_masked(y_true, y_pred):
     rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss
 
-  
+
 def nse(y_true, y_pred):
     """
     compute the nash-sutcliffe model efficiency coefficient
@@ -98,16 +98,15 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def predict(model_weight_dir, io_data, dist_matrix, hidden_size, partition, outfile,
-        logged_q=False, half_tst=False):
+def predict(model_weight_dir, io_data, hidden_size, partition, outfile,
+            logged_q=False, half_tst=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
     predictions feather file.
     :param model_weight_dir:
-    :param x_data: [dict] dictionary or .npz file with all the x_data
-    :param y_data: [dict] dictionary or .npz file with all the y_data
-    :param dist_matrix: [dict] dictionary or .npz file with all the dist_matrix
+    :param io_data: [dict] dictionary or .npz file with all x_data, y_data,
+    and dist matrix
     :param hidden_size: [int] the number of hidden units in model
     :param half_tst: [bool] whether or not to halve the testing data so some
     can be held out
@@ -119,10 +118,10 @@ def predict(model_weight_dir, io_data, dist_matrix, hidden_size, partition, outf
     :return:[none]
     """
     io_data = get_data_if_file(io_data)
-    dist_matrix = get_data_if_file(dist_matrix)
+    dist_matrix = io_data['dist_matrix']
 
     out_size = len(io_data['y_vars'])
-    model = RGCNModel(hidden_size, out_size, A=dist_matrix['dist_matrix'])
+    model = RGCNModel(hidden_size, out_size, A=dist_matrix)
 
     model.load_weights(os.path.join(model_weight_dir))
 
@@ -132,7 +131,7 @@ def predict(model_weight_dir, io_data, dist_matrix, hidden_size, partition, outf
     else:
         raise ValueError('partition arg needs to be "trn" or "tst"')
 
-    num_segs = dist_matrix['dist_matrix'].shape[0]
+    num_segs = dist_matrix.shape[0]
     y_pred = model.predict(io_data[f'x_{partition}'], batch_size=num_segs)
     y_pred_pp = prepped_array_to_df(y_pred, io_data[f'dates_{partition}'],
                                     io_data[f'ids_{partition}'],
@@ -189,7 +188,7 @@ def fmt_preds_obs(pred_file, obs_file, variable):
 def calc_metrics(df):
     """
     calculate metrics (rmse and nse) on one reach
-    :param df:[pd dataframe] dataframe of observations and predictions for 
+    :param df:[pd dataframe] dataframe of observations and predictions for
     one reach
     :return: [pd Series] the rmse and nse for that one reach
     """
@@ -201,10 +200,9 @@ def calc_metrics(df):
         return pd.Series(dict(rmse=np.nan, nse=np.nan))
 
 
-
 def overall_metrics(pred_file, obs_file, outfile, variable):
     """
-    calculate overall metrics 
+    calculate overall metrics
     :param pred_file: [str] path to predictions feather file
     :param obs_file: [str] path to observations csv file
     :param outfile: [str] file where the metrics should be written
@@ -219,7 +217,7 @@ def overall_metrics(pred_file, obs_file, outfile, variable):
 
 def reach_specific_metrics(pred_file, obs_file, outfile, variable):
     """
-    calculate reach-specific metrics 
+    calculate reach-specific metrics
     :param pred_file: [str] path to predictions feather file
     :param obs_file: [str] path to observations csv file
     :param outfile: [str] file where the metrics should be written

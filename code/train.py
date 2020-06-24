@@ -24,8 +24,7 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
                 learning_rate_ft=0.01):
     """
     train the rgcn
-    :param x_data: [dict or str] the data file or data dict of the x_data
-    :param y_data: [dict or str] the data file or data dict of the y_data
+    :param io_data: [dict or str] the data file or data dict of the io_data
     :param dist_matrix: [dict or str] data file or data dict of the dist_matrix
     :param pretrain_epochs: [int] number of pretrain epochs
     :param finetune_epochs: [int] number of finetune epochs

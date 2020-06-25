@@ -17,7 +17,7 @@ def get_data_if_file(d):
         return np.load(d)
 
 
-def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
+def train_model(io_data, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
                 learning_rate_ft=0.01):
     """
@@ -41,7 +41,7 @@ def train_model(io_data, dist_matrix, pretrain_epochs, finetune_epochs,
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
-    dist_matrix = get_data_if_file(dist_matrix)['dist_matrix']
+    dist_matrix = io_data['dist_matrix']
 
     n_seg = dist_matrix.shape[0]
     out_size = len(io_data['y_vars'])

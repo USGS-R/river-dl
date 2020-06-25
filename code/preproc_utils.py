@@ -20,7 +20,7 @@ def scale(data_arr, std=None, mean=None):
         std = data_arr.std(skipna=True)
         mean = data_arr.mean(skipna=True)
     # adding small number in case there is a std of zero
-    scaled = (data_arr - mean)/(std + 1e-10)
+    scaled = (data_arr - mean) / (std + 1e-10)
     check_if_finite(std)
     check_if_finite(mean)
     return scaled, std, mean
@@ -56,37 +56,15 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     (batch_size), nfeat]
     """
     combined = []
-    for i in range(int(1/offset)):
+    for i in range(int(1 / offset)):
         start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1]+1,
+        idx = np.arange(start=start, stop=data_array.shape[1] + 1,
                         step=seq_len)
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
         combined.extend([s for s in split if s.shape[1] == seq_len])
     combined = np.asarray(combined)
     return combined
-
-
-def read_format_data(filename):
-    """
-    read in data into a dataframe, then format the dates and sort
-    :param filename: [str] filename that has the data
-    :return: [dataframe] formatted/sorted data
-    """
-    # read in x, y_pretrain data
-    if filename.endswith('csv'):
-        df = pd.read_csv(filename)
-    elif filename.endswith('feather'):
-        df = pd.read_feather(filename)
-        del df['model_idx']
-    else:
-        raise ValueError('file_format should be "feather" or "csv"')
-    df['date'] = pd.to_datetime(df['date'])
-    df['seg_id_nat'] = pd.to_numeric(df['seg_id_nat'])
-    df = df.sort_values(['date', 'seg_id_nat'])
-    df = df.set_index(['seg_id_nat', 'date'])
-    ds = df.to_xarray()
-    return ds
 
 
 def get_unique_dates(partition, x_data_file):
@@ -124,7 +102,7 @@ def read_multiple_obs(obs_files, pre_train_file):
     """
     obs = [xr.open_zarr(pre_train_file).sortby(['seg_id_nat', 'date'])]
     for filename in obs_files:
-        ds = read_format_data(filename)
+        ds = xr.open_zarr(filename)
         obs.append(ds)
     obs = xr.merge(obs, join='left')
     obs = obs[['temp_c', 'discharge_cms']]
@@ -141,7 +119,7 @@ def reshape_for_training(data):
     :return: reshaped data [nbatch * nseg, len_seq, nfeat/nout]
     """
     n_batch, n_seg, seq_len, n_feat = data.shape
-    return np.reshape(data, [n_batch*n_seg, seq_len, n_feat])
+    return np.reshape(data, [n_batch * n_seg, seq_len, n_feat])
 
 
 def exclude_segments(weights, exclude_segs):
@@ -190,67 +168,41 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def create_pretrain_weights(y_pre_data):
+def change_weights_by_outcols(weights, out_cols):
     """
-    create pretrain weights with the same shape as the pretrain data with all
-    one's. Assuming here that we want all of the segments and variables to
-    count equally in the pretraining.
-    :param y_pre_data: [xr dataset] the pretraining data
-    :return: [xr dataset] dataset of all one's with the same shape as y_pre_data
+    modify the weights by the outcolumns
+    :param weights:[xr dataset] weights
+    :param out_cols:[str] which columns you will be looking at. should be
+    'temp', 'flow', or 'both'
+    :returns: [xr dataset] modified weights
     """
-    pretrain_wgts = initialize_weights(y_pre_data, 1)
-    return pretrain_wgts
+    if out_cols == "both":
+        pass
+    elif out_cols == 'temp':
+        weights.seg_outflow.loc[:, :] = 0
+    elif out_cols == 'flow':
+        weights.seg_tave_water.loc[:, :] = 0
+    else:
+        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
+    return weights
 
 
-def initialize_ft_data(y_pre_data, y_trn_data):
+def create_weight_vectors(y_data, out_cols, exclude_segs):
     """
-    here we are replacing the pretrain data vars with observations where we have
-    observations
-    :param y_pre_data: [xr dataset] the pretraining dataset
-    :param y_trn_data: [xr dataset] the observation dataset
-    :return: [xr dataset] dataset with the same dimensions as the pretrain set
-    """
-    ft_data = initialize_weights(y_pre_data, np.nan)
-    for data_var in y_trn_data.data_vars:
-        ft_data[data_var] = y_trn_data[data_var]
-    return ft_data
-
-
-def mask_ft_wgts_data(y_pre_data, y_trn_data):
-    """
-    mask the finetune (obs) weights and data. the result is two datasets.
-    ft_wgts are weights of 0 where there are no observations and 1 where there
-    are observations. ft_data is the pretrain data where we have no observations
-    and the observations where we have observations
-    :param y_pre_data: [xr dataset] the pretraining dataset
-    :param y_trn_data: [xr dataset] the observation dataset
-    :return: [tuple of xr datasets] the ft weights and data
-    """
-    ft_wgts = initialize_weights(y_pre_data, 0)
-    ft_data = initialize_ft_data(y_pre_data, y_trn_data)
-    ft_wgts = ft_wgts.where(ft_data.isnull(), other=1)
-    ft_data = ft_data.where(ft_data.notnull(), other=y_pre_data)
-    # make sure the finetune weights are not all zero
-    assert np.sum(ft_wgts.to_array().values) > 0
-    return ft_wgts, ft_data
-
-
-def create_finetune_weights_data(y_pre_data, y_trn_data, exclude_segs):
-    """
-    filter out either flow, temperature, or neither in the pre-training and 
-    finetune y data.
-    **I AM MAKING A SIGNIFICANT ASSUMPTION HERE: THE FINETUNE
-    VARIABLES WILL BE IN THE PRETRAINING VARIABLES
-    :param y_pre_data: [xr dataset] the pretraining dataset
-    :param y_trn_data: [xr dataset] the observation dataset
+    filter out either flow, temperature, or neither in the pre-training and
+    finetune y data
+    :param y_data: [xr dataset]
+    :param out_cols: [str] which columns to have count in the loss function;
+    either 'temp', 'flow', or 'both'
     :param exclude_segs: [list] list of segment ids to exclude from the loss
     function
     :return: [xr dataset] dataset of weights between one and zero
     """
-    ft_wgts, ft_data = mask_ft_wgts_data(y_pre_data, y_trn_data)
+    initial_weights = initialize_weights(y_data, 1)
+    weights = change_weights_by_outcols(initial_weights, out_cols)
     if exclude_segs:
-        ft_wgts = exclude_segments(ft_wgts, exclude_segs)
-    return ft_wgts, ft_data
+        weights = exclude_segments(weights, exclude_segs)
+    return weights
 
 
 def convert_batch_reshape(dataset):
@@ -317,7 +269,6 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     """
     get y_obs_trn and y_obs_tst
     :param obs_files: [list] observation files
-    :param x_data_file: [str] path to x_data_file
     :param pretrain_file: [str] path to pretrain file
     :param finetune_vars: [list] variables that will be used in finetuning
     :return: [xr datasets]
@@ -327,9 +278,9 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
-def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
-           pretrain_vars, finetune_vars, test_start_date='2004-09-30',
-           n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
+def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
+              pretrain_vars, finetune_vars, test_start_date='2004-09-30',
+              n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -338,8 +289,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
     :param obs_flow_file:[str] discharge observations file (csv)
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
     :param x_vars: [list] variables that should be used as input
-    :param pretrain_vars: [list] variables that will be used for pretraining
-    :param finetune_vars: [list] variables that will be used for finetuning
+    :param pretrain_vars: [str] 'flow', 'temp', or 'both'
+    :param finetune_vars: [str] 'flow', 'temp', or 'both'
     :param test_start_date: [str] the date to start for the test period
     :param n_test_yr: [int] number of years to take for the test period
     :param exclude_file: [str] path to exclude file
@@ -372,24 +323,25 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # read, filter observations for finetuning
-    y_obs = get_y_obs([obs_temper_file, obs_flow_file], pretrain_file,
-                      finetune_vars)
+    y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], pretrain_file)
     y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
-    y_pre = ds_pre[pretrain_vars]
+    y_vars = ['seg_tave_water', 'seg_outflow']
+    y_pre = ds_pre[y_vars]
     y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)
 
     if log_q:
         y_obs_trn = log_discharge(y_obs_trn)
-        y_obs_tst = log_discharge(y_obs_tst)
+        y_pre_trn = log_discharge(y_pre_trn)
 
     # filter pretrain/finetune y
     if exclude_file:
         exclude_segs = read_exclude_segs_file(exclude_file)
     else:
         exclude_segs = None
-    y_pre_wgts = create_pretrain_weights(y_pre_trn)
-    y_obs_wgts, y_obs_trn = create_finetune_weights_data(y_pre_trn, y_obs_trn,
-                                                         exclude_segs)
+    y_pre_wgts = create_weight_vectors(y_pre_trn, pretrain_vars,
+                                       exclude_segs=None)
+    y_obs_wgts = create_weight_vectors(y_pre_trn, finetune_vars,
+                                       exclude_segs=exclude_segs)
 
     # scale y training data and get the mean and std
     y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
@@ -411,8 +363,9 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, x_vars,
             'y_obs_trn_mean': y_trn_obs_mean.to_array().values,
             'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
             'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
-            'y_vars': np.array(pretrain_vars),
+            'y_vars': np.array(y_vars),
             'y_obs_tst': convert_batch_reshape(y_obs_tst),
+            'dist_matrix': prep_adj_matrix(distfile, 'upstream')
             }
     if out_file:
         np.savez_compressed(out_file, **data)

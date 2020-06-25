@@ -2,6 +2,7 @@ name: rgcn
 channels:
     - conda-forge
     - defaults
+    - bioconda
 dependencies:
     - dvc
     - ipython
@@ -9,4 +10,8 @@ dependencies:
     - pandas
     - pyarrow
     - scikit-learn
+    - snakemake
     - tensorflow >= 2.0
+    - tensorflow-gpu >= 2.0
+    - xarray
+    - zarr

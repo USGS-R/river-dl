@@ -28,6 +28,7 @@ data_dir = args.in_data_dir
 obs_temper = os.path.join(data_dir, 'obs_temp_full')
 obs_flow = os.path.join(data_dir, 'obs_flow_full')
 sntemp = os.path.join(data_dir, 'uncal_sntemp_input_output')
+catch_attr_file = os.path.join(data_dir, 'seg_attr_drb.feather')
 distfile = os.path.join(data_dir, 'distance_matrix.npz')
 x_vars =['seg_rain', 'seg_tave_air', 'seginc_swrad', 'seg_length',
          'seginc_potet', 'seg_slope', 'seg_humid', 'seg_elev']
@@ -38,6 +39,7 @@ test_yrs = 12
 data = prep_data(obs_temper_file=obs_temper, obs_flow_file=obs_flow,
                  pretrain_file=sntemp, distfile=distfile, x_vars=x_vars,
                  pretrain_vars=pt_vars, finetune_vars=ft_vars,
-                 n_test_yr=test_yrs, test_start_date=test_start,
-                 exclude_file=exclude_file, log_q=log_q, out_file=out_file)
+                 catch_prop_file=catch_attr_file, n_test_yr=test_yrs,
+                 test_start_date=test_start, exclude_file=exclude_file,
+                 log_q=log_q, out_file=out_file)
 

@@ -111,6 +111,31 @@ def read_multiple_obs(obs_files, pre_train_file):
     return obs
 
 
+def join_catch_properties(x_data_ts, catch_props):
+    """
+    append the catchment properties to the x time series data
+    :param x_data_ts: [xr dataset] timeseries x-data
+    :param catch_props: [xr dataset] catchment properties data
+    :return: [xr dataset] the merged datasets
+    """
+    # broadcast the catchment properties on the ts data so that there is a value
+    # for each date
+    _, ds_catch = xr.broadcast(x_data_ts, catch_props)
+    return xr.merge([x_data_ts, ds_catch], join='left')
+
+
+def prep_catch_props(x_data_ts, catch_prop_file):
+    """
+    read catch property file and join with ts data
+    :param x_data_ts: [xr dataset] timeseries x-data
+    :param catch_prop_file: [str] the feather file of catchment attributes
+    :return: [xr dataset] merged datasets
+    """
+    df_catch_props = pd.read_feather(catch_prop_file)
+    ds_catch_props = df_catch_props.set_index('seg_id_nat').to_xarray()
+    return join_catch_properties(x_data_ts, ds_catch_props)
+
+
 def reshape_for_training(data):
     """
     reshape the data for training
@@ -279,8 +304,9 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
 
 
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
-              pretrain_vars, finetune_vars, test_start_date='2004-09-30',
-              n_test_yr=12, exclude_file=None, log_q=False, out_file=None):
+              catch_prop_file=None, pretrain_vars='both', finetune_vars='both',
+              test_start_date='2004-09-30', n_test_yr=12, exclude_file=None,
+              log_q=False, out_file=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -288,7 +314,10 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     :param obs_temper_file: [str] temperature observations file (csv)
     :param obs_flow_file:[str] discharge observations file (csv)
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
+    :param distfile: [str] path to the distance matrix .npz file
     :param x_vars: [list] variables that should be used as input
+    :param catch_prop_file: [str] the path to the catchment properties file. If
+    left unfilled, the catchment properties will not be included as predictors
     :param pretrain_vars: [str] 'flow', 'temp', or 'both'
     :param finetune_vars: [str] 'flow', 'temp', or 'both'
     :param test_start_date: [str] the date to start for the test period
@@ -315,6 +344,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
 
     ds_pre = xr.open_zarr(pretrain_file)
     x_data = ds_pre[x_vars]
+    if catch_prop_file:
+        x_data = prep_catch_props(x_data, catch_prop_file)
     x_trn, x_tst = separate_trn_tst(x_data, test_start_date, n_test_yr)
 
     x_scl, x_std, x_mean = scale(x_data)

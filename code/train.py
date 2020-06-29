@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from RGCN import RGCNModel, rmse_masked
@@ -11,7 +12,7 @@ def get_data_if_file(d):
     :param d:
     :return:
     """
-    if isinstance(d, dict):
+    if isinstance(d, NpzFile):
         return d
     else:
         return np.load(d)

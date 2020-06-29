@@ -1,6 +1,7 @@
 import os
 import json
 import pandas as pd
+import xarray as xr
 import numpy as np
 from RGCN import RGCNModel
 from train import get_data_if_file
@@ -98,6 +99,33 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
+def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
+                      outfile, logged_q=False, half_tst=False):
+    """
+    make predictions from trained model
+    :param model_weights_dir:
+    :param io_file:
+    :param dist_matrix_file: [str] path to .npz file with all the dist_matrix
+    :param hidden_size: [int] the number of hidden units in model
+    :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
+    for the train or the dev period
+    :param outfile: [str] the file where the output data should be stored
+    :param logged_q: [str] whether the discharge was logged in training. if True
+    the exponent of the discharge will be taken in the model unscaling
+    :param half_tst: [bool] whether or not to halve the testing data so some
+    can be held out
+    :return:
+    """
+    io_data = get_data_if_file(io_data)
+    out_size = len(io_data['y_vars'])
+    model = RGCNModel(hidden_size, out_size, A=io_data['dist_matrix'])
+
+    model.load_weights(model_weights_dir)
+    preds = predict(model, io_data, partition, outfile, logged_q=logged_q,
+                    half_tst=half_tst)
+    return preds
+
+
 def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     """
     use trained model to make predictions and then evaluate those predictions.
@@ -158,6 +186,14 @@ def get_var_names(variable):
     return obs_var, seg_var
 
 
+def load_if_not_df(pred_data):
+    print("pred_data:", pred_data)
+    if isinstance(pred_data, str):
+        return(pd.read_feather(pred_data))
+    else:
+        return pred_data
+
+
 def fmt_preds_obs(pred_data, obs_file, variable):
     """
     combine predictions and observations in one dataframe
@@ -166,11 +202,10 @@ def fmt_preds_obs(pred_data, obs_file, variable):
     :param variable: [str] either 'flow' or 'temp'
     """
     obs_var, seg_var = get_var_names(variable)
+    pred_data = load_if_not_df(pred_data)
     if {'date', 'seg_id_nat'}.issubset(pred_data.columns):
         pred_data.set_index(['date', 'seg_id_nat'], inplace=True)
-    obs = pd.read_csv(obs_file, parse_dates=['date'],
-                      infer_datetime_format=True,
-                      index_col=['date', 'seg_id_nat'])
+    obs = xr.open_zarr(obs_file).to_dataframe()
     obs_cln = obs[[obs_var]]
     obs_cln.columns = ['obs']
     preds = pred_data[[seg_var]]
@@ -204,12 +239,13 @@ def overall_metrics(pred_data, obs_file, variable, partition, outfile=None):
     :param partition: [str] either 'trn' or 'temp'
     :return: [pd Series] the overall metrics
     """
+    print("variable: ", variable)
     data = fmt_preds_obs(pred_data, obs_file, variable)
     metrics = calc_metrics(data)
     metrics['variable'] = variable
     metrics['partition'] = partition
     if outfile:
-        metrics.to_csv(outfile)
+        metrics.to_csv(outfile, header=False)
     return metrics
 
 
@@ -243,4 +279,11 @@ def all_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
     df_all = pd.concat(df_all, axis=1).T
     if outfile:
         df_all.to_csv(outfile)
+    return df_all
+
+
+def combine_csvs(csv_files, outfile):
+    dfs = [pd.read_csv(f, index_col=0).T for f in csv_files]
+    df_all = pd.concat(dfs, axis=0)
+    df_all.to_csv(outfile)
     return df_all

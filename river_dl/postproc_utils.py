@@ -7,21 +7,23 @@ from RGCN import RGCNModel
 from train import get_data_if_file
 
 
-def prepped_array_to_df(y_pred, dates, ids, col_names):
+def prepped_array_to_df(data_array, dates, ids, col_names):
     """
-    post process y data (reshape and make into pandas DFs)
-    :param y_pred:[numpy array] array of predictions [nbatch, seq_len, n_out]
+    convert prepped x or y data in numpy array to pandas df
+    (reshape and make into pandas DFs)
+    :param data_array:[numpy array] array of x or y data [nbatch, seq_len,
+    n_out]
     :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
     :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]
     :return:[pd dataframe] df with cols
     ['date', 'seg_id_nat', 'temp_c', 'discharge_cms]
     """
-    y_pred = np.reshape(y_pred, [y_pred.shape[0]*y_pred.shape[1],
-                                 y_pred.shape[2]])
+    y_pred = np.reshape(y_pred, [data_array.shape[0]*data_array.shape[1],
+                                 data_array.shape[2]])
 
     dates = np.reshape(dates, [dates.shape[0]*dates.shape[1], dates.shape[2]])
     ids = np.reshape(ids, [ids.shape[0]*ids.shape[1], ids.shape[2]])
-    df_preds = pd.DataFrame(y_pred, columns=col_names)
+    df_preds = pd.DataFrame(data_array, columns=col_names)
     df_dates = pd.DataFrame(dates, columns=['date'])
     df_ids = pd.DataFrame(ids, columns=['seg_id_nat'])
     df = pd.concat([df_dates, df_ids, df_preds], axis=1)

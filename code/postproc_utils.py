@@ -283,7 +283,7 @@ def all_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
 
 
 def combine_csvs(csv_files, outfile):
-    dfs = [pd.read_csv(f, index_col=0).T for f in csv_files]
+    dfs = [pd.read_csv(f, index_col=0, header=None).T for f in csv_files]
     df_all = pd.concat(dfs, axis=0)
     df_all.to_csv(outfile)
     return df_all

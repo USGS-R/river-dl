@@ -17,8 +17,6 @@ parser.add_argument("-p", "--pretrain_epochs", help='number of pretrain'
 parser.add_argument("-f", "--finetune_epochs", help='number of finetune'
                     'epochs', type=int)
                     
-parser.add_argument("-f", "--metrics_file", help='file that contains the'
-                                                 'evaluation metrics')
 
 args = parser.parse_args()
 in_data_file = args.in_data

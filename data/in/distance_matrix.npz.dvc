@@ -1,7 +1,0 @@
-md5: d7e61ced61968019a70445f6311043d2
-outs:
-- md5: f7d2c7d730f8f1aa6189da146079ffad
-  path: distance_matrix.npz
-  cache: true
-  metric: false
-  persist: false

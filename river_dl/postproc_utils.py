@@ -3,8 +3,8 @@ import json
 import pandas as pd
 import xarray as xr
 import numpy as np
-from RGCN import RGCNModel
-from train import get_data_if_file
+from .RGCN import RGCNModel
+from .train import get_data_if_file
 
 
 def prepped_array_to_df(data_array, dates, ids, col_names):
@@ -18,8 +18,9 @@ def prepped_array_to_df(data_array, dates, ids, col_names):
     :return:[pd dataframe] df with cols
     ['date', 'seg_id_nat', 'temp_c', 'discharge_cms]
     """
-    y_pred = np.reshape(y_pred, [data_array.shape[0]*data_array.shape[1],
-                                 data_array.shape[2]])
+    data_array = np.reshape(data_array,
+                            [data_array.shape[0]*data_array.shape[1],
+                             data_array.shape[2]])
 
     dates = np.reshape(dates, [dates.shape[0]*dates.shape[1], dates.shape[2]])
     ids = np.reshape(ids, [ids.shape[0]*ids.shape[1], ids.shape[2]])
@@ -105,9 +106,8 @@ def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
                       outfile, logged_q=False, half_tst=False):
     """
     make predictions from trained model
-    :param model_weights_dir:
-    :param io_file:
-    :param dist_matrix_file: [str] path to .npz file with all the dist_matrix
+    :param model_weights_dir: [str] directory to saved model weights
+    :param io_file: [str] directory to prepped data file
     :param hidden_size: [int] the number of hidden units in model
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period

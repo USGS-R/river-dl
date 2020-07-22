@@ -12,7 +12,7 @@ import numpy as np
 
 
 class RGCN(layers.Layer):
-    def __init__(self, hidden_size, A, flow_in_temp, rand_seed=None):
+    def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
         """
 
         :param hidden_size: [int] the number of hidden units
@@ -144,7 +144,7 @@ class RGCN(layers.Layer):
 
 
 class RGCNModel(tf.keras.Model):
-    def __init__(self, hidden_size, A, flow_in_temp, rand_seed=None):
+    def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
         """
         :param hidden_size: [int] the number of hidden units
         :param n_phys_vars: [int] the number of outputs to produce in

@@ -147,6 +147,63 @@ def reshape_for_training(data):
     return np.reshape(data, [n_batch * n_seg, seq_len, n_feat])
 
 
+def get_exclude_start_end(exclude_grp):
+    """
+    get the start and end dates for the exclude group
+    :param exclude_grp: [dict] dictionary representing the exclude group from
+    the exclude yml file
+    :return: [tuple of datetime objects] start date, end date
+    """
+    start = exclude_grp.get('start_date')
+    if start:
+        start = datetime.datetime.strptime(start, '%Y-%m-%d')
+
+    end = exclude_grp.get('end_date')
+    if end:
+        end = datetime.datetime.strptime(end, '%Y-%m-%d')
+    return start, end
+
+
+def get_exclude_vars(exclude_grp):
+    """
+    get the variables to exclude for the exclude group
+    :param exclude_grp: [dict] dictionary representing the exclude group from
+    the exclude yml file
+    :return: [list] variables to exclude
+    """
+    variable = exclude_grp.get('variable')
+    if not variable or variable == 'both':
+        return ['seg_tave_water', 'seg_outflow']
+    elif variable == 'temp':
+        return ['seg_tave_water']
+    elif variable == 'flow':
+        return ['seg_outflow']
+    else:
+        raise ValueError('exclude variable must be flow, temp, or both')
+
+
+def get_exclude_seg_ids(exclude_grp, all_segs):
+    """
+    get the segments to exclude
+    :param exclude_grp: [dict] dictionary representing the exclude group from
+    the exclude yml file
+    :param all_segs: [array] all of the segments. this is needed if we are doing
+    a reverse exclusion
+    :return: [list like] the segments to exclude
+    """
+    # ex_segs are the sites to exclude
+    if 'seg_id_nats_ex' in exclude_grp.keys():
+        ex_segs = exclude_grp['seg_id_nats_ex']
+    # exclude all *but* the "seg_id_nats_in"
+    elif 'seg_id_nats_in' in exclude_grp.keys():
+        ex_mask = ~all_segs.isin(exclude_grp['seg_id_nats_in'])
+        ex_segs = all_segs[ex_mask]
+    else:
+        raise ValueError('exclude grp needs either "seg_id_nats_in" or'
+                         '"seg_id_nats_ex')
+    return ex_segs
+
+
 def exclude_segments(weights, exclude_segs):
     """
     exclude segments from being trained on by setting their weights as zero
@@ -156,25 +213,16 @@ def exclude_segments(weights, exclude_segs):
     :return:
     """
     for seg_grp in exclude_segs:
-        start = seg_grp.get('start_date')
-        if start:
-            start = datetime.datetime.strptime(start, '%Y-%m-%d')
+        # get the start and end dates is present
+        start, end = get_exclude_start_end(seg_grp)
+        exclude_vars = get_exclude_vars(seg_grp)
+        segs_to_exclude = get_exclude_seg_ids(seg_grp, weights.seg_id_nat)
 
-        end = seg_grp.get('end_date')
-        if end:
-            end = datetime.datetime.strptime(end, '%Y-%m-%d')
-
-        for v in weights.data_vars:
+        # loop through the data_vars
+        for v in exclude_vars:
+            # set those weights to zero
             weights[v].load()
-            if 'seg_id_nats_ex' in seg_grp.keys():
-                ex_segs = seg_grp['seg_id_nats_ex']
-            elif 'seg_id_nats_in' in seg_grp.keys():
-                ex_mask = ~weights.seg_id_nat.isin(seg_grp['seg_id_nats_in'])
-                ex_segs = weights.seg_id_nat[ex_mask]
-            else:
-                raise ValueError('exclude grp needs either "seg_id_nats_in" or'
-                                 '"seg_id_nats_ex')
-            weights[v].loc[ex_segs, start:end] = 0
+            weights[v].loc[start:end, segs_to_exclude] = 0
     return weights
 
 
@@ -341,7 +389,6 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
             'dates_ids_tst: un-batched dates and national seg ids for testing
                             data [n_yrs, n_seg, len_seq, 2]
     """
-
     ds_pre = xr.open_zarr(pretrain_file)
     x_data = ds_pre[x_vars]
     if catch_prop_file:
@@ -455,16 +502,17 @@ def read_exclude_segs_file(exclude_file):
 
     group_after_2017:
         start_date: "2017-10-01"
-        seg_id_nats:
+        variable: "temp"
+        seg_id_nats_ex:
             - 1556
             - 1569
     group_2018_water_year:
         start_date: "2017-10-01"
         end_date: "2018-10-01"
-        seg_id_nats:
+        seg_id_nats_ex:
             - 1653
     group_all_time:
-        seg_id_nats:
+        seg_id_nats_in:
             - 1806
             - 2030
 

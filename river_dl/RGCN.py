@@ -12,19 +12,21 @@ import numpy as np
 
 
 class RGCN(layers.Layer):
-    def __init__(self, hidden_size, pred_out_size, A, rand_seed=None):
+    def __init__(self, hidden_size, A, flow_in_temp, rand_seed=None):
         """
 
         :param hidden_size: [int] the number of hidden units
-        :param pred_out_size: [int] the number of outputs to produce in
-        fine-tuning
         :param n_phys_vars: [int] the number of outputs to produce in
         pre-training
         :param A: [numpy array] adjacency matrix
+        :param flow_in_temp: [bool] whether the flow predictions should feed
+        into the temp predictions
+        :param rand_seed: [int] the random seed for initialization
         """
         super().__init__()
         self.hidden_size = hidden_size
         self.A = A.astype('float32')
+        self.flow_in_temp = flow_in_temp
 
         # set up the layer
         self.lstm = tf.keras.layers.LSTMCell(hidden_size)
@@ -72,13 +74,29 @@ class RGCN(layers.Layer):
         self.b_c = self.add_weight(shape=[hidden_size], initializer='zeros',
                                    name='b_c')
 
-        # was W2
-        self.W_out = self.add_weight(shape=[hidden_size, pred_out_size],
-                                     initializer=w_initializer,
-                                     name='W_out')
-        # was b2
-        self.b_out = self.add_weight(shape=[pred_out_size], initializer='zeros',
-                                     name='b_out')
+        if self.flow_in_temp:
+            # was W2
+            self.W_out_flow = self.add_weight(shape=[hidden_size, 1],
+                                              initializer=w_initializer,
+                                              name='W_out')
+            # was b2
+            self.b_out_flow = self.add_weight(shape=[1], initializer='zeros',
+                                              name='b_out')
+
+            self.W_out_temp = self.add_weight(shape=[hidden_size+1, 1],
+                                              initializer=w_initializer,
+                                              name='W_out')
+
+            self.b_out_temp = self.add_weight(shape=[1], initializer='zeros',
+                                              name='b_out')
+        else:
+            # was W2
+            self.W_out = self.add_weight(shape=[hidden_size, 2],
+                                         initializer=w_initializer,
+                                         name='W_out')
+            # was b2
+            self.b_out = self.add_weight(shape=[2],
+                                         initializer='zeros', name='b_out')
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -108,7 +126,14 @@ class RGCN(layers.Layer):
                                      + tf.matmul(c_graph, self.W_c_prev)
                                      + self.b_c)
 
-            out_pred = tf.matmul(h_update, self.W_out) + self.b_out
+            if self.flow_in_temp:
+                out_pred_q = tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
+                out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q], axis=1),
+                                       self.W_out_temp) + self.b_out_temp
+                out_pred = tf.concat([out_pred_t, out_pred_q], axis=1)
+            else:
+                out_pred = tf.matmul(h_update, self.W_out) + self.b_out
+
             out.append(out_pred)
 
             hidden_state_prev = h_update
@@ -119,17 +144,18 @@ class RGCN(layers.Layer):
 
 
 class RGCNModel(tf.keras.Model):
-    def __init__(self, hidden_size, pred_out_size, A, rand_seed=None):
+    def __init__(self, hidden_size, A, flow_in_temp, rand_seed=None):
         """
         :param hidden_size: [int] the number of hidden units
-        :param pred_out_size: [int] the number of outputs to produce in
-        fine-tuning
         :param n_phys_vars: [int] the number of outputs to produce in
         pre-training
         :param A: [numpy array] adjacency matrix
+        :param flow_in_temp: [bool] whether the flow predictions should feed
+        into the temp predictions
+        :param rand_seed: [int] the random seed for initialization
         """
         super().__init__()
-        self.rgcn_layer = RGCN(hidden_size, pred_out_size, A, rand_seed)
+        self.rgcn_layer = RGCN(hidden_size, A, flow_in_temp, rand_seed)
 
     def call(self, inputs, **kwargs):
         output = self.rgcn_layer(inputs)

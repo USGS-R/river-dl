@@ -3,8 +3,8 @@ import json
 import pandas as pd
 import xarray as xr
 import numpy as np
-from .RGCN import RGCNModel
-from .train import get_data_if_file
+from river_dl.RGCN import RGCNModel
+from river_dl.train import get_data_if_file
 
 
 def prepped_array_to_df(data_array, dates, ids, col_names):

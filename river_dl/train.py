@@ -46,7 +46,7 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     n_seg = dist_matrix.shape[0]
     out_size = len(io_data['y_vars'])
-    model = RGCNModel(hidden_units, out_size, flow_in_temp=flow_in_temp,
+    model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
                       A=dist_matrix, rand_seed=seed)
 
     # pretrain

@@ -30,6 +30,8 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
     :param out_dir: [str] directory where the output files should be written
+    :param flow_in_temp: [bool] whether the flow predictions should feed
+    into the temp predictions
     :param seed: [int] random seed
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate

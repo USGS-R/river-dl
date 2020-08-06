@@ -3,7 +3,7 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
-from .RGCN import RGCNModel, rmse_masked
+from river_dl.RGCN import RGCNModel, rmse_masked
 
 
 def get_data_if_file(d):
@@ -19,8 +19,8 @@ def get_data_if_file(d):
 
 
 def train_model(io_data, pretrain_epochs, finetune_epochs,
-                hidden_units, out_dir, seed=None, learning_rate_pre=0.005,
-                learning_rate_ft=0.01):
+                hidden_units, out_dir, flow_in_temp=False, seed=None,
+                learning_rate_pre=0.005, learning_rate_ft=0.01):
     """
     train the rgcn
     :param x_data: [dict or str] the data file or data dict of the x_data
@@ -30,6 +30,8 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
     :param out_dir: [str] directory where the output files should be written
+    :param flow_in_temp: [bool] whether the flow predictions should feed
+    into the temp predictions
     :param seed: [int] random seed
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
@@ -46,7 +48,8 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     n_seg = dist_matrix.shape[0]
     out_size = len(io_data['y_vars'])
-    model = RGCNModel(hidden_units, out_size, A=dist_matrix, rand_seed=seed)
+    model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
+                      A=dist_matrix, rand_seed=seed)
 
     # pretrain
     optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)

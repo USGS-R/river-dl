@@ -278,6 +278,44 @@ def create_weight_vectors(y_data, out_cols, exclude_segs):
     return weights
 
 
+def reduce_one_variable(obs, variable, reduce_amount):
+    """
+    change a specified percentage of observation values to NaN for a given
+    variable. The values that are changed are chosen randomly
+    :param obs: [pandas df] the observation data
+    :param variable: [str] the variable to reduce (i.e., 'seg_tave_water' or
+    'seg_outflow')
+    :param reduce_amount: [float] fraction to reduce the training data by.
+    For example, if 0.9, 90% of the training data will be changed to NaN
+    :return: [pandas df] data with the percentage of training data changed to
+    Nan
+    """
+    variable_series = obs[variable]
+    non_null = variable_series[variable_series.notnull()]
+    reduce_idx = non_null.sample(frac=reduce_amount).index
+    obs.loc[reduce_idx, variable] = np.nan
+    return obs
+
+
+def reduce_training_data(y_obs, reduce_temp_trn, reduce_flow_trn):
+    """
+    artificially reduce the amount of training data in the training dataset
+    :param y_obs: [xarray dataset] the training observations data for flow and
+    temp
+    :param reduce_temp_trn: [float] fraction to reduce the temperature training
+    data by. For example, if 0.9, 90% of the temperature training data will be
+    changed to NaN
+    :param reduce_flow_trn: [float] fraction to reduce the flow training data
+    by. For example, if 0.9, 90% of the flow training data will be changed to
+    NaN
+    :return: [xarray dataset] data with reduced amounts of training data
+    """
+    df = y_obs.to_dataframe()
+    df_reduced = reduce_one_variable(df, 'seg_tave_water', reduce_temp_trn)
+    df_reduced = reduce_one_variable(df_reduced, 'seg_outflow', reduce_flow_trn)
+    return df_reduced.to_xarray()
+
+
 def convert_batch_reshape(dataset):
     """
     convert xarray dataset into numpy array, swap the axes, batch the array and
@@ -353,8 +391,8 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
 
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
               catch_prop_file=None, pretrain_vars='both', finetune_vars='both',
-              test_start_date='2004-09-30', n_test_yr=12, exclude_file=None,
-              log_q=False, out_file=None):
+              test_start_date='2004-09-30', n_test_yr=12, reduce_temp_trn=0,
+              reduce_flow_trn=0, exclude_file=None, log_q=False, out_file=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -370,6 +408,12 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     :param finetune_vars: [str] 'flow', 'temp', or 'both'
     :param test_start_date: [str] the date to start for the test period
     :param n_test_yr: [int] number of years to take for the test period
+    :param reduce_temp_trn: [float] fraction to reduce the temperature training
+    data by. For example, if 0.9, 90% of the temperature training data will be
+    changed to NaN
+    :param reduce_flow_trn: [float] fraction to reduce the flow training data
+    by. For example, if 0.9, 90% of the flow training data will be changed to
+    NaN
     :param exclude_file: [str] path to exclude file
     :param log_q: [bool] whether or not to take the log of discharge in training
     :param out_file: [str] file to where the values will be written
@@ -403,6 +447,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     # read, filter observations for finetuning
     y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], pretrain_file)
     y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
+    y_obs_trn = reduce_training_data(y_obs_trn, reduce_temp_trn,
+                                     reduce_flow_trn)
     y_vars = ['seg_tave_water', 'seg_outflow']
     y_pre = ds_pre[y_vars]
     y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)

@@ -162,32 +162,7 @@ class RGCNModel(tf.keras.Model):
         return output
 
 
-def rmse_masked(data, y_pred):
-    """
-    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
-    with 0 when y_s is nan; num_y_s is a count of just those non-nan
-    observations) so we're only looking at predictions with corresponding
-    observations available
-    (credit: @aappling-usgs)
-    :param data: [tensor] true (observed) y values. these may have nans and 
-    sample weights
-    :param y_pred: [tensor] predicted y values
-    :return: rmse (one value for each training sample)
-    """
-    weights = data[:, :, -2:]
-    y_true = data[:, :, :-2]
-
-    # ensure y_pred, weights, and y_true are all tensors the same data type
-    y_true = tf.convert_to_tensor(y_true)
-    weights = tf.convert_to_tensor(weights)
-    y_true = tf.cast(y_true, y_pred.dtype)
-    weights = tf.cast(weights, y_pred.dtype)
-
-    # make all zero-weighted observations 'nan' so they don't get counted at all
-    # in the loss calculation
-    y_true = tf.where(weights == 0, np.nan, y_true)
-
-    # count the number of non-nans
+def rmse_masked_one_var(y_true, y_pred):
     num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
                          tf.float32)
     zero_or_error = tf.where(tf.math.is_nan(y_true),
@@ -197,5 +172,50 @@ def rmse_masked(data, y_pred):
     sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
     rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
     return rmse_loss
+
+
+def weighted_masked_rmse(temperature_weight=0.5):
+    """
+    calculate a weighted, masked rmse. 
+    :param temperature_weight: [float] weight between 0 and 1. The difference
+    between one and the temperature_weight becomes the flow_weight. If you want
+    to weight the rmse of temperature and the rmse of flow equally,
+    the temperature_weight would be 0.5
+    """
+
+    def rmse_masked(data, y_pred):
+        """
+        Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
+        with 0 when y_s is nan; num_y_s is a count of just those non-nan
+        observations) so we're only looking at predictions with corresponding
+        observations available
+        (credit: @aappling-usgs)
+        :param data: [tensor] true (observed) y values. these may have nans and 
+        sample weights
+        :param y_pred: [tensor] predicted y values
+        :return: rmse (one value for each training sample)
+        """
+        weights = data[:, :, -2:]
+        y_true = data[:, :, :-2]
+
+        # ensure y_pred, weights, and y_true are all tensors the same data type
+        y_true = tf.convert_to_tensor(y_true)
+        weights = tf.convert_to_tensor(weights)
+        y_true = tf.cast(y_true, y_pred.dtype)
+        weights = tf.cast(weights, y_pred.dtype)
+
+        # make all zero-weighted observations 'nan' so they don't get counted
+        # at all in the loss calculation
+        y_true = tf.where(weights == 0, np.nan, y_true)
+
+        rmse_temp = rmse_masked_one_var(y_true[:, :, 0], y_pred[:, :, 0])
+        rmse_flow = rmse_masked_one_var(y_true[:, :, 1], y_pred[:, :, 1])
+
+        rmse_loss = rmse_temp * temperature_weight + \ 
+                    rmse_temp * (1 - temperature_weight)
+
+        return rmse_loss
+
+    return rmse_masked
 
 

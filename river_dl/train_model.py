@@ -18,6 +18,11 @@ parser.add_argument("-f", "--finetune_epochs", help='number of finetune'
                     'epochs', type=int)
 parser.add_argument("-q", "--flow-in-temp", help='whether or not to do flow\
                     in temp', action='store_true') 
+parser.add_argument("--pt_temp_wgt", help='weight for temp rmse in pretraining',
+                    type=float, default=0.5) 
+parser.add_argument("--ft_temp_wgt", help='weight for temp rmse in finetuning',
+                    type=float, default=0.5) 
+
 
 args = parser.parse_args()
 flow_in_temp = args.flow_in_temp
@@ -26,8 +31,12 @@ hidden_units = args.hidden_units
 out_dir = args.outdir
 pt_epochs = args.pretrain_epochs
 ft_epochs = args.finetune_epochs
+pt_temp_wgt = args.pt_temp_wgt
+ft_temp_wgt = args.ft_temp_wgt
 
 # -------- train ------
 model = train_model(in_data_file, pt_epochs, ft_epochs, hidden_units,
-                    out_dir=out_dir, flow_in_temp=flow_in_temp)
+                    out_dir=out_dir, flow_in_temp=flow_in_temp,
+                    finetune_temp_rmse_weight=ft_temp_wgt,
+                    pretrain_temp_rmse_weight=pt_temp_wgt)
 

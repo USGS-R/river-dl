@@ -3,7 +3,7 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
-from river_dl.RGCN import RGCNModel, rmse_masked
+from river_dl.RGCN import RGCNModel, weighted_masked_rmse
 
 
 def get_data_if_file(d):
@@ -20,6 +20,7 @@ def get_data_if_file(d):
 
 def train_model(io_data, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, flow_in_temp=False, seed=None,
+                pretrain_temp_rmse_weight=0.5, finetune_temp_rmse_weight=0.5,
                 learning_rate_pre=0.005, learning_rate_ft=0.01):
     """
     train the rgcn
@@ -33,14 +34,23 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     :param flow_in_temp: [bool] whether the flow predictions should feed
     into the temp predictions
     :param seed: [int] random seed
-    :param learning_rate_pre: [float] the pretrain learning rate
+    :param pretrain_temp_rmse_weight: [float] weight between 0 and 1. How much
+    to weight the rmse of temperature in pretraining compared to flow. The
+    difference between one and the temperature_weight becomes the flow_weight.
+    If you want to weight the rmse of temperature and the rmse of flow equally,
+    the temperature_weight would be 0.5
+    :param finetune_temp_rmse_weight: [float] weight between 0 and 1. How much
+    to weight the rmse of temperature in finetuning compared to flow. The
+    difference between one and the temperature_weight becomes the flow_weight.
+    If you want to weight the rmse of temperature and the rmse of flow equally,
+    the temperature_weight would be 0.5
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
     """
-    if tf.test.gpu_device_name(): 
+    if tf.test.gpu_device_name():
         print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
     else:
-       print("Please install GPU version of TF")
+        print("Please install GPU version of TF")
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
@@ -53,7 +63,8 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     # pretrain
     optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
-    model.compile(optimizer_pre, loss=rmse_masked)
+    model.compile(optimizer_pre,
+                  loss=weighted_masked_rmse(pretrain_temp_rmse_weight))
 
     csv_log_pre = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, f'pretrain_log.csv'))
@@ -77,7 +88,8 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     # finetune
     optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-    model.compile(optimizer_ft, loss=rmse_masked)
+    model.compile(optimizer_ft,
+                  loss=weighted_masked_rmse(finetune_temp_rmse_weight))
 
     csv_log_ft = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, 'finetune_log.csv'))

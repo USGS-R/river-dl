@@ -359,6 +359,7 @@ def log_discharge(y):
     :param y: [xr dataset] the y data
     :return: [xr dataset] the data logged
     """
+    y['seg_outflow'].load()
     y['seg_outflow'].loc[:, :] = y['seg_outflow'] + 1e-6
     y['seg_outflow'].loc[:, :] = xr.ufuncs.log(y['seg_outflow'])
     return y

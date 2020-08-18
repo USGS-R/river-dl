@@ -218,7 +218,7 @@ def weighted_masked_rmse(temperature_weight=0.5):
         rmse_flow = rmse_masked_one_var(true_flow, pred_flow, weights_flow)
 
         rmse_loss = rmse_temp * temperature_weight +\
-                    rmse_temp * (1 - temperature_weight)
+                    rmse_flow * (1 - temperature_weight)
 
         return rmse_loss
 

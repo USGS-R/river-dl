@@ -75,8 +75,8 @@ def rmse_masked(y_true, y_pred):
     observations) so we're only looking at predictions with corresponding
     observations available
     (credit: @aappling-usgs)
-    :param y_true: [tensor] observed y values
-    :param y_pred: [tensor] predicted y values
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
     :return: rmse (one value for each training sample)
     """
     # count the number of non-nans
@@ -92,14 +92,65 @@ def rmse_masked(y_true, y_pred):
 def nse(y_true, y_pred):
     """
     compute the nash-sutcliffe model efficiency coefficient
-    :param y_true:
-    :param y_pred:
-    :return:
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [float] the nash-sutcliffe efficiency coefficient
     """
     q_mean = np.nanmean(y_true)
     numerator = np.nansum((y_true-y_pred)**2)
     denominator = np.nansum((y_true - q_mean)**2)
     return 1 - (numerator/denominator)
+
+
+def rmse_logged(y_true, y_pred):
+    """
+    compute the rmse of the logged data
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [float] the rmse of the logged data
+    """
+    return rmse_masked(np.log(y_true), np.log(y_pred))
+
+
+def filter_by_percentile(data, percentile, less_than=True):
+    """
+    filter an array by a percentile. The data less than (or greater than if
+    `less_than=False`) will be changed to NaN
+    :param data: [array-like] data to filter (probably y predictions or
+    y observations )
+    :param percentile: [number] percentile number 0-100
+    :param less_than: [bool] whether you want the data *less than* the
+    percentile. If False, the data greater than the percentile will remain.
+    :return: [array-like] filtered data
+    """
+    if less_than:
+        return np.where(y_true<percentile, y_true, np.nan)
+    else less_than:
+        return np.where(y_true>percentile, y_true, np.nan)
+
+
+def rmse_top10(y_true, y_pred):
+    """
+    compute the rmse of the top 10 percent of data 
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [float] the rmse of the top 10 percentile of data
+    """
+    y_true = filter_by_percentile(y_true, 90, less_than=False)
+    y_pred = filter_by_percentile(y_pred, 90, less_than=False)
+    return rmse_masked(y_true, y_pred)
+
+
+def rmse_bot10(y_true, y_pred):
+    """
+    compute the rmse of the bottom 10 percent of data 
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [float] the rmse of the bottom 10 percentile of data
+    """
+    y_true = filter_by_percentile(y_true, 10, less_than=True)
+    y_pred = filter_by_percentile(y_pred, 10, less_than=True)
+    return rmse_masked(y_true, y_pred)
 
 
 def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
@@ -175,9 +226,9 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
 
 def get_var_names(variable):
     """
-
+    get the long variable names from 'flow' or 'temp'
     :param variable: [str] either 'flow' or 'temp'
-    :return:
+    :return: [str] long variable names
     """
     if variable == 'flow':
         obs_var = 'discharge_cms'
@@ -226,11 +277,25 @@ def calc_metrics(df):
     :return: [pd Series] the rmse and nse for that one reach
     """
     if df['obs'].count() > 10:
-        reach_rmse = rmse_masked(df['obs'], df['pred'])
-        reach_nse = nse(df['obs'].values, df['pred'].values)
-        return pd.Series(dict(rmse=reach_rmse, nse=reach_nse))
+        obs = df['obs'].values
+        pred = df['pred'].values
+        metrics = {
+                'rmse': rmse_masked(obs, pred)
+                'nse': nse(obs, pred)
+                'rmse_top10': rmse_top10(obs, pred)
+                'rmse_bot10': rmse_bot10(obs, pred)
+                'rmse_logged': rmse_logged(obs, pred)
+                }
+
     else:
-        return pd.Series(dict(rmse=np.nan, nse=np.nan))
+        metrics = {
+                'rmse': np.nan
+                'nse': np.nan
+                'rmse_top10': np.nan
+                'rmse_bot10': np.nan
+                'rmse_logged': np.nan
+                }
+    return pd.Series(metrics)
 
 
 def overall_metrics(pred_data, obs_file, variable, partition, outfile=None):

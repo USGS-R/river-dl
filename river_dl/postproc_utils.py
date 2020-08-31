@@ -112,6 +112,16 @@ def rmse_logged(y_true, y_pred):
     return rmse_masked(np.log(y_true), np.log(y_pred))
 
 
+def nse_logged(y_true, y_pred):
+    """
+    compute the rmse of the logged data
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [float] the rmse of the logged data
+    """
+    return nse(np.log(y_true), np.log(y_pred))
+
+
 def filter_by_percentile(data, percentile, less_than=True):
     """
     filter an array by a percentile. The data less than (or greater than if
@@ -123,34 +133,26 @@ def filter_by_percentile(data, percentile, less_than=True):
     percentile. If False, the data greater than the percentile will remain.
     :return: [array-like] filtered data
     """
+    percentile_val = np.nanpercentile(data, percentile)
     if less_than:
-        return np.where(y_true<percentile, y_true, np.nan)
-    else less_than:
-        return np.where(y_true>percentile, y_true, np.nan)
+        return np.where(data<percentile_val, data, np.nan)
+    else:
+        return np.where(data>percentile_val, data, np.nan)
 
 
-def rmse_top10(y_true, y_pred):
+def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
     """
     compute the rmse of the top 10 percent of data 
     :param y_true: [array-like] observed y values
     :param y_pred: [array-like] predicted y values
-    :return: [float] the rmse of the top 10 percentile of data
+    :param metric: [function] metric function
+    :param percentile: [number] percentile number 0-100
+    :param less_than: [bool] whether you want the data *less than* the
+    percentile. If False, the data greater than the percentile will remain.
     """
-    y_true = filter_by_percentile(y_true, 90, less_than=False)
-    y_pred = filter_by_percentile(y_pred, 90, less_than=False)
-    return rmse_masked(y_true, y_pred)
-
-
-def rmse_bot10(y_true, y_pred):
-    """
-    compute the rmse of the bottom 10 percent of data 
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
-    :return: [float] the rmse of the bottom 10 percentile of data
-    """
-    y_true = filter_by_percentile(y_true, 10, less_than=True)
-    y_pred = filter_by_percentile(y_pred, 10, less_than=True)
-    return rmse_masked(y_true, y_pred)
+    y_true = filter_by_percentile(y_true, percentile, less_than)
+    y_pred = filter_by_percentile(y_pred, percentile, less_than)
+    return metric(y_true, y_pred)
 
 
 def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
@@ -276,24 +278,34 @@ def calc_metrics(df):
     one reach
     :return: [pd Series] the rmse and nse for that one reach
     """
-    if df['obs'].count() > 10:
-        obs = df['obs'].values
-        pred = df['pred'].values
+    obs = df['obs'].values
+    pred = df['pred'].values
+    if len(obs) > 10:
         metrics = {
-                'rmse': rmse_masked(obs, pred)
-                'nse': nse(obs, pred)
-                'rmse_top10': rmse_top10(obs, pred)
-                'rmse_bot10': rmse_bot10(obs, pred)
-                'rmse_logged': rmse_logged(obs, pred)
+                'rmse': rmse_masked(obs, pred),
+                'nse': nse(obs, pred),
+                'rmse_top10': percentile_metric(obs, pred, rmse_masked, 90,
+                                                less_than=False),
+                'rmse_bot10': percentile_metric(obs, pred, rmse_masked, 10,
+                                                less_than=True),
+                'rmse_logged': rmse_logged(obs, pred),
+                'nse_top10': percentile_metric(obs, pred, nse, 90,
+                                               less_than=False),
+                'nse_bot10': percentile_metric(obs, pred, nse, 10,
+                                               less_than=True),
+                'nse_logged': nse_logged(obs, pred)
                 }
 
     else:
         metrics = {
-                'rmse': np.nan
-                'nse': np.nan
-                'rmse_top10': np.nan
-                'rmse_bot10': np.nan
-                'rmse_logged': np.nan
+                'rmse': np.nan,
+                'nse': np.nan,
+                'rmse_top10': np.nan,
+                'rmse_bot10': np.nan,
+                'rmse_logged': np.nan,
+                'nse_top10': np.nan,
+                'nse_bot10': np.nan,
+                'nse_logged': np.nan
                 }
     return pd.Series(metrics)
 
@@ -351,7 +363,7 @@ def combined_reach_specific(pred_trn, pred_tst, obs_temp, obs_flow,
     return df_all
 
 
-def all_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
+def combine_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
     trn_temp = overall_metrics(pred_trn, obs_temp, 'temp', 'trn')
     tst_temp = overall_metrics(pred_tst, obs_temp, 'temp', 'tst')
     trn_flow = overall_metrics(pred_trn, obs_flow, 'flow', 'trn')

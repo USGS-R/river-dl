@@ -241,25 +241,6 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def change_weights_by_outcols(weights, out_cols):
-    """
-    modify the weights by the outcolumns
-    :param weights:[xr dataset] weights
-    :param out_cols:[str] which columns you will be looking at. should be
-    'temp', 'flow', or 'both'
-    :returns: [xr dataset] modified weights
-    """
-    if out_cols == "both":
-        pass
-    elif out_cols == 'temp':
-        weights.seg_outflow.loc[:, :] = 0
-    elif out_cols == 'flow':
-        weights.seg_tave_water.loc[:, :] = 0
-    else:
-        raise ValueError('out_cols needs to be "flow", "temp", or "both"')
-    return weights
-
-
 def create_weight_vectors(y_data, reduce_temp_trn, reduce_flow_trn,
                           exclude_segs):
     """

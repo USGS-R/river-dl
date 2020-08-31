@@ -1,7 +1,6 @@
 import os
 import argparse
 from river_dl.train import train_model
-from river_dl.postproc_utils import predict, all_overall
 
 
 parser = argparse.ArgumentParser()

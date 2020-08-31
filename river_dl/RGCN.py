@@ -162,15 +162,19 @@ class RGCNModel(tf.keras.Model):
         return output
 
 
+@tf.function
 def rmse_masked_one_var(y_true, y_pred, weights):
     num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
                          tf.float32)
-    zero_or_error = tf.where(tf.math.is_nan(y_true),
-                             tf.zeros_like(y_true),
-                             y_pred - y_true)
-    wgt_zero_or_err = (zero_or_error * weights)
-    sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
-    rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
+    if num_y_true > 0:
+        zero_or_error = tf.where(tf.math.is_nan(y_true),
+                                 tf.zeros_like(y_true),
+                                 y_pred - y_true)
+        wgt_zero_or_err = (zero_or_error * weights)
+        sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
+        rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
+    else:
+        rmse_loss = 0.0
     return rmse_loss
 
 
@@ -223,5 +227,3 @@ def weighted_masked_rmse(temperature_weight=0.5):
         return rmse_loss
 
     return rmse_masked
-
-

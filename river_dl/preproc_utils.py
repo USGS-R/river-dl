@@ -291,6 +291,7 @@ def reduce_one_variable(obs, variable, weights, reduce_amount):
     :param obs: [pandas df] the observation data
     :param variable: [str] the variable to reduce (i.e., 'seg_tave_water' or
     'seg_outflow')
+    oparam weights:[xr dataset] weights that will be changed
     :param reduce_amount: [float] fraction to reduce the training data by.
     For example, if 0.9, a random 90% of the weights in the training data for
     the variable will be set to zero
@@ -301,7 +302,7 @@ def reduce_one_variable(obs, variable, weights, reduce_amount):
     non_null = variable_series[variable_series.notnull()]
     reduce_idx = non_null.sample(frac=reduce_amount).index
     weights.loc[reduce_idx, variable] = 0
-    return obs
+    return weights
 
 
 def reduce_training_data(y_obs, weights, reduce_temp_trn, reduce_flow_trn):
@@ -316,13 +317,13 @@ def reduce_training_data(y_obs, weights, reduce_temp_trn, reduce_flow_trn):
     :param reduce_flow_trn: [float] fraction to reduce the flow training data
     by. For example, if 0.9, a random 90% of the weights for the flow
     training data will be set to zero
-    :return: [xarray dataset] updated weights (zero's where reduced)
+    :return: [xarray dataset] updated weights (zeros where reduced)
     """
     weights = weights.to_dataframe()
     df = y_obs.to_dataframe()
     wgt_reduced = reduce_one_variable(df, 'seg_tave_water', weights,
                                       reduce_temp_trn)
-    wgt_reduced = reduce_one_variable(wgt_reduced, 'seg_outflow', wgt_reduced,
+    wgt_reduced = reduce_one_variable(df, 'seg_outflow', wgt_reduced,
                                       reduce_flow_trn)
     return wgt_reduced.to_xarray()
 

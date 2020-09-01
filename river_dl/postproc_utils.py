@@ -122,22 +122,25 @@ def nse_logged(y_true, y_pred):
     return nse(np.log(y_true), np.log(y_pred))
 
 
-def filter_by_percentile(data, percentile, less_than=True):
+def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
     """
     filter an array by a percentile. The data less than (or greater than if
     `less_than=False`) will be changed to NaN
-    :param data: [array-like] data to filter (probably y predictions or
-    y observations )
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
     :param percentile: [number] percentile number 0-100
     :param less_than: [bool] whether you want the data *less than* the
     percentile. If False, the data greater than the percentile will remain.
     :return: [array-like] filtered data
     """
-    percentile_val = np.nanpercentile(data, percentile)
+    percentile_val = np.nanpercentile(y_true, percentile)
     if less_than:
-        return np.where(data<percentile_val, data, np.nan)
+        y_true_filt = np.where(y_true < percentile_val, y_true, np.nan)
+        y_pred_filt = np.where(y_true < percentile_val, y_pred, np.nan)
     else:
-        return np.where(data>percentile_val, data, np.nan)
+        y_true_filt = np.where(y_true > percentile_val, y_true, np.nan)
+        y_pred_filt = np.where(y_true > percentile_val, y_pred, np.nan)
+    return y_true_filt, y_pred_filt
 
 
 def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
@@ -150,9 +153,9 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
     :param less_than: [bool] whether you want the data *less than* the
     percentile. If False, the data greater than the percentile will remain.
     """
-    y_true = filter_by_percentile(y_true, percentile, less_than)
-    y_pred = filter_by_percentile(y_pred, percentile, less_than)
-    return metric(y_true, y_pred)
+    y_true_filt, y_pred_filt = filter_by_percentile(y_true, y_pred, percentile,
+                                                    less_than)
+    return metric(y_true_filt, y_pred_filt)
 
 
 def predict_from_file(model_weights_dir, io_data, hidden_size, partition,

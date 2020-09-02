@@ -102,7 +102,7 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def filter_negative_preds(y_true, y_pred)
+def filter_negative_preds(y_true, y_pred):
     # print a warning if there are a lot of negatives
     n_negative = len(y_pred[y_pred > 0])
     if n_negative/len(y_pred) > 0.05:

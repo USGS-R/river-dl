@@ -102,13 +102,7 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def rmse_logged(y_true, y_pred):
-    """
-    compute the rmse of the logged data
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
-    :return: [float] the rmse of the logged data
-    """
+def filter_negative_preds(y_true, y_pred)
     # print a warning if there are a lot of negatives
     n_negative = len(y_pred[y_pred > 0])
     if n_negative/len(y_pred) > 0.05:
@@ -116,6 +110,17 @@ def rmse_logged(y_true, y_pred):
     # filter out negative predictions
     y_true = np.where(y_pred < 0, np.nan, y_true)
     y_pred = np.where(y_pred < 0, np.nan, y_pred)
+    return y_true, y_pred
+
+
+def rmse_logged(y_true, y_pred):
+    """
+    compute the rmse of the logged data
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [float] the rmse of the logged data
+    """
+    y_true, y_pred = filter_negative_preds(y_true, y_pred)
     return rmse_masked(np.log(y_true), np.log(y_pred))
 
 
@@ -126,6 +131,7 @@ def nse_logged(y_true, y_pred):
     :param y_pred: [array-like] predicted y values
     :return: [float] the rmse of the logged data
     """
+    y_true, y_pred = filter_negative_preds(y_true, y_pred)
     return nse(np.log(y_true), np.log(y_pred))
 
 

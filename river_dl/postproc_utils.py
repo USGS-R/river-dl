@@ -102,11 +102,13 @@ def nse(y_true, y_pred):
     return 1 - (numerator/denominator)
 
 
-def filter_negative_preds(y_true, y_pred)
+def filter_negative_preds(y_true, y_pred):
     # print a warning if there are a lot of negatives
-    n_negative = len(y_pred[y_pred > 0])
-    if n_negative/len(y_pred) > 0.05:
-        raise Warning('More than 5% of predictions were negative')
+    n_negative = len(y_pred[y_pred < 0])
+    perc_negative = n_negative/len(y_pred) 
+    if perc_negative > 0.05:
+        print(f'Warning than 5% of predictions were negative {n_negative} of\
+                {len(y_pred)}')
     # filter out negative predictions
     y_true = np.where(y_pred < 0, np.nan, y_true)
     y_pred = np.where(y_pred < 0, np.nan, y_pred)
@@ -387,7 +389,7 @@ def combine_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
     df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
     df_all = pd.concat(df_all, axis=1).T
     if outfile:
-        df_all.to_csv(outfile)
+        df_all.to_csv(outfile, index=False)
     return df_all
 
 

@@ -242,21 +242,29 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def reduce_training_data(training_data_file, reduce_amount, out_file=None):
+def reduce_training_data(data_file, train_start_date='1980-10-01',
+                         train_end_date='2004-09-30', reduce_amount=0,
+                         out_file=None):
     """
     artificially reduce the amount of training data in the training dataset
-    :param training_data_file: [str] path to the training observations data file
+    :param train_start_date: [str] date (fmt YYYY-MM-DD) for when training data
+    starts
+    :param train_end_date: [str] date (fmt YYYY-MM-DD) for when training data
+    ends
+    :param data_file: [str] path to the observations data file
     :param reduce_amount: [float] fraction to reduce the training data by.
     For example, if 0.9, a random 90% of the training data will be set to nan
     :param out_file: [str] file to which the reduced dataset will be written
     :return: [xarray dataset] updated weights (nan where reduced)
     """
     # read in an convert to dataframe
-    ds = xr.open_zarr(training_data_file)
+    ds = xr.open_zarr(data_file)
     df = ds.to_dataframe()
-    non_null = df[df.notnull()]
+    idx = pd.IndexSlice
+    df_trn = df.loc[idx[train_start_date: train_end_date, :], :]
+    non_null = df_trn[df_trn.notnull()]
     reduce_idx = non_null.sample(frac=reduce_amount).index
-    df.loc[reduce_idx] = 0
+    df.loc[reduce_idx] = np.nan
     reduced_ds = df.to_xarray()
     if out_file:
         reduced_ds.to_zarr(out_file)

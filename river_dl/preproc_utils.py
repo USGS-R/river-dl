@@ -403,9 +403,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
         y_obs_wgts = initialize_weights(y_obs_trn)
 
     # scale y training data and get the mean and std
-    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
-    # for pre-training, keep everything together
-    y_trn_pre_scl, _, _ = scale(y_pre_trn)
+    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_obs_pre)
+    y_trn_obs_scl, _, _ = scale(y_obs_trn, y_trn_pre_std, y_trn_pre_mean)
 
     data = {'x_trn': convert_batch_reshape(x_trn_scl),
             'x_tst': convert_batch_reshape(x_tst_scl),
@@ -418,8 +417,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
             'dates_tst': coord_as_reshaped_array(x_tst, 'date'),
             'y_pre_trn': convert_batch_reshape(y_trn_pre_scl),
             'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
-            'y_obs_trn_std': y_trn_obs_std.to_array().values,
-            'y_obs_trn_mean': y_trn_obs_mean.to_array().values,
+            'y_std': y_trn_pre_std.to_array().values,
+            'y_mean': y_trn_pre_mean.to_array().values,
             'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
             'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
             'y_vars': np.array(y_vars),

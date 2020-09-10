@@ -384,6 +384,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     x_data = ds_pre[x_vars]
     if catch_prop_file:
         x_data = prep_catch_props(x_data, catch_prop_file)
+    # make sure we don't have any weird input values
+    check_if_finite(x_data)
     x_trn, x_tst = separate_trn_tst(x_data, test_start_date, n_test_yr)
 
     x_scl, x_std, x_mean = scale(x_data)
@@ -411,7 +413,7 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
         y_obs_wgts = initialize_weights(y_obs_trn)
 
     # scale y training data and get the mean and std
-    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_obs_pre)
+    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_pre_trn)
     y_trn_obs_scl, _, _ = scale(y_obs_trn, y_trn_pre_std, y_trn_pre_mean)
 
     data = {'x_trn': convert_batch_reshape(x_trn_scl),

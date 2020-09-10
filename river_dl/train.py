@@ -1,4 +1,5 @@
 import os
+import random
 import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
@@ -60,6 +61,13 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     out_size = len(io_data['y_vars'])
     model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
                       A=dist_matrix, rand_seed=seed)
+
+    if seed:
+        os.environ['PYTHONHASHSEED'] = str(seed)
+        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+        tf.random.set_seed(seed)
+        np.random.seed(seed)
+        random.seed(seed)
 
     # pretrain
     optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)

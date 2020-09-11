@@ -22,7 +22,11 @@ parser.add_argument("-q", "--flow-in-temp", help='whether or not to do flow\
 parser.add_argument("--pt_temp_wgt", help='weight for temp rmse in pretraining',
                     type=float, default=0.5) 
 parser.add_argument("--ft_temp_wgt", help='weight for temp rmse in finetuning',
-                    type=float, default=0.5) 
+                    type=float, default=0.5)
+parser.add_argument("--pt_learn_rate", help='learning rate for pretraining',
+                    type=float, default=0.005)
+parser.add_argument("--ft_learn_rate", help='learning rate for finetuning',
+                    type=float, default=0.01)
 
 
 args = parser.parse_args()
@@ -40,5 +44,6 @@ model = train_model(in_data_file, pt_epochs, ft_epochs, hidden_units,
                     out_dir=out_dir, flow_in_temp=flow_in_temp,
                     finetune_temp_rmse_weight=ft_temp_wgt,
                     pretrain_temp_rmse_weight=pt_temp_wgt,
-                    seed=args.random_seed)
+                    seed=args.random_seed, learning_rate_ft=args.ft_learn_rate,
+                    learning_rate_pre=args.pt_learn_rate)
 

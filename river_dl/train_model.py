@@ -11,6 +11,8 @@ parser.add_argument("-u", "--hidden_units", help='num of hidden units',
                     type=int, default=20)
 parser.add_argument("-m", "--metrics_file", help='file that contains the'
                                                  'evaluation metrics')
+parser.add_argument("-s", "--random_seed", help='random seed', default=None,
+                    type=int)
 parser.add_argument("-p", "--pretrain_epochs", help='number of pretrain'
                     'epochs', type=int)
 parser.add_argument("-f", "--finetune_epochs", help='number of finetune'
@@ -37,5 +39,6 @@ ft_temp_wgt = args.ft_temp_wgt
 model = train_model(in_data_file, pt_epochs, ft_epochs, hidden_units,
                     out_dir=out_dir, flow_in_temp=flow_in_temp,
                     finetune_temp_rmse_weight=ft_temp_wgt,
-                    pretrain_temp_rmse_weight=pt_temp_wgt)
+                    pretrain_temp_rmse_weight=pt_temp_wgt,
+                    seed=args.random_seed)
 

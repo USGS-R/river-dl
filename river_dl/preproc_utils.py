@@ -204,14 +204,15 @@ def get_exclude_seg_ids(exclude_grp, all_segs):
     return ex_segs
 
 
-def exclude_segments(weights, exclude_segs):
+def exclude_segments(y_data, exclude_segs):
     """
     exclude segments from being trained on by setting their weights as zero
-    :param weights: [xr dataset] dataset of weights
+    :param y_data:[xr dataset] y data. this is used to get the dimensions
     :param exclude_segs: [list] list of segments to exclude in the loss
     calculation
     :return:
     """
+    weights = initialize_weights(y_data, 1)
     for seg_grp in exclude_segs:
         # get the start and end dates is present
         start, end = get_exclude_start_end(seg_grp)
@@ -241,72 +242,33 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def create_weight_vectors(y_data, reduce_temp_trn, reduce_flow_trn,
-                          exclude_segs):
-    """
-    reduce either flow, temperature, or neither in the pre-training and
-    finetune y data
-    :param y_data: [xr dataset] y_data
-    :param reduce_temp_trn: [float] fraction to reduce the temperature training
-    data by. For example, if 0.9, a random 90% of the weights for the
-    temperature training data will be set to zero
-    :param reduce_flow_trn: [float] fraction to reduce the flow training data
-    by. For example, if 0.9, a random 90% of the weights for the flow
-    training data will be set to zero
-    :param exclude_segs: [list] list of segment ids to exclude from the loss
-    function
-    :return: [xr dataset] dataset of weights between one and zero
-    """
-    initial_weights = initialize_weights(y_data, 1)
-    weights = reduce_training_data(y_data, initial_weights, reduce_temp_trn,
-                                   reduce_flow_trn)
-    if exclude_segs:
-        weights = exclude_segments(weights, exclude_segs)
-    return weights
-
-
-def reduce_one_variable(obs, variable, weights, reduce_amount):
-    """
-    change a specified percentage of observation values to NaN for a given
-    variable. The values that are changed are chosen randomly
-    :param obs: [pandas df] the observation data
-    :param variable: [str] the variable to reduce (i.e., 'seg_tave_water' or
-    'seg_outflow')
-    oparam weights:[xr dataset] weights that will be changed
-    :param reduce_amount: [float] fraction to reduce the training data by.
-    For example, if 0.9, a random 90% of the weights in the training data for
-    the variable will be set to zero
-    :return: [pandas df] data with the percentage of training data weights
-    changed to zero
-    """
-    variable_series = obs[variable]
-    non_null = variable_series[variable_series.notnull()]
-    reduce_idx = non_null.sample(frac=reduce_amount).index
-    weights.loc[reduce_idx, variable] = 0
-    return weights
-
-
-def reduce_training_data(y_obs, weights, reduce_temp_trn, reduce_flow_trn):
+def reduce_training_data(data_file, train_start_date='1980-10-01',
+                         train_end_date='2004-09-30', reduce_amount=0,
+                         out_file=None):
     """
     artificially reduce the amount of training data in the training dataset
-    :param y_obs: [xarray dataset] the training observations data for flow and
-    temp
-    :param weights:[xr dataset] weights that will be changed
-    :param reduce_temp_trn: [float] fraction to reduce the temperature training
-    data by. For example, if 0.9, a random 90% of the weights for the
-    temperature training data will be set to zero
-    :param reduce_flow_trn: [float] fraction to reduce the flow training data
-    by. For example, if 0.9, a random 90% of the weights for the flow
-    training data will be set to zero
-    :return: [xarray dataset] updated weights (zeros where reduced)
+    :param train_start_date: [str] date (fmt YYYY-MM-DD) for when training data
+    starts
+    :param train_end_date: [str] date (fmt YYYY-MM-DD) for when training data
+    ends
+    :param data_file: [str] path to the observations data file
+    :param reduce_amount: [float] fraction to reduce the training data by.
+    For example, if 0.9, a random 90% of the training data will be set to nan
+    :param out_file: [str] file to which the reduced dataset will be written
+    :return: [xarray dataset] updated weights (nan where reduced)
     """
-    weights = weights.to_dataframe()
-    df = y_obs.to_dataframe()
-    wgt_reduced = reduce_one_variable(df, 'seg_tave_water', weights,
-                                      reduce_temp_trn)
-    wgt_reduced = reduce_one_variable(df, 'seg_outflow', wgt_reduced,
-                                      reduce_flow_trn)
-    return wgt_reduced.to_xarray()
+    # read in an convert to dataframe
+    ds = xr.open_zarr(data_file)
+    df = ds.to_dataframe()
+    idx = pd.IndexSlice
+    df_trn = df.loc[idx[train_start_date: train_end_date, :], :]
+    non_null = df_trn[df_trn.notnull()]
+    reduce_idx = non_null.sample(frac=reduce_amount).index
+    df.loc[reduce_idx] = np.nan
+    reduced_ds = df.to_xarray()
+    if out_file:
+        reduced_ds.to_zarr(out_file)
+    return reduced_ds
 
 
 def convert_batch_reshape(dataset):
@@ -385,9 +347,7 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
 
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
               catch_prop_file=None, test_start_date='2004-09-30', n_test_yr=12,
-              reduce_temp_trn=0, reduce_flow_trn=0, reduce_temp_pretrn=0,
-              reduce_flow_pretrn=0, exclude_file=None, log_q=False,
-              out_file=None):
+              exclude_file=None, log_q=False, out_file=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -399,22 +359,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     :param x_vars: [list] variables that should be used as input
     :param catch_prop_file: [str] the path to the catchment properties file. If
     left unfilled, the catchment properties will not be included as predictors
-    :param pretrain_vars: [str] 'flow', 'temp', or 'both'
-    :param finetune_vars: [str] 'flow', 'temp', or 'both'
     :param test_start_date: [str] the date to start for the test period
     :param n_test_yr: [int] number of years to take for the test period
-    :param reduce_temp_pretrn: [float] fraction to reduce the temperature
-    pretraining data by. For example, if 0.9, 90% of the temperature training
-    data weights will be changed to zero for pretraining
-    :param reduce_temp_pretrn: [float] fraction to reduce the flow pretraining
-    data by. For example, if 0.9, 90% of the flow training data weights will be
-    changed to zero for pretraining
-    :param reduce_temp_trn: [float] fraction to reduce the temperature training
-    finetuning data by. For example, if 0.9, 90% of the temperature training
-    data weights will be changed to zero for finetuning
-    :param reduce_flow_trn: [float] fraction to reduce the flow training data
-    finetuning data by. For example, if 0.9, 90% of the flow training data
-    weights will be changed to zero for finetuning
     :param exclude_file: [str] path to exclude file
     :param log_q: [bool] whether or not to take the log of discharge in training
     :param out_file: [str] file to where the values will be written
@@ -438,6 +384,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     x_data = ds_pre[x_vars]
     if catch_prop_file:
         x_data = prep_catch_props(x_data, catch_prop_file)
+    # make sure we don't have any weird input values
+    check_if_finite(x_data)
     x_trn, x_tst = separate_trn_tst(x_data, test_start_date, n_test_yr)
 
     x_scl, x_std, x_mean = scale(x_data)
@@ -457,20 +405,16 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
         y_pre_trn = log_discharge(y_pre_trn)
 
     # filter pretrain/finetune y
+    y_pre_wgts = initialize_weights(y_pre_trn)
     if exclude_file:
         exclude_segs = read_exclude_segs_file(exclude_file)
+        y_obs_wgts = exclude_segments(y_obs_trn, exclude_segs=exclude_segs)
     else:
-        exclude_segs = None
-    y_pre_wgts = create_weight_vectors(y_pre_trn, reduce_temp_pretrn,
-                                       reduce_flow_pretrn, exclude_segs=None)
-    y_obs_wgts = create_weight_vectors(y_pre_trn, reduce_temp_trn,
-                                       reduce_flow_trn,
-                                       exclude_segs=exclude_segs)
+        y_obs_wgts = initialize_weights(y_obs_trn)
 
     # scale y training data and get the mean and std
-    y_trn_obs_scl, y_trn_obs_std, y_trn_obs_mean = scale(y_obs_trn)
-    # for pre-training, keep everything together
-    y_trn_pre_scl, _, _ = scale(y_pre_trn)
+    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_pre_trn)
+    y_trn_obs_scl, _, _ = scale(y_obs_trn, y_trn_pre_std, y_trn_pre_mean)
 
     data = {'x_trn': convert_batch_reshape(x_trn_scl),
             'x_tst': convert_batch_reshape(x_tst_scl),
@@ -483,8 +427,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
             'dates_tst': coord_as_reshaped_array(x_tst, 'date'),
             'y_pre_trn': convert_batch_reshape(y_trn_pre_scl),
             'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
-            'y_obs_trn_std': y_trn_obs_std.to_array().values,
-            'y_obs_trn_mean': y_trn_obs_mean.to_array().values,
+            'y_std': y_trn_pre_std.to_array().values,
+            'y_mean': y_trn_pre_mean.to_array().values,
             'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
             'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
             'y_vars': np.array(y_vars),

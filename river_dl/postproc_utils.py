@@ -233,8 +233,8 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
                                     io_data[f'ids_{partition}'],
                                     io_data['y_vars'])
 
-    y_pred_pp = unscale_output(y_pred_pp, io_data['y_obs_trn_std'],
-                               io_data['y_obs_trn_mean'], io_data['y_vars'],
+    y_pred_pp = unscale_output(y_pred_pp, io_data['y_std'],
+                               io_data['y_mean'], io_data['y_vars'],
                                logged_q)
 
     if half_tst and partition == 'tst':

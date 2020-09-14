@@ -1,5 +1,4 @@
-import os
-import json
+import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import numpy as np
@@ -398,3 +397,22 @@ def combine_csvs(csv_files, outfile):
     df_all = pd.concat(dfs, axis=0)
     df_all.to_csv(outfile, index=False)
     return df_all
+
+
+def plot_train_obs(prepped_data, variable, outfile):
+    """
+    plot training observations
+    :param prepped_data: [str] path to npz file of prepped data
+    :param variable: [str] which variable to plot, 'flow' or 'temp'
+    :param outfile: [str] where to store the resulting file
+    :return: None
+    """
+    data = np.load(prepped_data)
+    df = prepped_array_to_df(data['y_obs_trn'], data['dates_trn'],
+                             data['ids_trn'], data['y_vars'])
+    _, seg_var = get_var_names(variable)
+    df_piv = df.pivot(index='date', columns='seg_id_nat', values=seg_var)
+    df_piv.dropna(axis=1, how='all', inplace=True)
+    df_piv.plot(subplots=True, figsize=(8, 12))
+    plt.tight_layout()
+    plt.savefig(outfile)

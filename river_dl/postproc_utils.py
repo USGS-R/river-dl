@@ -261,7 +261,6 @@ def get_var_names(variable):
 
 
 def load_if_not_df(pred_data):
-    print("pred_data:", pred_data)
     if isinstance(pred_data, str):
         return(pd.read_feather(pred_data))
     else:
@@ -327,19 +326,37 @@ def calc_metrics(df):
     return pd.Series(metrics)
 
 
-def overall_metrics(pred_data, obs_file, variable, partition, outfile=None):
+def overall_metrics(pred_file, obs_file, variable, partition, group=None,
+                    outfile=None):
     """
-    calculate overall metrics
-    :param pred_data: [str] path to predictions feather file
-    :param obs_file: [str] path to observations csv file
-    :param outfile: [str] file where the metrics should be written
+    calculate metrics for a certain group (or no group at all) for a given
+    partition and variable
+    :param pred_file: [str] path to predictions feather file
+    :param obs_file: [str] path to observations zarr file
     :param variable: [str] either 'flow' or 'temp'
     :param partition: [str] either 'trn' or 'temp'
-    :return: [pd Series] the overall metrics
+    :param group: [str or list] which group the metrics should be computed for.
+    Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
+    (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
+    and month), and None (everything is left together)
+    :param outfile: [str] file where the metrics should be written
+    :return: [pd dataframe] the condensed metrics
     """
-    print("variable: ", variable)
-    data = fmt_preds_obs(pred_data, obs_file, variable)
-    metrics = calc_metrics(data)
+    data = fmt_preds_obs(pred_file, obs_file, variable)
+    data.reset_index(inplace=True)
+    if not group:
+        metrics = calc_metrics(data)
+        # need to convert to dataframe and transpose so it looks like the others
+        metrics = pd.DataFrame(metrics).T
+    elif group == 'seg_id_nat':
+        metrics = data.groupby('seg_id_nat').apply(calc_metrics).reset_index()
+    elif group == 'month':
+        metrics = data.groupby(data['date'].dt.month).apply(calc_metrics).reset_index()
+    elif group == ['seg_id_nat', 'month']:
+        metrics = data.groupby([data['date'].dt.month,
+                                'seg_id_nat']).apply(calc_metrics).reset_index()
+    else:
+        raise ValueError('group value not valid')
     metrics['variable'] = variable
     metrics['partition'] = partition
     if outfile:
@@ -347,55 +364,30 @@ def overall_metrics(pred_data, obs_file, variable, partition, outfile=None):
     return metrics
 
 
-def reach_specific_metrics(pred_data, obs_file, variable, partition,
-                           outfile=None):
+def combined_metrics(pred_trn, pred_tst, obs_temp, obs_flow, grp=None,
+                     outfile=None):
     """
-    calculate reach-specific metrics
-    :param pred_data: [str] path to predictions feather file
-    :param obs_file: [str] path to observations csv file
-    :param outfile: [str] file where the metrics should be written
-    :param variable: [str] either 'flow' or 'temp'
-    :return: [pd DataFrame] the reach-specific metrics
+    calculate the metrics for flow and temp and training and test sets for a
+    given grouping
+    :param pred_trn: [str] path to training prediction feather file
+    :param pred_tst: [str] path to testing prediction feather file
+    :param obs_temp: [str] path to observations temperature zarr file
+    :param obs_flow: [str] path to observations flow zarr file
+    :param group: [str or list] which group the metrics should be computed for.
+    Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
+    (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
+    and month), and None (everything is left together)
+    :param outfile: [str] csv file where the metrics should be written
+    :return: combined metrics
     """
-    data = fmt_preds_obs(pred_data, obs_file, variable)
-    reach_metrics = data.groupby('seg_id_nat').apply(
-            calc_metrics).reset_index()
-    reach_metrics['variable'] = variable
-    reach_metrics['partition'] = partition
-    if outfile:
-        reach_metrics.to_feather(outfile)
-    return reach_metrics
-
-
-def combined_reach_specific(pred_trn, pred_tst, obs_temp, obs_flow,
-                            outfile=None):
-    trn_temp = reach_specific_metrics(pred_trn, obs_temp, 'temp', 'trn')
-    trn_flow = reach_specific_metrics(pred_trn, obs_flow, 'flow', 'trn')
-    tst_temp = reach_specific_metrics(pred_tst, obs_temp, 'temp', 'tst')
-    tst_flow = reach_specific_metrics(pred_tst, obs_flow, 'flow', 'tst')
+    trn_temp = overall_metrics(pred_trn, obs_temp, 'temp', 'trn', grp)
+    trn_flow = overall_metrics(pred_trn, obs_flow, 'flow', 'trn', grp)
+    tst_temp = overall_metrics(pred_tst, obs_temp, 'temp', 'tst', grp)
+    tst_flow = overall_metrics(pred_tst, obs_flow, 'flow', 'tst', grp)
     df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)
-    return df_all
-
-
-def combine_overall(pred_trn, pred_tst, obs_temp, obs_flow, outfile=None):
-    trn_temp = overall_metrics(pred_trn, obs_temp, 'temp', 'trn')
-    tst_temp = overall_metrics(pred_tst, obs_temp, 'temp', 'tst')
-    trn_flow = overall_metrics(pred_trn, obs_flow, 'flow', 'trn')
-    tst_flow = overall_metrics(pred_tst, obs_flow, 'flow', 'tst')
-    df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
-    df_all = pd.concat(df_all, axis=1).T
-    if outfile:
-        df_all.to_csv(outfile, index=False)
-    return df_all
-
-
-def combine_csvs(csv_files, outfile):
-    dfs = [pd.read_csv(f, index_col=0, header=None).T for f in csv_files]
-    df_all = pd.concat(dfs, axis=0)
-    df_all.to_csv(outfile, index=False)
     return df_all
 
 

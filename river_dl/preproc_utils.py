@@ -244,7 +244,7 @@ def initialize_weights(y_data, initial_val=1):
 
 def reduce_training_data(data_file, train_start_date='1980-10-01',
                          train_end_date='2004-09-30', reduce_amount=0,
-                         out_file=None):
+                         out_file=None, segs=None):
     """
     artificially reduce the amount of training data in the training dataset
     :param train_start_date: [str] date (fmt YYYY-MM-DD) for when training data
@@ -262,7 +262,9 @@ def reduce_training_data(data_file, train_start_date='1980-10-01',
     df = ds.to_dataframe()
     idx = pd.IndexSlice
     df_trn = df.loc[idx[train_start_date: train_end_date, :], :]
-    non_null = df_trn[df_trn.notnull()]
+    if segs:
+        df_trn = df_trn.loc[idx[:, segs], :]
+    non_null = df_trn.dropna()
     reduce_idx = non_null.sample(frac=reduce_amount).index
     df.loc[reduce_idx] = np.nan
     reduced_ds = df.to_xarray()
@@ -347,7 +349,7 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
 
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
               catch_prop_file=None, test_start_date='2004-09-30', n_test_yr=12,
-              exclude_file=None, log_q=False, out_file=None):
+              exclude_file=None, log_q=False, out_file=None, segs=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -381,6 +383,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
                             data [n_yrs, n_seg, len_seq, 2]
     """
     ds_pre = xr.open_zarr(pretrain_file)
+    if segs:
+        ds_pre = ds_pre.loc[dict(seg_id_nat=segs)]
     x_data = ds_pre[x_vars]
     if catch_prop_file:
         x_data = prep_catch_props(x_data, catch_prop_file)
@@ -395,6 +399,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
 
     # read, filter observations for finetuning
     y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], pretrain_file)
+    if segs:
+        y_obs = y_obs.loc[dict(seg_id_nat=segs)]
     y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
     y_vars = ['seg_tave_water', 'seg_outflow']
     y_pre = ds_pre[y_vars]

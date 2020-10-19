@@ -22,7 +22,7 @@ class LSTMModel(tf.keras.Model):
 
     def call(self, inputs, **kwargs):
         x = self.lstm_layer(inputs)
-        temp_prediction = self.dense_flow(x)
+        temp_prediction = self.dense_temp(x)
         flow_prediction = self.dense_flow(x)
         return tf.concat([temp_prediction, flow_prediction], axis=2)
 

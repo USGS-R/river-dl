@@ -10,7 +10,7 @@ import tensorflow as tf
 from tensorflow.keras import layers
 
 
-class LSTMMOdel(tf.keras.Model):
+class LSTMModel(tf.keras.Model):
     def __init__(self, hidden_size):
         """
         :param hidden_size: [int] the number of hidden units

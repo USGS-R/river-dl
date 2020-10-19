@@ -5,7 +5,7 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel, weighted_masked_rmse
-from river_dl.lstm import LSTMMOdel
+from river_dl.lstm import LSTMModel
 from river_dl.preproc_utils import prep_data
 
 
@@ -63,7 +63,7 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     n_seg = dist_matrix.shape[0]
     if model == 'lstm':
-        model = LSTMMOdel(hidden_units)
+        model = LSTMModel(hidden_units)
     elif model == 'rgcn':
         model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
                           A=dist_matrix, rand_seed=seed)

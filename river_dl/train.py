@@ -5,6 +5,8 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel, weighted_masked_rmse
+from river_dl.lstm import LSTMModel
+from river_dl.preproc_utils import prep_data
 
 
 def get_data_if_file(d):
@@ -13,15 +15,16 @@ def get_data_if_file(d):
     :param d:
     :return:
     """
-    if isinstance(d, NpzFile):
+    if isinstance(d, NpzFile) or isinstance(d, dict):
         return d
     else:
         return np.load(d)
 
 
 def train_model(io_data, pretrain_epochs, finetune_epochs,
-                hidden_units, out_dir, flow_in_temp=False, seed=None,
-                pretrain_temp_rmse_weight=0.5, finetune_temp_rmse_weight=0.5,
+                hidden_units, out_dir, flow_in_temp=False, model='rgcn',
+                seed=None, pretrain_temp_rmse_weight=0.5,
+                finetune_temp_rmse_weight=0.5,
                 learning_rate_pre=0.005, learning_rate_ft=0.01):
     """
     train the rgcn
@@ -34,6 +37,7 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     :param out_dir: [str] directory where the output files should be written
     :param flow_in_temp: [bool] whether the flow predictions should feed
     into the temp predictions
+    :param model: [str] which model to use (either 'lstm' or 'rgcn')
     :param seed: [int] random seed
     :param pretrain_temp_rmse_weight: [float] weight between 0 and 1. How much
     to weight the rmse of temperature in pretraining compared to flow. The
@@ -51,16 +55,18 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     if tf.test.gpu_device_name():
         print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
     else:
-        print("Please install GPU version of TF")
+        print("Not using GPU")
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
     dist_matrix = io_data['dist_matrix']
 
     n_seg = dist_matrix.shape[0]
-    out_size = len(io_data['y_vars'])
-    model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
-                      A=dist_matrix, rand_seed=seed)
+    if model == 'lstm':
+        model = LSTMModel(hidden_units)
+    elif model == 'rgcn':
+        model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
+                          A=dist_matrix, rand_seed=seed)
 
     if seed:
         os.environ['PYTHONHASHSEED'] = str(seed)

@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import numpy as np
+from river_dl.lstm import LSTMModel 
 from river_dl.RGCN import RGCNModel
 from river_dl.train import get_data_if_file
 
@@ -174,7 +175,7 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
 
 def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
                       outfile, flow_in_temp=False, logged_q=False,
-                      half_tst=False):
+                      half_tst=False, model='rgcn'):
     """
     make predictions from trained model
     :param model_weights_dir: [str] directory to saved model weights
@@ -188,11 +189,16 @@ def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
     the exponent of the discharge will be taken in the model unscaling
     :param half_tst: [bool] whether or not to halve the testing data so some
     can be held out
+    :param model: [str] model to use either 'rgcn' or 'lstm'
     :return:
     """
     io_data = get_data_if_file(io_data)
-    model = RGCNModel(hidden_size, A=io_data['dist_matrix'],
-                      flow_in_temp=flow_in_temp)
+    if model == 'rgcn':
+        model = RGCNModel(hidden_size, A=io_data['dist_matrix'],
+                          flow_in_temp=flow_in_temp)
+    elif model == 'lstm':
+        model = LSTMModel(hidden_size)
+        
 
     model.load_weights(model_weights_dir)
     preds = predict(model, io_data, partition, outfile, logged_q=logged_q,

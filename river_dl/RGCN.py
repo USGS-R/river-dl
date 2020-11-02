@@ -163,7 +163,24 @@ class RGCNModel(tf.keras.Model):
 
 
 @tf.function
-def rmse_masked_one_var(y_true, y_pred, weights):
+def rmse_masked_one_var(data, y_pred, var_idx):
+    weights = data[:, :, -2:]
+    y_true = data[:, :, :-2]
+
+    # ensure y_pred, weights, and y_true are all tensors the same data type
+    y_true = tf.convert_to_tensor(y_true)
+    weights = tf.convert_to_tensor(weights)
+    y_true = tf.cast(y_true, y_pred.dtype)
+    weights = tf.cast(weights, y_pred.dtype)
+
+    # make all zero-weighted observations 'nan' so they don't get counted
+    # at all in the loss calculation
+    y_true = tf.where(weights == 0, np.nan, y_true)
+
+    weights = weights[:, :, var_idx]
+    y_true = y_true[:, :, var_idx]
+    y_pred = y_pred[:, :, var_idx]
+
     num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
                          tf.float32)
     if num_y_true > 0:
@@ -178,7 +195,25 @@ def rmse_masked_one_var(y_true, y_pred, weights):
     return rmse_loss
 
 
-def weighted_masked_rmse(temperature_weight=0.5):
+def rmse_masked_separate(data, y_pred):
+    """
+    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
+    with 0 when y_s is nan; num_y_s is a count of just those non-nan
+    observations) so we're only looking at predictions with corresponding
+    observations available
+    (credit: @aappling-usgs)
+    :param data: [tensor] true (observed) y values. these may have nans and
+    sample weights
+    :param y_pred: [tensor] predicted y values
+    :return: rmse (one value for each training sample)
+    """
+    rmse_main = rmse_masked_one_var(data, y_pred, 0)
+    rmse_aux = rmse_masked_one_var(data, y_pred, 1)
+    losses = tf.stack([rmse_main, rmse_aux], axis=0)
+    return rmse_main
+
+
+def weighted_masked_rmse(aux_weight=0.5):
     """
     calculate a weighted, masked rmse. 
     :param temperature_weight: [float] weight between 0 and 1. The difference
@@ -187,43 +222,9 @@ def weighted_masked_rmse(temperature_weight=0.5):
     the temperature_weight would be 0.5
     """
 
-    def rmse_masked(data, y_pred):
-        """
-        Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
-        with 0 when y_s is nan; num_y_s is a count of just those non-nan
-        observations) so we're only looking at predictions with corresponding
-        observations available
-        (credit: @aappling-usgs)
-        :param data: [tensor] true (observed) y values. these may have nans and 
-        sample weights
-        :param y_pred: [tensor] predicted y values
-        :return: rmse (one value for each training sample)
-        """
-        weights = data[:, :, -2:]
-        y_true = data[:, :, :-2]
-
-        # ensure y_pred, weights, and y_true are all tensors the same data type
-        y_true = tf.convert_to_tensor(y_true)
-        weights = tf.convert_to_tensor(weights)
-        y_true = tf.cast(y_true, y_pred.dtype)
-        weights = tf.cast(weights, y_pred.dtype)
-
-        # make all zero-weighted observations 'nan' so they don't get counted
-        # at all in the loss calculation
-        y_true = tf.where(weights == 0, np.nan, y_true)
-
-        weights_temp = weights[:, :, 0]
-        weights_flow = weights[:, :, 1]
-        true_temp = y_true[:, :, 0]
-        true_flow = y_true[:, :, 1]
-        pred_temp = y_pred[:, :, 0]
-        pred_flow = y_pred[:, :, 1]
-        rmse_temp = rmse_masked_one_var(true_temp, pred_temp, weights_temp)
-        rmse_flow = rmse_masked_one_var(true_flow, pred_flow, weights_flow)
-
-        rmse_loss = rmse_temp * temperature_weight +\
-                    rmse_flow * (1 - temperature_weight)
-
+    def rmse_masked_combined(data, y_pred):
+        rmse_main, rmse_aux = rmse_masked_separate(data, y_pred)
+        rmse_loss = rmse_main + aux_weight * rmse_aux
         return rmse_loss
 
-    return rmse_masked
+    return rmse_masked_combined

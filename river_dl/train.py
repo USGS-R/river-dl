@@ -4,9 +4,8 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
-from river_dl.RGCN import RGCNModel, weighted_masked_rmse
-from river_dl.lstm import LSTMModel
-from river_dl.preproc_utils import prep_data
+from RGCN import RGCNModel
+from lstm import LSTMModel, LSTMGradSimilarity
 
 
 def get_data_if_file(d):
@@ -23,9 +22,7 @@ def get_data_if_file(d):
 
 def train_model(io_data, pretrain_epochs, finetune_epochs,
                 hidden_units, out_dir, flow_in_temp=False, model='rgcn',
-                seed=None, pretrain_temp_rmse_weight=0.5,
-                finetune_temp_rmse_weight=0.5,
-                learning_rate_pre=0.005, learning_rate_ft=0.01):
+                seed=None, learning_rate_pre=0.005, learning_rate_ft=0.01):
     """
     train the rgcn
     :param x_data: [dict or str] the data file or data dict of the x_data
@@ -67,6 +64,8 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     elif model == 'rgcn':
         model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
                           A=dist_matrix, rand_seed=seed)
+    elif model == 'lstm_grad_correction':
+        model = LSTMGradSimilarity(hidden_units)
 
     if seed:
         os.environ['PYTHONHASHSEED'] = str(seed)
@@ -77,8 +76,7 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     # pretrain
     optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
-    model.compile(optimizer_pre,
-                  loss=weighted_masked_rmse(pretrain_temp_rmse_weight))
+    model.compile(optimizer_pre)
 
     csv_log_pre = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, f'pretrain_log.csv'))
@@ -102,8 +100,7 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
 
     # finetune
     optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-    model.compile(optimizer_ft,
-                  loss=weighted_masked_rmse(finetune_temp_rmse_weight))
+    model.compile(optimizer_ft)
 
     csv_log_ft = tf.keras.callbacks.CSVLogger(
         os.path.join(out_dir, 'finetune_log.csv'))
@@ -124,3 +121,6 @@ def train_model(io_data, pretrain_epochs, finetune_epochs,
     model.save_weights(os.path.join(out_dir, f'trained_weights/'))
     return model
 
+
+train_model('../data/out/2037_prepped.npz', 5, 5, 20, '../',
+            model='lstm_grad_correction')

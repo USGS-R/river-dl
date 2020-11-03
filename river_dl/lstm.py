@@ -8,15 +8,17 @@ based off code by Xiaowei Jia
 from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras import layers
-from RGCN import rmse_masked_one_var
+from river_dl.RGCN import rmse_masked_one_var
 
 
 class LSTMModel(tf.keras.Model):
-    def __init__(self, hidden_size):
+    def __init__(self, hidden_size, gradient_correction=False, lamb=1):
         """
         :param hidden_size: [int] the number of hidden units
         """
         super().__init__()
+        self.gradient_correction = gradient_correction
+        self.lamb = lamb
         self.lstm_layer = layers.LSTM(hidden_size, return_sequences=True,
                                       name='lstm_shared')
         self.dense_main = layers.Dense(1, name='dense_main')
@@ -29,23 +31,15 @@ class LSTMModel(tf.keras.Model):
         aux_prediction = self.dense_aux(x)
         return tf.concat([main_prediction, aux_prediction], axis=2)
 
-
-def adjust_gradient(main_grad, aux_grad):
-    projection = tf.minimum(tf.matmul(main_grad, aux_grad), 0) * main_grad / tf.matmul(main_grad, main_grad)
-    return aux_grad - projection
-
-
-def get_variables(trainable_variables, name):
-    return [v for v in trainable_variables if name in v.name]
-
-
-class LSTMGradSimilarity(LSTMModel):
     @tf.function
     def train_step(self, data):
         x, y = data
 
+        # If I don't do one forward pass before starting the gradient tape,
+        # the thing hangs
+        _ = self(x)
         with tf.GradientTape(persistent=True) as tape:
-            y_pred = self(x, training=True) # forward pass
+            y_pred = self(x, training=True)  # forward pass
 
             loss_main = rmse_masked_one_var(y, y_pred, 0)
             loss_aux = rmse_masked_one_var(y, y_pred, 1)
@@ -62,13 +56,43 @@ class LSTMGradSimilarity(LSTMModel):
         gradient_shared_main = tape.gradient(loss_main, shared_vars)
         gradient_shared_aux = tape.gradient(loss_aux, shared_vars)
 
-        # adjust auxiliary gradient
-        adjusted_aux_grad = adjust_gradient(gradient_shared_main,
-                                            gradient_shared_aux)
-        # combined adjusted auxiliary gradient and main gradient
-        combined_grad = gradient_shared_main + adjusted_aux_grad
+        if self.gradient_correction:
+            # adjust auxiliary gradient
+            gradient_shared_aux = adjust_gradient_list(gradient_shared_main,
+                                                       gradient_shared_aux)
+        combined_gradient = combine_gradients_list(gradient_shared_main,
+                                                   gradient_shared_aux,
+                                                   lamb=self.lamb)
 
         # apply gradients
         self.optimizer.apply_gradients(zip(gradient_main_out, main_out_vars))
         self.optimizer.apply_gradients(zip(gradient_aux_out, aux_out_vars))
-        self.optimizer.apply_gradients(zip(combined_grad, shared_vars))
+        self.optimizer.apply_gradients(zip(combined_gradient, shared_vars))
+        return {'loss_main': loss_main, 'loss_aux': loss_aux}
+
+
+def adjust_gradient(main_grad, aux_grad):
+    # flatten tensors
+    main_grad_flat = tf.reshape(main_grad, [-1])
+    aux_grad_flat = tf.reshape(aux_grad, [-1])
+
+    # project and adjust
+    projection = tf.minimum(tf.reduce_sum(main_grad_flat * aux_grad_flat), 0) \
+                            * main_grad_flat / \
+                            tf.reduce_sum(main_grad_flat * main_grad_flat)
+    adjusted = aux_grad_flat - projection
+    return tf.reshape(adjusted, aux_grad.shape)
+
+
+def get_variables(trainable_variables, name):
+    return [v for v in trainable_variables if name in v.name]
+
+
+def combine_gradients_list(main_grads, aux_grads, lamb=1):
+    return [main_grads[i] + lamb * aux_grads[i] for i in
+            range(len(main_grads))]
+
+
+def adjust_gradient_list(main_grads, aux_grads):
+    return [adjust_gradient(main_grads[i], aux_grads[i]) for i in
+            range(len(main_grads))]

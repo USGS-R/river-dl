@@ -348,8 +348,9 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
 
 
 def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
-              catch_prop_file=None, test_start_date='2004-09-30', n_test_yr=12,
-              exclude_file=None, log_q=False, out_file=None, segs=None):
+              primary_variable='temp', catch_prop_file=None,
+              test_start_date='2004-09-30', n_test_yr=12, exclude_file=None,
+              log_q=False, out_file=None, segs=None):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -359,6 +360,8 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
     :param distfile: [str] path to the distance matrix .npz file
     :param x_vars: [list] variables that should be used as input
+    :param primary_variable: [str] which variable the model should focus on
+    'temp' or 'flow'. This determines the order of the variables.
     :param catch_prop_file: [str] the path to the catchment properties file. If
     left unfilled, the catchment properties will not be included as predictors
     :param test_start_date: [str] the date to start for the test period
@@ -398,12 +401,16 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # read, filter observations for finetuning
+    if primary_variable == 'temp':
+        y_vars = ['seg_tave_water', 'seg_outflow']
+    else:
+        y_vars = ['seg_outflow', 'seg_tave_water']
     y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], pretrain_file)
+    y_obs = y_obs[y_vars]
+    y_pre = ds_pre[y_vars]
     if segs:
         y_obs = y_obs.loc[dict(seg_id_nat=segs)]
     y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
-    y_vars = ['seg_tave_water', 'seg_outflow']
-    y_pre = ds_pre[y_vars]
     y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)
 
     if log_q:

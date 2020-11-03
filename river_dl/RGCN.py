@@ -16,8 +16,6 @@ class RGCN(layers.Layer):
         """
 
         :param hidden_size: [int] the number of hidden units
-        :param n_phys_vars: [int] the number of outputs to produce in
-        pre-training
         :param A: [numpy array] adjacency matrix
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
@@ -127,8 +125,10 @@ class RGCN(layers.Layer):
                                      + self.b_c)
 
             if self.flow_in_temp:
-                out_pred_q = tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
-                out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q], axis=1),
+                out_pred_q = tf.matmul(h_update, self.W_out_flow) +\
+                             self.b_out_flow
+                out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q],
+                                                 axis=1),
                                        self.W_out_temp) + self.b_out_temp
                 out_pred = tf.concat([out_pred_t, out_pred_q], axis=1)
             else:
@@ -147,8 +147,6 @@ class RGCNModel(tf.keras.Model):
     def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
         """
         :param hidden_size: [int] the number of hidden units
-        :param n_phys_vars: [int] the number of outputs to produce in
-        pre-training
         :param A: [numpy array] adjacency matrix
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
@@ -195,36 +193,18 @@ def rmse_masked_one_var(data, y_pred, var_idx):
     return rmse_loss
 
 
-def rmse_masked_separate(data, y_pred):
-    """
-    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
-    with 0 when y_s is nan; num_y_s is a count of just those non-nan
-    observations) so we're only looking at predictions with corresponding
-    observations available
-    (credit: @aappling-usgs)
-    :param data: [tensor] true (observed) y values. these may have nans and
-    sample weights
-    :param y_pred: [tensor] predicted y values
-    :return: rmse (one value for each training sample)
-    """
-    rmse_main = rmse_masked_one_var(data, y_pred, 0)
-    rmse_aux = rmse_masked_one_var(data, y_pred, 1)
-    losses = tf.stack([rmse_main, rmse_aux], axis=0)
-    return rmse_main
-
-
-def weighted_masked_rmse(aux_weight=0.5):
+@tf.function
+def weighted_masked_rmse(lamb=0.5):
     """
     calculate a weighted, masked rmse. 
-    :param temperature_weight: [float] weight between 0 and 1. The difference
-    between one and the temperature_weight becomes the flow_weight. If you want
-    to weight the rmse of temperature and the rmse of flow equally,
-    the temperature_weight would be 0.5
+    :param lamb: [float] (short for lambda). The factor that the auxiliary loss
+    will be multiplied by before added to the main loss.
     """
 
     def rmse_masked_combined(data, y_pred):
-        rmse_main, rmse_aux = rmse_masked_separate(data, y_pred)
-        rmse_loss = rmse_main + aux_weight * rmse_aux
+        rmse_main = rmse_masked_one_var(data, y_pred, 0)
+        rmse_aux = rmse_masked_one_var(data, y_pred, 1)
+        rmse_loss = (1 - lamb) * rmse_main + lamb * rmse_aux
         return rmse_loss
 
     return rmse_masked_combined

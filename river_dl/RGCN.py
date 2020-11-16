@@ -161,7 +161,48 @@ class RGCNModel(tf.keras.Model):
 
 
 @tf.function
-def rmse_masked_one_var(data, y_pred, var_idx):
+def rmse(y_true, y_pred, weights):
+    num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
+                         tf.float32)
+    if num_y_true > 0:
+        zero_or_error = tf.where(tf.math.is_nan(y_true),
+                                 tf.zeros_like(y_true),
+                                 y_pred - y_true)
+        wgt_zero_or_err = (zero_or_error * weights)
+        sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
+        rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
+    else:
+        rmse_loss = 0.0
+    return rmse_loss
+
+
+@tf.function
+def nnse(y_true, y_pred):
+    num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
+                         tf.float32)
+    if num_y_true > 0:
+        # get mean accounting for nans
+        zero_or_val = tf.where(tf.math.is_nan(y_true),
+                               tf.zeros_like(y_true),
+                               y_true)
+        obs_mean = tf.reduce_sum(zero_or_val)/num_y_true
+
+        zero_or_error = tf.where(tf.math.is_nan(y_true),
+                                 tf.zeros_like(y_true),
+                                 y_pred - y_true)
+
+        denom = tf.reduce_sum(tf.math.abs(zero_or_val - obs_mean))
+        numerator = tf.reduce_sum(zero_or_error)
+        nse = 1 - numerator/denom
+        nnse = 1/(2 - nse)
+        nnse_loss = 1 - nnse
+    else:
+        nnse_loss = 0.0
+    return nnse_loss
+
+
+@tf.function
+def y_data_components(data, y_pred, var_idx):
     weights = data[:, :, -2:]
     y_true = data[:, :, :-2]
 
@@ -178,19 +219,13 @@ def rmse_masked_one_var(data, y_pred, var_idx):
     weights = weights[:, :, var_idx]
     y_true = y_true[:, :, var_idx]
     y_pred = y_pred[:, :, var_idx]
+    return y_true, y_pred, weights
 
-    num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
-                         tf.float32)
-    if num_y_true > 0:
-        zero_or_error = tf.where(tf.math.is_nan(y_true),
-                                 tf.zeros_like(y_true),
-                                 y_pred - y_true)
-        wgt_zero_or_err = (zero_or_error * weights)
-        sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
-        rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
-    else:
-        rmse_loss = 0.0
-    return rmse_loss
+
+@tf.function
+def rmse_masked_one_var(data, y_pred, var_idx):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+    return rmse(y_true, y_pred, weights)
 
 
 @tf.function

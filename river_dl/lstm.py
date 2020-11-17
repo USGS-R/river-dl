@@ -12,12 +12,14 @@ from river_dl.RGCN import rmse_masked_one_var
 
 
 class LSTMModel(tf.keras.Model):
-    def __init__(self, hidden_size, gradient_correction=False, lamb=1):
+    def __init__(self, hidden_size, gradient_correction=False, lamb=1,
+                 grad_log_file=None):
         """
         :param hidden_size: [int] the number of hidden units
         """
         super().__init__()
         self.gradient_correction = gradient_correction
+        self.grad_log_file = grad_log_file
         self.lamb = lamb
         self.lstm_layer = layers.LSTM(hidden_size, return_sequences=True,
                                       name='lstm_shared')
@@ -59,7 +61,8 @@ class LSTMModel(tf.keras.Model):
         if self.gradient_correction:
             # adjust auxiliary gradient
             gradient_shared_aux = adjust_gradient_list(gradient_shared_main,
-                                                       gradient_shared_aux)
+                                                       gradient_shared_aux,
+                                                       self.grad_log_file)
         combined_gradient = combine_gradients_list(gradient_shared_main,
                                                    gradient_shared_aux,
                                                    lamb=self.lamb)
@@ -71,7 +74,7 @@ class LSTMModel(tf.keras.Model):
         return {'loss_main': loss_main, 'loss_aux': loss_aux}
 
 
-def adjust_gradient(main_grad, aux_grad):
+def adjust_gradient(main_grad, aux_grad, logfile=None):
     # flatten tensors
     main_grad_flat = tf.reshape(main_grad, [-1])
     aux_grad_flat = tf.reshape(aux_grad, [-1])
@@ -80,6 +83,13 @@ def adjust_gradient(main_grad, aux_grad):
     projection = tf.minimum(tf.reduce_sum(main_grad_flat * aux_grad_flat), 0) \
                             * main_grad_flat / \
                             tf.reduce_sum(main_grad_flat * main_grad_flat)
+    if logfile:
+        logfile = "file://" + logfile
+        tf.print(tf.reduce_sum(projection), output_stream=logfile, sep=',')
+    projection = tf.cond(tf.math.is_nan(tf.reduce_sum(projection)),
+                         lambda: tf.zeros(aux_grad_flat.shape),
+                         lambda: projection
+                         )
     adjusted = aux_grad_flat - projection
     return tf.reshape(adjusted, aux_grad.shape)
 
@@ -93,6 +103,6 @@ def combine_gradients_list(main_grads, aux_grads, lamb=1):
             range(len(main_grads))]
 
 
-def adjust_gradient_list(main_grads, aux_grads):
-    return [adjust_gradient(main_grads[i], aux_grads[i]) for i in
+def adjust_gradient_list(main_grads, aux_grads, logfile=None):
+    return [adjust_gradient(main_grads[i], aux_grads[i], logfile) for i in
             range(len(main_grads))]

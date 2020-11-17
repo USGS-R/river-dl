@@ -58,7 +58,9 @@ def train_model(io_data, pretrain_epochs, finetune_epochs, hidden_units,
         model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
                           A=dist_matrix, rand_seed=seed)
     elif model_type == 'lstm_grad_correction':
-        model = LSTMModel(hidden_units, gradient_correction=True, lamb=lamb)
+        grad_log_file = os.path.join(out_dir, 'grad_correction.txt')
+        model = LSTMModel(hidden_units, gradient_correction=True, lamb=lamb,
+                          grad_log_file=grad_log_file)
 
     if seed:
         os.environ['PYTHONHASHSEED'] = str(seed)

@@ -199,8 +199,7 @@ def get_exclude_seg_ids(exclude_grp, all_segs):
         ex_mask = ~all_segs.isin(exclude_grp['seg_id_nats_in'])
         ex_segs = all_segs[ex_mask]
     else:
-        raise ValueError('exclude grp needs either "seg_id_nats_in" or'
-                         '"seg_id_nats_ex')
+        ex_segs = all_segs
     return ex_segs
 
 
@@ -223,7 +222,7 @@ def exclude_segments(y_data, exclude_segs):
         for v in exclude_vars:
             # set those weights to zero
             weights[v].load()
-            weights[v].loc[start:end, segs_to_exclude] = 0
+            weights[v].loc[dict(date=slice(start, end), seg_id_nat=segs_to_exclude)] = 0
     return weights
 
 

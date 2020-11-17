@@ -88,41 +88,42 @@ def train_model(
         random.seed(seed)
 
     # pretrain
-    optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
+    if pretrain_epochs > 0:
+        optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 
-    # use built in 'fit' method unless model is grad correction
-    x_trn_pre = io_data["x_trn"]
-    # combine with weights to pass to loss function
-    y_trn_pre = np.concatenate(
-        [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
-    )
-
-    if model_type == "rgcn":
-        model.compile(optimizer_pre, loss=weighted_masked_rmse(aux_weight=lamb))
-    else:
-        model.compile(optimizer_pre)
-
-    csv_log_pre = tf.keras.callbacks.CSVLogger(
-        os.path.join(out_dir, f"pretrain_log.csv")
-    )
-    model.fit(
-        x=x_trn_pre,
-        y=y_trn_pre,
-        epochs=pretrain_epochs,
-        batch_size=n_seg,
-        callbacks=[csv_log_pre],
-    )
-
-    pre_train_time = datetime.datetime.now()
-    pre_train_time_elapsed = pre_train_time - start_time
-    out_time_file = os.path.join(out_dir, "training_time.txt")
-    with open(out_time_file, "w") as f:
-        f.write(
-            f"elapsed time pretrain (includes building graph):\
-                 {pre_train_time_elapsed} \n"
+        # use built in 'fit' method unless model is grad correction
+        x_trn_pre = io_data["x_trn"]
+        # combine with weights to pass to loss function
+        y_trn_pre = np.concatenate(
+            [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
         )
 
-    model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
+        if model_type == "rgcn":
+            model.compile(optimizer_pre, loss=weighted_masked_rmse(aux_weight=lamb))
+        else:
+            model.compile(optimizer_pre)
+
+        csv_log_pre = tf.keras.callbacks.CSVLogger(
+            os.path.join(out_dir, f"pretrain_log.csv")
+        )
+        model.fit(
+            x=x_trn_pre,
+            y=y_trn_pre,
+            epochs=pretrain_epochs,
+            batch_size=n_seg,
+            callbacks=[csv_log_pre],
+        )
+
+        pre_train_time = datetime.datetime.now()
+        pre_train_time_elapsed = pre_train_time - start_time
+        out_time_file = os.path.join(out_dir, "training_time.txt")
+        with open(out_time_file, "w") as f:
+            f.write(
+                f"elapsed time pretrain (includes building graph):\
+                     {pre_train_time_elapsed} \n"
+            )
+
+        model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
 
     # finetune
     optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
@@ -132,14 +133,10 @@ def train_model(
     else:
         model.compile(optimizer_ft)
 
-    csv_log_ft = tf.keras.callbacks.CSVLogger(
-        os.path.join(out_dir, "finetune_log.csv")
-    )
+    csv_log_ft = tf.keras.callbacks.CSVLogger(os.path.join(out_dir, "finetune_log.csv"))
 
     x_trn_obs = io_data["x_trn"]
-    y_trn_obs = np.concatenate(
-        [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
-    )
+    y_trn_obs = np.concatenate([io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2)
 
     model.fit(
         x=x_trn_obs,

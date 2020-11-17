@@ -23,113 +23,152 @@ class RGCN(layers.Layer):
         """
         super().__init__()
         self.hidden_size = hidden_size
-        self.A = A.astype('float32')
+        self.A = A.astype("float32")
         self.flow_in_temp = flow_in_temp
 
         # set up the layer
         self.lstm = tf.keras.layers.LSTMCell(hidden_size)
 
         ### set up the weights ###
-        w_initializer = tf.random_normal_initializer(stddev=0.02,
-                                                     seed=rand_seed)
+        w_initializer = tf.random_normal_initializer(
+            stddev=0.02, seed=rand_seed
+        )
 
         # was Wg1
-        self.W_graph_h = self.add_weight(shape=[hidden_size, hidden_size],
-                                         initializer=w_initializer,
-                                         name='W_graph_h')
+        self.W_graph_h = self.add_weight(
+            shape=[hidden_size, hidden_size],
+            initializer=w_initializer,
+            name="W_graph_h",
+        )
         # was bg1
-        self.b_graph_h = self.add_weight(shape=[hidden_size],
-                                         initializer='zeros', name='b_graph_h')
+        self.b_graph_h = self.add_weight(
+            shape=[hidden_size], initializer="zeros", name="b_graph_h"
+        )
         # was Wg2
-        self.W_graph_c = self.add_weight(shape=[hidden_size, hidden_size],
-                                         initializer=w_initializer,
-                                         name='W_graph_c')
+        self.W_graph_c = self.add_weight(
+            shape=[hidden_size, hidden_size],
+            initializer=w_initializer,
+            name="W_graph_c",
+        )
         # was bg2
-        self.b_graph_c = self.add_weight(shape=[hidden_size],
-                                         initializer='zeros', name='b_graph_c')
+        self.b_graph_c = self.add_weight(
+            shape=[hidden_size], initializer="zeros", name="b_graph_c"
+        )
 
         # was Wa1
-        self.W_h_cur = self.add_weight(shape=[hidden_size, hidden_size],
-                                       initializer=w_initializer,
-                                       name='W_h_cur')
+        self.W_h_cur = self.add_weight(
+            shape=[hidden_size, hidden_size],
+            initializer=w_initializer,
+            name="W_h_cur",
+        )
         # was Wa2
-        self.W_h_prev = self.add_weight(shape=[hidden_size, hidden_size],
-                                        initializer=w_initializer,
-                                        name='W_h_prev')
+        self.W_h_prev = self.add_weight(
+            shape=[hidden_size, hidden_size],
+            initializer=w_initializer,
+            name="W_h_prev",
+        )
         # was ba
-        self.b_h = self.add_weight(shape=[hidden_size], initializer='zeros',
-                                   name='b_h')
+        self.b_h = self.add_weight(
+            shape=[hidden_size], initializer="zeros", name="b_h"
+        )
 
         # was Wc1
-        self.W_c_cur = self.add_weight(shape=[hidden_size, hidden_size],
-                                       initializer=w_initializer,
-                                       name='W_c_cur')
+        self.W_c_cur = self.add_weight(
+            shape=[hidden_size, hidden_size],
+            initializer=w_initializer,
+            name="W_c_cur",
+        )
         # was Wc2
-        self.W_c_prev = self.add_weight(shape=[hidden_size, hidden_size],
-                                        initializer=w_initializer,
-                                        name='W_c_prev')
+        self.W_c_prev = self.add_weight(
+            shape=[hidden_size, hidden_size],
+            initializer=w_initializer,
+            name="W_c_prev",
+        )
         # was bc
-        self.b_c = self.add_weight(shape=[hidden_size], initializer='zeros',
-                                   name='b_c')
+        self.b_c = self.add_weight(
+            shape=[hidden_size], initializer="zeros", name="b_c"
+        )
 
         if self.flow_in_temp:
             # was W2
-            self.W_out_flow = self.add_weight(shape=[hidden_size, 1],
-                                              initializer=w_initializer,
-                                              name='W_out')
+            self.W_out_flow = self.add_weight(
+                shape=[hidden_size, 1], initializer=w_initializer, name="W_out"
+            )
             # was b2
-            self.b_out_flow = self.add_weight(shape=[1], initializer='zeros',
-                                              name='b_out')
+            self.b_out_flow = self.add_weight(
+                shape=[1], initializer="zeros", name="b_out"
+            )
 
-            self.W_out_temp = self.add_weight(shape=[hidden_size+1, 1],
-                                              initializer=w_initializer,
-                                              name='W_out')
+            self.W_out_temp = self.add_weight(
+                shape=[hidden_size + 1, 1],
+                initializer=w_initializer,
+                name="W_out",
+            )
 
-            self.b_out_temp = self.add_weight(shape=[1], initializer='zeros',
-                                              name='b_out')
+            self.b_out_temp = self.add_weight(
+                shape=[1], initializer="zeros", name="b_out"
+            )
         else:
             # was W2
-            self.W_out = self.add_weight(shape=[hidden_size, 2],
-                                         initializer=w_initializer,
-                                         name='W_out')
+            self.W_out = self.add_weight(
+                shape=[hidden_size, 2], initializer=w_initializer, name="W_out"
+            )
             # was b2
-            self.b_out = self.add_weight(shape=[2],
-                                         initializer='zeros', name='b_out')
+            self.b_out = self.add_weight(
+                shape=[2], initializer="zeros", name="b_out"
+            )
 
     @tf.function
     def call(self, inputs, **kwargs):
         graph_size = self.A.shape[0]
-        hidden_state_prev, cell_state_prev = (tf.zeros([graph_size,
-                                                        self.hidden_size]),
-                                              tf.zeros([graph_size,
-                                                        self.hidden_size]))
+        hidden_state_prev, cell_state_prev = (
+            tf.zeros([graph_size, self.hidden_size]),
+            tf.zeros([graph_size, self.hidden_size]),
+        )
         out = []
         n_steps = inputs.shape[1]
         for t in range(n_steps):
-            h_graph = tf.nn.tanh(tf.matmul(self.A, tf.matmul(hidden_state_prev,
-                                                             self.W_graph_h)
-                                           + self.b_graph_h))
-            c_graph = tf.nn.tanh(tf.matmul(self.A, tf.matmul(cell_state_prev,
-                                                             self.W_graph_c)
-                                           + self.b_graph_c))
+            h_graph = tf.nn.tanh(
+                tf.matmul(
+                    self.A,
+                    tf.matmul(hidden_state_prev, self.W_graph_h)
+                    + self.b_graph_h,
+                )
+            )
+            c_graph = tf.nn.tanh(
+                tf.matmul(
+                    self.A,
+                    tf.matmul(cell_state_prev, self.W_graph_c) + self.b_graph_c,
+                )
+            )
 
-            seq, state = self.lstm(inputs[:, t, :], states=[hidden_state_prev,
-                                                            cell_state_prev])
+            seq, state = self.lstm(
+                inputs[:, t, :], states=[hidden_state_prev, cell_state_prev]
+            )
             hidden_state_cur, cell_state_cur = state
 
-            h_update = tf.nn.sigmoid(tf.matmul(hidden_state_cur, self.W_h_cur)
-                                     + tf.matmul(h_graph, self.W_h_prev)
-                                     + self.b_h)
-            c_update = tf.nn.sigmoid(tf.matmul(cell_state_cur, self.W_c_cur)
-                                     + tf.matmul(c_graph, self.W_c_prev)
-                                     + self.b_c)
+            h_update = tf.nn.sigmoid(
+                tf.matmul(hidden_state_cur, self.W_h_cur)
+                + tf.matmul(h_graph, self.W_h_prev)
+                + self.b_h
+            )
+            c_update = tf.nn.sigmoid(
+                tf.matmul(cell_state_cur, self.W_c_cur)
+                + tf.matmul(c_graph, self.W_c_prev)
+                + self.b_c
+            )
 
             if self.flow_in_temp:
-                out_pred_q = tf.matmul(h_update, self.W_out_flow) +\
-                             self.b_out_flow
-                out_pred_t = tf.matmul(tf.concat([h_update, out_pred_q],
-                                                 axis=1),
-                                       self.W_out_temp) + self.b_out_temp
+                out_pred_q = (
+                    tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
+                )
+                out_pred_t = (
+                    tf.matmul(
+                        tf.concat([h_update, out_pred_q], axis=1),
+                        self.W_out_temp,
+                    )
+                    + self.b_out_temp
+                )
                 out_pred = tf.concat([out_pred_t, out_pred_q], axis=1)
             else:
                 out_pred = tf.matmul(h_update, self.W_out) + self.b_out
@@ -179,13 +218,14 @@ def rmse_masked_one_var(data, y_pred, var_idx):
     y_true = y_true[:, :, var_idx]
     y_pred = y_pred[:, :, var_idx]
 
-    num_y_true = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_true)),
-                         tf.float32)
+    num_y_true = tf.cast(
+        tf.math.count_nonzero(~tf.math.is_nan(y_true)), tf.float32
+    )
     if num_y_true > 0:
-        zero_or_error = tf.where(tf.math.is_nan(y_true),
-                                 tf.zeros_like(y_true),
-                                 y_pred - y_true)
-        wgt_zero_or_err = (zero_or_error * weights)
+        zero_or_error = tf.where(
+            tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
+        )
+        wgt_zero_or_err = zero_or_error * weights
         sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
         rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
     else:
@@ -196,7 +236,7 @@ def rmse_masked_one_var(data, y_pred, var_idx):
 @tf.function
 def weighted_masked_rmse(lamb=0.5):
     """
-    calculate a weighted, masked rmse. 
+    calculate a weighted, masked rmse.
     :param lamb: [float] (short for lambda). The factor that the auxiliary loss
     will be multiplied by before added to the main loss.
     """

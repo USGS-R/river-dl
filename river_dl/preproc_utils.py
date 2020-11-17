@@ -35,7 +35,7 @@ def separate_trn_tst(dataset, test_start, n_test_years):
     :param test_start: [str] date where training data should start
     :param n_test_years: [int] number of years to take for the test period
     """
-    start_date = datetime.datetime.strptime(test_start, '%Y-%m-%d')
+    start_date = datetime.datetime.strptime(test_start, "%Y-%m-%d")
     test_end = start_date + relativedelta(years=n_test_years)
     tst = dataset.sel(date=slice(test_start, test_end))
     # take all the rest
@@ -58,8 +58,7 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     combined = []
     for i in range(int(1 / offset)):
         start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1] + 1,
-                        step=seq_len)
+        idx = np.arange(start=start, stop=data_array.shape[1] + 1, step=seq_len)
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
         combined.extend([s for s in split if s.shape[1] == seq_len])
@@ -74,7 +73,7 @@ def get_unique_dates(partition, x_data_file):
     :param x_data_file: [str] path to x_data_file
     :return: [np array] unique dates
     """
-    return np.sort(np.unique(np.load(x_data_file)[f'dates_{partition}']))
+    return np.sort(np.unique(np.load(x_data_file)[f"dates_{partition}"]))
 
 
 def get_dates(partition, x_data_file):
@@ -84,9 +83,9 @@ def get_dates(partition, x_data_file):
     :param x_data_file: [str] path to x_data_file
     :return: [array] dates
     """
-    if partition == 'both':
-        trn_dates = get_unique_dates('trn', x_data_file)
-        tst_dates = get_unique_dates('tst', x_data_file)
+    if partition == "both":
+        trn_dates = get_unique_dates("trn", x_data_file)
+        tst_dates = get_unique_dates("tst", x_data_file)
         return np.sort(np.concatenate([trn_dates, tst_dates]))
     else:
         return get_unique_dates(partition, x_data_file)
@@ -100,14 +99,15 @@ def read_multiple_obs(obs_files, pre_train_file):
     :param pre_train_file: [str] the file of pre_training data
     :return: [xr dataset] the observations in the same time
     """
-    obs = [xr.open_zarr(pre_train_file).sortby(['seg_id_nat', 'date'])]
+    obs = [xr.open_zarr(pre_train_file).sortby(["seg_id_nat", "date"])]
     for filename in obs_files:
         ds = xr.open_zarr(filename)
         obs.append(ds)
-    obs = xr.merge(obs, join='left')
-    obs = obs[['temp_c', 'discharge_cms']]
-    obs = obs.rename({'temp_c': 'seg_tave_water',
-                      'discharge_cms': 'seg_outflow'})
+    obs = xr.merge(obs, join="left")
+    obs = obs[["temp_c", "discharge_cms"]]
+    obs = obs.rename(
+        {"temp_c": "seg_tave_water", "discharge_cms": "seg_outflow"}
+    )
     return obs
 
 
@@ -121,7 +121,7 @@ def join_catch_properties(x_data_ts, catch_props):
     # broadcast the catchment properties on the ts data so that there is a value
     # for each date
     _, ds_catch = xr.broadcast(x_data_ts, catch_props)
-    return xr.merge([x_data_ts, ds_catch], join='left')
+    return xr.merge([x_data_ts, ds_catch], join="left")
 
 
 def prep_catch_props(x_data_ts, catch_prop_file):
@@ -132,7 +132,7 @@ def prep_catch_props(x_data_ts, catch_prop_file):
     :return: [xr dataset] merged datasets
     """
     df_catch_props = pd.read_feather(catch_prop_file)
-    ds_catch_props = df_catch_props.set_index('seg_id_nat').to_xarray()
+    ds_catch_props = df_catch_props.set_index("seg_id_nat").to_xarray()
     return join_catch_properties(x_data_ts, ds_catch_props)
 
 
@@ -154,13 +154,13 @@ def get_exclude_start_end(exclude_grp):
     the exclude yml file
     :return: [tuple of datetime objects] start date, end date
     """
-    start = exclude_grp.get('start_date')
+    start = exclude_grp.get("start_date")
     if start:
-        start = datetime.datetime.strptime(start, '%Y-%m-%d')
+        start = datetime.datetime.strptime(start, "%Y-%m-%d")
 
-    end = exclude_grp.get('end_date')
+    end = exclude_grp.get("end_date")
     if end:
-        end = datetime.datetime.strptime(end, '%Y-%m-%d')
+        end = datetime.datetime.strptime(end, "%Y-%m-%d")
     return start, end
 
 
@@ -171,15 +171,15 @@ def get_exclude_vars(exclude_grp):
     the exclude yml file
     :return: [list] variables to exclude
     """
-    variable = exclude_grp.get('variable')
-    if not variable or variable == 'both':
-        return ['seg_tave_water', 'seg_outflow']
-    elif variable == 'temp':
-        return ['seg_tave_water']
-    elif variable == 'flow':
-        return ['seg_outflow']
+    variable = exclude_grp.get("variable")
+    if not variable or variable == "both":
+        return ["seg_tave_water", "seg_outflow"]
+    elif variable == "temp":
+        return ["seg_tave_water"]
+    elif variable == "flow":
+        return ["seg_outflow"]
     else:
-        raise ValueError('exclude variable must be flow, temp, or both')
+        raise ValueError("exclude variable must be flow, temp, or both")
 
 
 def get_exclude_seg_ids(exclude_grp, all_segs):
@@ -192,11 +192,11 @@ def get_exclude_seg_ids(exclude_grp, all_segs):
     :return: [list like] the segments to exclude
     """
     # ex_segs are the sites to exclude
-    if 'seg_id_nats_ex' in exclude_grp.keys():
-        ex_segs = exclude_grp['seg_id_nats_ex']
+    if "seg_id_nats_ex" in exclude_grp.keys():
+        ex_segs = exclude_grp["seg_id_nats_ex"]
     # exclude all *but* the "seg_id_nats_in"
-    elif 'seg_id_nats_in' in exclude_grp.keys():
-        ex_mask = ~all_segs.isin(exclude_grp['seg_id_nats_in'])
+    elif "seg_id_nats_in" in exclude_grp.keys():
+        ex_mask = ~all_segs.isin(exclude_grp["seg_id_nats_in"])
         ex_segs = all_segs[ex_mask]
     else:
         ex_segs = all_segs
@@ -222,7 +222,9 @@ def exclude_segments(y_data, exclude_segs):
         for v in exclude_vars:
             # set those weights to zero
             weights[v].load()
-            weights[v].loc[dict(date=slice(start, end), seg_id_nat=segs_to_exclude)] = 0
+            weights[v].loc[
+                dict(date=slice(start, end), seg_id_nat=segs_to_exclude)
+            ] = 0
     return weights
 
 
@@ -241,9 +243,14 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def reduce_training_data(data_file, train_start_date='1980-10-01',
-                         train_end_date='2004-09-30', reduce_amount=0,
-                         out_file=None, segs=None):
+def reduce_training_data(
+    data_file,
+    train_start_date="1980-10-01",
+    train_end_date="2004-09-30",
+    reduce_amount=0,
+    out_file=None,
+    segs=None,
+):
     """
     artificially reduce the amount of training data in the training dataset
     :param train_start_date: [str] date (fmt YYYY-MM-DD) for when training data
@@ -260,7 +267,7 @@ def reduce_training_data(data_file, train_start_date='1980-10-01',
     ds = xr.open_zarr(data_file)
     df = ds.to_dataframe()
     idx = pd.IndexSlice
-    df_trn = df.loc[idx[train_start_date: train_end_date, :], :]
+    df_trn = df.loc[idx[train_start_date:train_end_date, :], :]
     if segs:
         df_trn = df_trn.loc[idx[:, segs], :]
     non_null = df_trn.dropna()
@@ -280,7 +287,7 @@ def convert_batch_reshape(dataset):
     :return: [numpy array] batched and reshaped dataset
     """
     # convert xr.dataset to numpy array
-    dataset = dataset.transpose('seg_id_nat', 'date')
+    dataset = dataset.transpose("seg_id_nat", "date")
     arr = dataset.to_array().values
 
     # before [nfeat, nseg, ndates]; after [nseg, ndates, nfeat]
@@ -298,8 +305,8 @@ def convert_batch_reshape(dataset):
 
 
 def coord_as_reshaped_array(dataset, coord_name):
-    coord_array = xr.broadcast(dataset[coord_name], dataset['seg_tave_air'])[0]
-    new_var_name = coord_name + '1'
+    coord_array = xr.broadcast(dataset[coord_name], dataset["seg_tave_air"])[0]
+    new_var_name = coord_name + "1"
     dataset[new_var_name] = coord_array
     reshaped_np_arr = convert_batch_reshape(dataset[[new_var_name]])
     return reshaped_np_arr
@@ -315,9 +322,9 @@ def log_discharge(y):
     :param y: [xr dataset] the y data
     :return: [xr dataset] the data logged
     """
-    y['seg_outflow'].load()
-    y['seg_outflow'].loc[:, :] = y['seg_outflow'] + 1e-6
-    y['seg_outflow'].loc[:, :] = xr.ufuncs.log(y['seg_outflow'])
+    y["seg_outflow"].load()
+    y["seg_outflow"].loc[:, :] = y["seg_outflow"] + 1e-6
+    y["seg_outflow"].loc[:, :] = xr.ufuncs.log(y["seg_outflow"])
     return y
 
 
@@ -346,10 +353,21 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
     return ds_y_obs
 
 
-def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
-              primary_variable='temp', catch_prop_file=None,
-              test_start_date='2004-09-30', n_test_yr=12, exclude_file=None,
-              log_q=False, out_file=None, segs=None):
+def prep_data(
+    obs_temper_file,
+    obs_flow_file,
+    pretrain_file,
+    distfile,
+    x_vars,
+    primary_variable="temp",
+    catch_prop_file=None,
+    test_start_date="2004-09-30",
+    n_test_yr=12,
+    exclude_file=None,
+    log_q=False,
+    out_file=None,
+    segs=None,
+):
     """
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
@@ -400,10 +418,10 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # read, filter observations for finetuning
-    if primary_variable == 'temp':
-        y_vars = ['seg_tave_water', 'seg_outflow']
+    if primary_variable == "temp":
+        y_vars = ["seg_tave_water", "seg_outflow"]
     else:
-        y_vars = ['seg_outflow', 'seg_tave_water']
+        y_vars = ["seg_outflow", "seg_tave_water"]
     y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], pretrain_file)
     y_obs = y_obs[y_vars]
     y_pre = ds_pre[y_vars]
@@ -428,25 +446,26 @@ def prep_data(obs_temper_file, obs_flow_file, pretrain_file, distfile, x_vars,
     y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_pre_trn)
     y_trn_obs_scl, _, _ = scale(y_obs_trn, y_trn_pre_std, y_trn_pre_mean)
 
-    data = {'x_trn': convert_batch_reshape(x_trn_scl),
-            'x_tst': convert_batch_reshape(x_tst_scl),
-            'x_std': x_std.to_array().values,
-            'x_mean': x_mean.to_array().values,
-            'x_cols': np.array(x_vars),
-            'ids_trn': coord_as_reshaped_array(x_trn, 'seg_id_nat'),
-            'dates_trn': coord_as_reshaped_array(x_trn, 'date'),
-            'ids_tst': coord_as_reshaped_array(x_tst, 'seg_id_nat'),
-            'dates_tst': coord_as_reshaped_array(x_tst, 'date'),
-            'y_pre_trn': convert_batch_reshape(y_trn_pre_scl),
-            'y_obs_trn': convert_batch_reshape(y_trn_obs_scl),
-            'y_std': y_trn_pre_std.to_array().values,
-            'y_mean': y_trn_pre_mean.to_array().values,
-            'y_pre_wgts': convert_batch_reshape(y_pre_wgts),
-            'y_obs_wgts': convert_batch_reshape(y_obs_wgts),
-            'y_vars': np.array(y_vars),
-            'y_obs_tst': convert_batch_reshape(y_obs_tst),
-            'dist_matrix': prep_adj_matrix(distfile, 'upstream')
-            }
+    data = {
+        "x_trn": convert_batch_reshape(x_trn_scl),
+        "x_tst": convert_batch_reshape(x_tst_scl),
+        "x_std": x_std.to_array().values,
+        "x_mean": x_mean.to_array().values,
+        "x_cols": np.array(x_vars),
+        "ids_trn": coord_as_reshaped_array(x_trn, "seg_id_nat"),
+        "dates_trn": coord_as_reshaped_array(x_trn, "date"),
+        "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat"),
+        "dates_tst": coord_as_reshaped_array(x_tst, "date"),
+        "y_pre_trn": convert_batch_reshape(y_trn_pre_scl),
+        "y_obs_trn": convert_batch_reshape(y_trn_obs_scl),
+        "y_std": y_trn_pre_std.to_array().values,
+        "y_mean": y_trn_pre_mean.to_array().values,
+        "y_pre_wgts": convert_batch_reshape(y_pre_wgts),
+        "y_obs_wgts": convert_batch_reshape(y_obs_wgts),
+        "y_vars": np.array(y_vars),
+        "y_obs_tst": convert_batch_reshape(y_obs_tst),
+        "dist_matrix": prep_adj_matrix(distfile, "upstream"),
+    }
     if out_file:
         np.savez_compressed(out_file, **data)
     return data
@@ -475,7 +494,7 @@ def prep_adj_matrix(infile, dist_type, out_file=None):
     """
     adj_matrices = np.load(infile)
     adj = adj_matrices[dist_type]
-    adj = sort_dist_matrix(adj, adj_matrices['rowcolnames'])
+    adj = sort_dist_matrix(adj, adj_matrices["rowcolnames"])
     adj = np.where(np.isinf(adj), 0, adj)
     adj = -adj
     mean_adj = np.mean(adj[adj != 0])
@@ -523,6 +542,6 @@ def read_exclude_segs_file(exclude_file):
     :return: [list] list of dictionaries of segments to exclude. dict keys must
     have 'seg_id_nats' and may also have 'start_date' and 'end_date'
     """
-    with open(exclude_file, 'r') as s:
+    with open(exclude_file, "r") as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]

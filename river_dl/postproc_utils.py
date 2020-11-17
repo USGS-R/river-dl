@@ -196,10 +196,10 @@ def predict_from_file(model_weights_dir, io_data, hidden_size, partition,
     if model == 'rgcn':
         model = RGCNModel(hidden_size, A=io_data['dist_matrix'],
                           flow_in_temp=flow_in_temp)
-    elif model == 'lstm':
+    elif model.startswith('lstm'):
         model = LSTMModel(hidden_size)
         
-
+    model(io_data['x_tst'])
     model.load_weights(model_weights_dir)
     preds = predict(model, io_data, partition, outfile, logged_q=logged_q,
                     half_tst=half_tst)

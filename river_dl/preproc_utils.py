@@ -284,7 +284,8 @@ def reduce_training_data_continuous(
     reduce_start="1980-10-01",
     reduce_end="2004-09-30",
     out_file=None,
-    segs=None):
+    segs=None,
+):
     """
     artificially reduce the amount of training data in the training dataset
     :param reduce_start: [str] date (fmt YYYY-MM-DD) for when reduction data

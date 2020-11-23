@@ -122,7 +122,6 @@ def train_model(
             callbacks=[csv_log_pre],
         )
 
-
         model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
 
     pre_train_time = datetime.datetime.now()

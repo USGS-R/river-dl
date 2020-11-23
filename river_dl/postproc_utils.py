@@ -301,7 +301,7 @@ def fmt_preds_obs(pred_data, obs_file, variable):
     """
     obs_var, seg_var = get_var_names(variable)
     pred_data = load_if_not_df(pred_data)
-    pred_data.loc[:, 'seg_id_nat'] = pred_data['seg_id_nat'].astype(int)
+    pred_data.loc[:, "seg_id_nat"] = pred_data["seg_id_nat"].astype(int)
     if {"date", "seg_id_nat"}.issubset(pred_data.columns):
         pred_data.set_index(["date", "seg_id_nat"], inplace=True)
     obs = xr.open_zarr(obs_file).to_dataframe()

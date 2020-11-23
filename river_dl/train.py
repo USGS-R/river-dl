@@ -62,6 +62,12 @@ def train_model(
     dist_matrix = io_data["dist_matrix"]
 
     n_seg = len(np.unique(io_data["ids_trn"]))
+    if n_seg > 1:
+        batch_size = n_seg
+    else:
+        num_years = io_data["x_trn"].shape[0]
+        batch_size = num_years
+
     if model_type == "lstm":
         model = LSTMModel(hidden_units, lamb=lamb)
     elif model_type == "rgcn":
@@ -99,7 +105,9 @@ def train_model(
         )
 
         if model_type == "rgcn":
-            model.compile(optimizer_pre, loss=weighted_masked_rmse(aux_weight=lamb))
+            model.compile(
+                optimizer_pre, loss=weighted_masked_rmse(aux_weight=lamb)
+            )
         else:
             model.compile(optimizer_pre)
 
@@ -110,41 +118,51 @@ def train_model(
             x=x_trn_pre,
             y=y_trn_pre,
             epochs=pretrain_epochs,
-            batch_size=n_seg,
+            batch_size=batch_size,
             callbacks=[csv_log_pre],
         )
 
-        pre_train_time = datetime.datetime.now()
-        pre_train_time_elapsed = pre_train_time - start_time
-        out_time_file = os.path.join(out_dir, "training_time.txt")
-        with open(out_time_file, "w") as f:
-            f.write(
-                f"elapsed time pretrain (includes building graph):\
-                     {pre_train_time_elapsed} \n"
-            )
 
         model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
 
+    pre_train_time = datetime.datetime.now()
+    pre_train_time_elapsed = pre_train_time - start_time
+    out_time_file = os.path.join(out_dir, "training_time.txt")
+    with open(out_time_file, "w") as f:
+        f.write(
+            f"elapsed time pretrain (includes building graph):\
+                 {pre_train_time_elapsed} \n"
+        )
+
     # finetune
-    optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
+    if finetune_epochs > 0:
+        optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
-    if model_type == "rgcn":
-        model.compile(optimizer_ft, loss=weighted_masked_rmse(aux_weight=lamb))
-    else:
-        model.compile(optimizer_ft)
+        if model_type == "rgcn":
+            model.compile(
+                optimizer_ft, loss=weighted_masked_rmse(aux_weight=lamb)
+            )
+        else:
+            model.compile(optimizer_ft)
 
-    csv_log_ft = tf.keras.callbacks.CSVLogger(os.path.join(out_dir, "finetune_log.csv"))
+        csv_log_ft = tf.keras.callbacks.CSVLogger(
+            os.path.join(out_dir, "finetune_log.csv")
+        )
 
-    x_trn_obs = io_data["x_trn"]
-    y_trn_obs = np.concatenate([io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2)
+        x_trn_obs = io_data["x_trn"]
+        y_trn_obs = np.concatenate(
+            [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
+        )
 
-    model.fit(
-        x=x_trn_obs,
-        y=y_trn_obs,
-        epochs=finetune_epochs,
-        batch_size=n_seg,
-        callbacks=[csv_log_ft],
-    )
+        model.fit(
+            x=x_trn_obs,
+            y=y_trn_obs,
+            epochs=finetune_epochs,
+            batch_size=batch_size,
+            callbacks=[csv_log_ft],
+        )
+
+        model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 
     finetune_time = datetime.datetime.now()
     finetune_time_elapsed = finetune_time - pre_train_time
@@ -154,5 +172,4 @@ def train_model(
                  {finetune_time_elapsed} \n"
         )
 
-    model.save_weights(os.path.join(out_dir, f"trained_weights/"))
     return model

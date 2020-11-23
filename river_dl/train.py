@@ -6,7 +6,6 @@ import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel, weighted_masked_rmse
 from river_dl.lstm import LSTMModel
-from river_dl.preproc_utils import prep_data
 
 
 def get_data_if_file(d):
@@ -21,106 +20,155 @@ def get_data_if_file(d):
         return np.load(d)
 
 
-def train_model(io_data, pretrain_epochs, finetune_epochs,
-                hidden_units, out_dir, flow_in_temp=False, model='rgcn',
-                seed=None, pretrain_temp_rmse_weight=0.5,
-                finetune_temp_rmse_weight=0.5,
-                learning_rate_pre=0.005, learning_rate_ft=0.01):
+def train_model(
+    io_data,
+    pretrain_epochs,
+    finetune_epochs,
+    hidden_units,
+    out_dir,
+    flow_in_temp=False,
+    model_type="rgcn",
+    seed=None,
+    lamb=1,
+    learning_rate_pre=0.005,
+    learning_rate_ft=0.01,
+):
     """
     train the rgcn
-    :param x_data: [dict or str] the data file or data dict of the x_data
-    :param y_data: [dict or str] the data file or data dict of the y_data
-    :param dist_matrix: [dict or str] data file or data dict of the dist_matrix
+    :param io_data: [dict or str] input and output data for model
     :param pretrain_epochs: [int] number of pretrain epochs
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
     :param out_dir: [str] directory where the output files should be written
     :param flow_in_temp: [bool] whether the flow predictions should feed
     into the temp predictions
-    :param model: [str] which model to use (either 'lstm' or 'rgcn')
+    :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
+    'lstm_grad_correction')
     :param seed: [int] random seed
-    :param pretrain_temp_rmse_weight: [float] weight between 0 and 1. How much
-    to weight the rmse of temperature in pretraining compared to flow. The
-    difference between one and the temperature_weight becomes the flow_weight.
-    If you want to weight the rmse of temperature and the rmse of flow equally,
-    the temperature_weight would be 0.5
-    :param finetune_temp_rmse_weight: [float] weight between 0 and 1. How much
-    to weight the rmse of temperature in finetuning compared to flow. The
-    difference between one and the temperature_weight becomes the flow_weight.
-    If you want to weight the rmse of temperature and the rmse of flow equally,
-    the temperature_weight would be 0.5
+    :param lamb: [float] (short for 'lambda') weight between 0 and 1. How much
+    to weight the auxiliary rmse is weighted compared to the main rmse. The
+    difference between one and lambda becomes the main rmse weight.
+    :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
     """
     if tf.test.gpu_device_name():
-        print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+        print("Default GPU Device: {}".format(tf.test.gpu_device_name()))
     else:
         print("Not using GPU")
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data['dist_matrix']
+    dist_matrix = io_data["dist_matrix"]
 
-    n_seg = dist_matrix.shape[0]
-    if model == 'lstm':
-        model = LSTMModel(hidden_units)
-    elif model == 'rgcn':
-        model = RGCNModel(hidden_units, flow_in_temp=flow_in_temp,
-                          A=dist_matrix, rand_seed=seed)
+    n_seg = len(np.unique(io_data["ids_trn"]))
+    if n_seg > 1:
+        batch_size = n_seg
+    else:
+        num_years = io_data["x_trn"].shape[0]
+        batch_size = num_years
+
+    if model_type == "lstm":
+        model = LSTMModel(hidden_units, lamb=lamb)
+    elif model_type == "rgcn":
+        model = RGCNModel(
+            hidden_units,
+            flow_in_temp=flow_in_temp,
+            A=dist_matrix,
+            rand_seed=seed,
+        )
+    elif model_type == "lstm_grad_correction":
+        grad_log_file = os.path.join(out_dir, "grad_correction.txt")
+        model = LSTMModel(
+            hidden_units,
+            gradient_correction=True,
+            lamb=lamb,
+            grad_log_file=grad_log_file,
+        )
 
     if seed:
-        os.environ['PYTHONHASHSEED'] = str(seed)
-        os.environ['TF_CUDNN_DETERMINISTIC'] = '1'
+        os.environ["PYTHONHASHSEED"] = str(seed)
+        os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
         tf.random.set_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
 
     # pretrain
-    optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
-    model.compile(optimizer_pre,
-                  loss=weighted_masked_rmse(pretrain_temp_rmse_weight))
+    if pretrain_epochs > 0:
+        optimizer_pre = tf.optimizers.Adam(learning_rate=learning_rate_pre)
 
-    csv_log_pre = tf.keras.callbacks.CSVLogger(
-        os.path.join(out_dir, f'pretrain_log.csv'))
+        # use built in 'fit' method unless model is grad correction
+        x_trn_pre = io_data["x_trn"]
+        # combine with weights to pass to loss function
+        y_trn_pre = np.concatenate(
+            [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
+        )
 
-    x_trn_pre = io_data['x_trn']
-    # combine with weights to pass to loss function
-    y_trn_pre = np.concatenate([io_data['y_pre_trn'], io_data['y_pre_wgts']],
-                               axis=2)
+        if model_type == "rgcn":
+            model.compile(
+                optimizer_pre, loss=weighted_masked_rmse(aux_weight=lamb)
+            )
+        else:
+            model.compile(optimizer_pre)
 
-    model.fit(x=x_trn_pre, y=y_trn_pre, epochs=pretrain_epochs,
-              batch_size=n_seg, callbacks=[csv_log_pre])
+        csv_log_pre = tf.keras.callbacks.CSVLogger(
+            os.path.join(out_dir, f"pretrain_log.csv")
+        )
+        model.fit(
+            x=x_trn_pre,
+            y=y_trn_pre,
+            epochs=pretrain_epochs,
+            batch_size=batch_size,
+            callbacks=[csv_log_pre],
+        )
+
+        model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
 
     pre_train_time = datetime.datetime.now()
     pre_train_time_elapsed = pre_train_time - start_time
-    out_time_file = os.path.join(out_dir, 'training_time.txt')
-    with open(out_time_file, 'w') as f:
-        f.write(f'elapsed time pretrain (includes building graph):\
-                 {pre_train_time_elapsed} \n')
-
-    model.save_weights(os.path.join(out_dir, 'pretrained_weights/'))
+    out_time_file = os.path.join(out_dir, "training_time.txt")
+    with open(out_time_file, "w") as f:
+        f.write(
+            f"elapsed time pretrain (includes building graph):\
+                 {pre_train_time_elapsed} \n"
+        )
 
     # finetune
-    optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-    model.compile(optimizer_ft,
-                  loss=weighted_masked_rmse(finetune_temp_rmse_weight))
+    if finetune_epochs > 0:
+        optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
-    csv_log_ft = tf.keras.callbacks.CSVLogger(
-        os.path.join(out_dir, 'finetune_log.csv'))
+        if model_type == "rgcn":
+            model.compile(
+                optimizer_ft, loss=weighted_masked_rmse(aux_weight=lamb)
+            )
+        else:
+            model.compile(optimizer_ft)
 
-    x_trn_obs = io_data['x_trn']
-    y_trn_obs = np.concatenate([io_data['y_obs_trn'], io_data['y_obs_wgts']],
-                               axis=2)
+        csv_log_ft = tf.keras.callbacks.CSVLogger(
+            os.path.join(out_dir, "finetune_log.csv")
+        )
 
-    model.fit(x=x_trn_obs, y=y_trn_obs, epochs=finetune_epochs,
-              batch_size=n_seg, callbacks=[csv_log_ft])
+        x_trn_obs = io_data["x_trn"]
+        y_trn_obs = np.concatenate(
+            [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
+        )
+
+        model.fit(
+            x=x_trn_obs,
+            y=y_trn_obs,
+            epochs=finetune_epochs,
+            batch_size=batch_size,
+            callbacks=[csv_log_ft],
+        )
+
+        model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 
     finetune_time = datetime.datetime.now()
     finetune_time_elapsed = finetune_time - pre_train_time
-    with open(out_time_file, 'a') as f:
-        f.write(f'elapsed time finetune:\
-                 {finetune_time_elapsed} \n')
+    with open(out_time_file, "a") as f:
+        f.write(
+            f"elapsed time finetune:\
+                 {finetune_time_elapsed} \n"
+        )
 
-    model.save_weights(os.path.join(out_dir, f'trained_weights/'))
     return model
-

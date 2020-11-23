@@ -243,7 +243,7 @@ def initialize_weights(y_data, initial_val=1):
     return weights
 
 
-def reduce_training_data(
+def reduce_training_data_random(
     data_file,
     train_start_date="1980-10-01",
     train_end_date="2004-09-30",
@@ -273,6 +273,36 @@ def reduce_training_data(
     non_null = df_trn.dropna()
     reduce_idx = non_null.sample(frac=reduce_amount).index
     df.loc[reduce_idx] = np.nan
+    reduced_ds = df.to_xarray()
+    if out_file:
+        reduced_ds.to_zarr(out_file)
+    return reduced_ds
+
+
+def reduce_training_data_continuous(
+    data_file,
+    reduce_start="1980-10-01",
+    reduce_end="2004-09-30",
+    out_file=None,
+    segs=None):
+    """
+    artificially reduce the amount of training data in the training dataset
+    :param reduce_start: [str] date (fmt YYYY-MM-DD) for when reduction data
+    starts
+    :param reduce_end: [str] date (fmt YYYY-MM-DD) for when reduction data
+    ends
+    :param data_file: [str] path to the observations data file
+    :param out_file: [str] file to which the reduced dataset will be written
+    :return: [xarray dataset] updated weights (nan where reduced)
+    """
+    # read in an convert to dataframe
+    ds = xr.open_zarr(data_file)
+    df = ds.to_dataframe()
+    idx = pd.IndexSlice
+    df_red = df.loc[idx[reduce_start:reduce_end, :], :]
+    if segs:
+        df_trn = df_trn.loc[idx[:, segs], :]
+    df.loc[df_red.index] = np.nan
     reduced_ds = df.to_xarray()
     if out_file:
         reduced_ds.to_zarr(out_file)

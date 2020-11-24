@@ -294,6 +294,17 @@ def load_if_not_df(pred_data):
         return pred_data
 
 
+def trim_obs(obs, preds):
+    obs_trim = obs.reset_index()
+    trim_preds = preds.reset_index()
+    obs_trim = obs_trim[
+        (obs_trim.date >= trim_preds.date.min())
+        & (obs_trim.date <= trim_preds.date.max())
+        & (obs_trim.seg_id_nat.isin(trim_preds.seg_id_nat.unique()))
+    ]
+    return obs_trim.set_index(["date", "seg_id_nat"])
+
+
 def fmt_preds_obs(pred_data, obs_file, variable):
     """
     combine predictions and observations in one dataframe
@@ -311,7 +322,8 @@ def fmt_preds_obs(pred_data, obs_file, variable):
     obs_cln.columns = ["obs"]
     preds = pred_data[[seg_var]]
     preds.columns = ["pred"]
-    combined = preds.join(obs_cln)
+    obs_cln_trim = trim_obs(obs_cln, preds)
+    combined = preds.join(obs_cln_trim)
     return combined
 
 

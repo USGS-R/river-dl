@@ -5,7 +5,7 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel, weighted_masked_rmse
-from river_dl.lstm import LSTMModel
+from river_dl.rnns import LSTMModel, GRUModel
 
 
 def get_data_if_file(d):
@@ -85,6 +85,8 @@ def train_model(
             lamb=lamb,
             grad_log_file=grad_log_file,
         )
+    elif model_type == "gru":
+        model = GRUModel(hidden_units, lamb=lamb)
 
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)

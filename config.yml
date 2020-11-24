@@ -1,0 +1,9 @@
+data_dir: "data/in"
+out_dir:  "data/out/test_snakemake/test_gru"
+x_vars: ['seg_rain', 'seg_tave_air', 'seginc_swrad', 'seg_length', 'seginc_potet', 'seg_slope', 'seg_humid', 'seg_elev']
+num_replicates: 1
+primary_variables: ['flow']
+models: ['gru']
+lambs: [1]
+#segments: [1568, 1578, 1462, 1565, 1566, 1457, 1450, 2037, 2012, 2014]
+segments: [1568]

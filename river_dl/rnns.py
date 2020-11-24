@@ -22,15 +22,15 @@ class LSTMModel(tf.keras.Model):
         self.gradient_correction = gradient_correction
         self.grad_log_file = grad_log_file
         self.lamb = lamb
-        self.lstm_layer = layers.LSTM(
-            hidden_size, return_sequences=True, name="lstm_shared"
+        self.rnn_layer = layers.LSTM(
+            hidden_size, return_sequences=True, name="rnn_shared"
         )
         self.dense_main = layers.Dense(1, name="dense_main")
         self.dense_aux = layers.Dense(1, name="dense_aux")
 
     @tf.function
     def call(self, inputs, **kwargs):
-        x = self.lstm_layer(inputs)
+        x = self.rnn_layer(inputs)
         main_prediction = self.dense_main(x)
         aux_prediction = self.dense_aux(x)
         return tf.concat([main_prediction, aux_prediction], axis=2)
@@ -52,7 +52,7 @@ class LSTMModel(tf.keras.Model):
 
         main_out_vars = get_variables(trainable_vars, "dense_main")
         aux_out_vars = get_variables(trainable_vars, "dense_aux")
-        shared_vars = get_variables(trainable_vars, "lstm_shared")
+        shared_vars = get_variables(trainable_vars, "rnn_shared")
 
         # get gradients
         gradient_main_out = tape.gradient(loss_main, main_out_vars)
@@ -74,6 +74,17 @@ class LSTMModel(tf.keras.Model):
         self.optimizer.apply_gradients(zip(gradient_aux_out, aux_out_vars))
         self.optimizer.apply_gradients(zip(combined_gradient, shared_vars))
         return {"loss_main": loss_main, "loss_aux": loss_aux}
+
+
+class GRUModel(LSTMModel):
+    def __init__(self, hidden_size, lamb=1):
+        """
+        :param hidden_size: [int] the number of hidden units
+        """
+        super().__init__(hidden_size, lamb=lamb)
+        self.rnn_layer = layers.GRU(
+            hidden_size, return_sequences=True, name="rnn_shared"
+        )
 
 
 def adjust_gradient(main_grad, aux_grad, logfile=None):

@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
 import numpy as np
-from river_dl.lstm import LSTMModel
+from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.RGCN import RGCNModel
 from river_dl.train import get_data_if_file
 
@@ -199,7 +199,7 @@ def predict_from_file(
     the exponent of the discharge will be taken in the model unscaling
     :param half_tst: [bool] whether or not to halve the testing data so some
     can be held out
-    :param model: [str] model to use either 'rgcn' or 'lstm'
+    :param model: [str] model to use either 'rgcn', 'lstm', or 'gru'
     :return:
     """
     io_data = get_data_if_file(io_data)
@@ -209,6 +209,8 @@ def predict_from_file(
         )
     elif model.startswith("lstm"):
         model = LSTMModel(hidden_size)
+    elif model == "gru":
+        model = GRUModel(hidden_size)
 
     model(io_data["x_tst"])
     model.load_weights(model_weights_dir)

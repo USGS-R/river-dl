@@ -23,7 +23,10 @@ class LSTMModel(tf.keras.Model):
         self.grad_log_file = grad_log_file
         self.lamb = lamb
         self.rnn_layer = layers.LSTM(
-            hidden_size, return_sequences=True, name="rnn_shared"
+            hidden_size,
+            return_sequences=True,
+            name="rnn_shared",
+            recurrent_dropout=0.15
         )
         self.dense_main = layers.Dense(1, name="dense_main")
         self.dense_aux = layers.Dense(1, name="dense_aux")

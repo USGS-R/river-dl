@@ -91,7 +91,7 @@ def get_dates(partition, x_data_file):
         return get_unique_dates(partition, x_data_file)
 
 
-def read_multiple_obs(obs_files, pre_train_file):
+def read_multiple_obs(obs_files, x_data):
     """
     read and format multiple observation files. we read in the pretrain data to
     make sure we have the same indexing.
@@ -99,7 +99,7 @@ def read_multiple_obs(obs_files, pre_train_file):
     :param pre_train_file: [str] the file of pre_training data
     :return: [xr dataset] the observations in the same time
     """
-    obs = [xr.open_zarr(pre_train_file).sortby(["seg_id_nat", "date"])]
+    obs = [x_data.sortby(["seg_id_nat", "date"])]
     for filename in obs_files:
         ds = xr.open_zarr(filename)
         obs.append(ds)
@@ -302,7 +302,7 @@ def reduce_training_data_continuous(
     idx = pd.IndexSlice
     df_red = df.loc[idx[reduce_start:reduce_end, :], :]
     if segs:
-        df_trn = df_trn.loc[idx[:, segs], :]
+        df_red = df_red.loc[idx[:, segs], :]
     df.loc[df_red.index] = np.nan
     reduced_ds = df.to_xarray()
     if out_file:
@@ -336,7 +336,10 @@ def convert_batch_reshape(dataset):
 
 
 def coord_as_reshaped_array(dataset, coord_name):
-    coord_array = xr.broadcast(dataset[coord_name], dataset["seg_tave_air"])[0]
+    # I need one variable name. It can be any in the dataset, but I'll use the
+    # first
+    first_var = next(iter(dataset.data_vars.keys()))
+    coord_array = xr.broadcast(dataset[coord_name], dataset[first_var])[0]
     new_var_name = coord_name + "1"
     dataset[new_var_name] = coord_array
     reshaped_np_arr = convert_batch_reshape(dataset[[new_var_name]])
@@ -387,10 +390,9 @@ def get_y_obs(obs_files, pretrain_file, finetune_vars):
 def prep_data(
     obs_temper_file,
     obs_flow_file,
-    pretrain_file,
-    distfile,
-    x_vars,
-    primary_variable="temp",
+    driver_file,
+    x_vars=None,
+    primary_variable="flow",
     catch_prop_file=None,
     test_start_date="2004-09-30",
     n_test_yr=12,
@@ -405,9 +407,8 @@ def prep_data(
     scaled to have a std of 1 and a mean of zero
     :param obs_temper_file: [str] temperature observations file (csv)
     :param obs_flow_file:[str] discharge observations file (csv)
-    :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
-    :param distfile: [str] path to the distance matrix .npz file
-    :param x_vars: [list] variables that should be used as input
+    :param x_vars: [list] variables that should be used as input. If None, all
+    of the variables will be used
     :param primary_variable: [str] which variable the model should focus on
     'temp' or 'flow'. This determines the order of the variables.
     :param catch_prop_file: [str] the path to the catchment properties file. If
@@ -433,10 +434,12 @@ def prep_data(
             'dates_ids_tst: un-batched dates and national seg ids for testing
                             data [n_yrs, n_seg, len_seq, 2]
     """
-    ds_pre = xr.open_zarr(pretrain_file)
+    x_data = xr.open_zarr(driver_file)
+    print(x_data)
     if segs:
-        ds_pre = ds_pre.loc[dict(seg_id_nat=segs)]
-    x_data = ds_pre[x_vars]
+        x_data = x_data.loc[dict(seg_id_nat=segs)]
+    if x_vars:
+        x_data = x_data[x_vars]
     if catch_prop_file:
         x_data = prep_catch_props(x_data, catch_prop_file)
     # make sure we don't have any weird input values
@@ -453,20 +456,16 @@ def prep_data(
         y_vars = ["seg_tave_water", "seg_outflow"]
     else:
         y_vars = ["seg_outflow", "seg_tave_water"]
-    y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], pretrain_file)
+    y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], x_data)
     y_obs = y_obs[y_vars]
-    y_pre = ds_pre[y_vars]
     if segs:
         y_obs = y_obs.loc[dict(seg_id_nat=segs)]
     y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
-    y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)
 
     if log_q:
         y_obs_trn = log_discharge(y_obs_trn)
-        y_pre_trn = log_discharge(y_pre_trn)
 
     # filter pretrain/finetune y
-    y_pre_wgts = initialize_weights(y_pre_trn)
     if exclude_file:
         exclude_segs = read_exclude_segs_file(exclude_file)
         y_obs_wgts = exclude_segments(y_obs_trn, exclude_segs=exclude_segs)
@@ -474,8 +473,7 @@ def prep_data(
         y_obs_wgts = initialize_weights(y_obs_trn)
 
     # scale y training data and get the mean and std
-    y_trn_pre_scl, y_trn_pre_std, y_trn_pre_mean = scale(y_pre_trn)
-    y_trn_obs_scl, _, _ = scale(y_obs_trn, y_trn_pre_std, y_trn_pre_mean)
+    y_trn_obs_scl, y_std, y_mean = scale(y_obs_trn)
 
     data = {
         "x_trn": convert_batch_reshape(x_trn_scl),
@@ -487,15 +485,12 @@ def prep_data(
         "dates_trn": coord_as_reshaped_array(x_trn, "date"),
         "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat"),
         "dates_tst": coord_as_reshaped_array(x_tst, "date"),
-        "y_pre_trn": convert_batch_reshape(y_trn_pre_scl),
         "y_obs_trn": convert_batch_reshape(y_trn_obs_scl),
-        "y_std": y_trn_pre_std.to_array().values,
-        "y_mean": y_trn_pre_mean.to_array().values,
-        "y_pre_wgts": convert_batch_reshape(y_pre_wgts),
+        "y_std": y_std.to_array().values,
+        "y_mean": y_mean.to_array().values,
         "y_obs_wgts": convert_batch_reshape(y_obs_wgts),
         "y_vars": np.array(y_vars),
         "y_obs_tst": convert_batch_reshape(y_obs_tst),
-        "dist_matrix": prep_adj_matrix(distfile, "upstream"),
     }
     if out_file:
         np.savez_compressed(out_file, **data)

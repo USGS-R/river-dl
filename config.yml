@@ -1,9 +1,21 @@
-data_dir: "data/in"
-out_dir:  "data/out/test_snakemake/test_gru"
-x_vars: ['seg_rain', 'seg_tave_air', 'seginc_swrad', 'seg_length', 'seginc_potet', 'seg_slope', 'seg_humid', 'seg_elev']
+# file paths
+data_dir: "..\\drb_ml_streamflow_paper\\data\\camels\\1_data\\out"
+out_dir:  "data\\out\\test_snakemake\\test_camels"
+# Assumes that the obs files and drivers files are in the same directory
+drivers_file: "drivers_camels"
+obs_flow: "obs_flow_camels"
+obs_temp: "obs_temp_camels"
+
 num_replicates: 1
+
+# run configs
+x_vars: ['seg_rain', 'seg_tave_air', 'seginc_swrad', 'seg_length', 'seginc_potet', 'seg_slope', 'seg_humid', 'seg_elev']
 primary_variables: ['flow']
 models: ['gru']
 lambs: [1]
 #segments: [1568, 1578, 1462, 1565, 1566, 1457, 1450, 2037, 2012, 2014]
-segments: [1568]
+segments: ['01022500']
+test_start_date: '2004-09-30'
+n_test_yr: 12
+pt_epochs: 50
+ft_epochs: 50

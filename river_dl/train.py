@@ -4,7 +4,7 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
-from river_dl.RGCN import RGCNModel, weighted_masked_rmse
+from river_dl.RGCN import weighted_masked_rmse
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -17,7 +17,7 @@ def get_data_if_file(d):
     if isinstance(d, NpzFile) or isinstance(d, dict):
         return d
     else:
-        return np.load(d)
+        return np.load(d, allow_pickle=True)
 
 
 def train_model(
@@ -26,7 +26,6 @@ def train_model(
     finetune_epochs,
     hidden_units,
     out_dir,
-    flow_in_temp=False,
     model_type="rgcn",
     seed=None,
     lamb=1,
@@ -59,7 +58,6 @@ def train_model(
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data["dist_matrix"]
 
     n_seg = len(np.unique(io_data["ids_trn"]))
     if n_seg > 1:
@@ -70,13 +68,6 @@ def train_model(
 
     if model_type == "lstm":
         model = LSTMModel(hidden_units, lamb=lamb)
-    elif model_type == "rgcn":
-        model = RGCNModel(
-            hidden_units,
-            flow_in_temp=flow_in_temp,
-            A=dist_matrix,
-            rand_seed=seed,
-        )
     elif model_type == "lstm_grad_correction":
         grad_log_file = os.path.join(out_dir, "grad_correction.txt")
         model = LSTMModel(

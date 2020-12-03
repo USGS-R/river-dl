@@ -238,7 +238,6 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     :return:[none]
     """
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data["dist_matrix"]
 
     # evaluate training
     if partition == "trn" or partition == "tst":
@@ -246,7 +245,7 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     else:
         raise ValueError('partition arg needs to be "trn" or "tst"')
 
-    num_segs = dist_matrix.shape[0]
+    num_segs = len(np.unique(io_data["ids_trn"]))
     y_pred = model.predict(io_data[f"x_{partition}"], batch_size=num_segs)
     y_pred_pp = prepped_array_to_df(
         y_pred,

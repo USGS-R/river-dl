@@ -1,6 +1,6 @@
 # file paths
-data_dir: "..\\drb_ml_streamflow_paper\\data\\camels\\1_data\\out"
-out_dir:  "data\\out\\test_snakemake\\test_camels"
+data_dir: "../drb_ml_streamflow_paper/data/camels/1_data/out"
+out_dir:  "data/out/test_snakemake/test_camels"
 # Assumes that the obs files and drivers files are in the same directory
 drivers_file: "drivers_camels"
 obs_flow: "obs_flow_camels"
@@ -17,5 +17,5 @@ lambs: [1]
 segments: ['01022500']
 test_start_date: '2004-09-30'
 n_test_yr: 12
-pt_epochs: 50
+pt_epochs: 0
 ft_epochs: 50

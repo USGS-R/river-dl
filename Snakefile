@@ -18,7 +18,7 @@ drivers = os.path.join(data_dir, config['drivers_file']),
 
 rule all:
     input:
-        f"{out_dir}\\exp_overall_metrics.csv",
+        f"{out_dir}/exp_overall_metrics.csv",
 
 
 rule prep_io_data:
@@ -27,21 +27,20 @@ rule prep_io_data:
         obs_flow,
         drivers,
     output:
-        "{outdir}\\seg_{segment}\\var_{variable}\\prepped.npz"
+        "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     run:
         prep_data(input[0], input[1], input[2],
                   test_start_date=config['test_start_date'],
                   primary_variable=wildcards.variable,
-                  log_q=False, segs=[int(wildcards.segment)],
+                  log_q=False, segs=[wildcards.segment],
                   n_test_yr=config['n_test_yr'], out_file=output[0])
 
 
 rule train_the_model:
     input:
-        "{outdir}\\seg_{segment}\\var_{variable}\\prepped.npz"
+        "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     output:
-        directory("{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\trained_weights\\"),
-        directory("{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\pretrained_weights\\"),
+        directory("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_weights/"),
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
@@ -52,15 +51,15 @@ rule train_the_model:
 
 rule make_predictions:
     input:
-        "{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\trained_weights\\",
-        "{outdir}\\seg_{segment}\\var_{variable}\\prepped.npz"
+        "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_weights/",
+        "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     params:
         hidden_size=20,
         half_tst=True,
     output:
-        "{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\{partition}_preds.feather",
+        "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_preds.feather",
     run:
-        weight_dir = input[0] + '\\'
+        weight_dir = input[0] + '/'
         predict_from_file(weight_dir, input[1], params.hidden_size,
                           wildcards.partition, output[0], flow_in_temp=True,
                           half_tst=params.half_tst,
@@ -81,16 +80,16 @@ def get_grp_arg(wildcards):
 
 rule combine_metrics:
     input:
-         "{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\trn_preds.feather",
-         "{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\tst_preds.feather",
+         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trn_preds.feather",
+         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/tst_preds.feather",
          obs_temp,
          obs_flow,
     output:
-         "{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\{metric_type}_metrics.csv"
+         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{metric_type}_metrics.csv"
     params:
         grp_arg = get_grp_arg
     run:
-        combined_metrics(input[0], input[1], input[2], input[3], params.grp_arg, output[0], full_slate=False)
+        combined_metrics(input[0], input[1], input[2], input[3], params.grp_arg, output[0])
 
 def get_exp_name(model, lamb):
     if model == 'lstm' and lamb==0:
@@ -109,7 +108,7 @@ def get_exp_name(model, lamb):
 def combine_exp_metrics(csvs):
     df_list = []
     for metric_file in csvs:
-        file_parts = metric_file.split('\\')
+        file_parts = metric_file.split('/')
         df = pd.read_csv(metric_file)
 
         run_id = int(file_parts[-2])
@@ -134,7 +133,7 @@ def combine_exp_metrics(csvs):
 
 def get_input_metric_files(wildcards):
     replicates_list = list(range(int(num_replicates)))
-    metric_files = expand("{outdir}\\seg_{segment}\\var_{variable}\\mod_{model}\\lamb_{lamb}\\{run_id}\\{metric_type}_metrics.csv",
+    metric_files = expand("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{metric_type}_metrics.csv",
                         segment=config['segments'],
                         model=config['models'],
                         lamb=config['lambs'],
@@ -149,7 +148,7 @@ rule combine_overall_metrics:
     input:
         get_input_metric_files
     output:
-        "{outdir}\\exp_{metric_type}_metrics.csv"
+        "{outdir}/exp_{metric_type}_metrics.csv"
     run:
         combined = combine_exp_metrics(input)
         #combined = combined.to_xarray()

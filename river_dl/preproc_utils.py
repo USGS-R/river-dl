@@ -435,7 +435,6 @@ def prep_data(
                             data [n_yrs, n_seg, len_seq, 2]
     """
     x_data = xr.open_zarr(driver_file)
-    print(x_data)
     if segs:
         x_data = x_data.loc[dict(seg_id_nat=segs)]
     if x_vars:

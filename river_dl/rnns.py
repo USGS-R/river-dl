@@ -13,7 +13,12 @@ from river_dl.RGCN import rmse_masked_one_var
 
 class LSTMModel(tf.keras.Model):
     def __init__(
-        self, hidden_size, gradient_correction=False, lamb=1, grad_log_file=None
+        self,
+        hidden_size,
+        gradient_correction=False,
+        lamb=1,
+        dropout=0,
+        grad_log_file=None
     ):
         """
         :param hidden_size: [int] the number of hidden units
@@ -26,7 +31,7 @@ class LSTMModel(tf.keras.Model):
             hidden_size,
             return_sequences=True,
             name="rnn_shared",
-            recurrent_dropout=0.15
+            recurrent_dropout=dropout
         )
         self.dense_main = layers.Dense(1, name="dense_main")
         self.dense_aux = layers.Dense(1, name="dense_aux")

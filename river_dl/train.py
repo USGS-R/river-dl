@@ -4,7 +4,7 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
-from river_dl.RGCN import RGCNModel, weighted_masked_rmse
+from river_dl.RGCN import RGCNModel, weighted_masked_rmse, nnse_loss
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -29,6 +29,7 @@ def train_model(
     flow_in_temp=False,
     model_type="rgcn",
     seed=None,
+    dropout=0,
     lamb=1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
@@ -83,6 +84,7 @@ def train_model(
             hidden_units,
             gradient_correction=True,
             lamb=lamb,
+            dropout=dropout,
             grad_log_file=grad_log_file,
         )
     elif model_type == "gru":

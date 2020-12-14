@@ -243,6 +243,12 @@ def nnse(y_true, y_pred):
 
 
 @tf.function
+def nnse_masked_one_var(data, y_pred, var_idx):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+    return nnse(y_true, y_pred, weights)
+
+
+@tf.function
 def y_data_components(data, y_pred, var_idx):
     weights = data[:, :, -2:]
     y_true = data[:, :, :-2]

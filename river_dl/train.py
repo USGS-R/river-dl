@@ -28,6 +28,7 @@ def train_model(
     out_dir,
     model_type="rgcn",
     seed=None,
+    dropout=0,
     lamb=1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
@@ -74,6 +75,7 @@ def train_model(
             hidden_units,
             gradient_correction=True,
             lamb=lamb,
+            dropout=dropout,
             grad_log_file=grad_log_file,
         )
     elif model_type == "gru":

@@ -115,7 +115,7 @@ def train_model(
             callbacks=[csv_log_pre],
         )
 
-        model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
+        model.save(os.path.join(out_dir, "pretrained_model/"))
 
     pre_train_time = datetime.datetime.now()
     pre_train_time_elapsed = pre_train_time - start_time
@@ -154,7 +154,7 @@ def train_model(
             callbacks=[csv_log_ft],
         )
 
-        model.save_weights(os.path.join(out_dir, f"trained_weights/"))
+        model.save(os.path.join(out_dir, f"trained_model/"))
 
     finetune_time = datetime.datetime.now()
     finetune_time_elapsed = finetune_time - pre_train_time

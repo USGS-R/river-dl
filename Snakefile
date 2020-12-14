@@ -40,7 +40,7 @@ rule train_the_model:
     input:
         "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     output:
-        directory("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_weights/"),
+        directory("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_model/"),
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
@@ -51,7 +51,7 @@ rule train_the_model:
 
 rule make_predictions:
     input:
-        "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_weights/",
+        "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_model/",
         "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     params:
         hidden_size=20,
@@ -60,10 +60,9 @@ rule make_predictions:
         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_preds.feather",
     run:
         weight_dir = input[0] + '/'
-        predict_from_file(weight_dir, input[1], params.hidden_size,
-                          wildcards.partition, output[0], flow_in_temp=True,
+        predict_from_file(weight_dir, input[1],
+                          wildcards.partition, output[0],
                           half_tst=params.half_tst,
-                          model=wildcards.model,
                           logged_q=False)
 
 
@@ -151,5 +150,4 @@ rule combine_overall_metrics:
         "{outdir}/exp_{metric_type}_metrics.csv"
     run:
         combined = combine_exp_metrics(input)
-        #combined = combined.to_xarray()
         combined.to_csv(output[0], index=False)

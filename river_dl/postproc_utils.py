@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
+import tensorflow as tf
 import numpy as np
 from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.RGCN import RGCNModel
@@ -178,13 +179,10 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
 def predict_from_file(
     model_weights_dir,
     io_data,
-    hidden_size,
     partition,
     outfile,
-    flow_in_temp=False,
     logged_q=False,
     half_tst=False,
-    model="rgcn",
 ):
     """
     make predictions from trained model
@@ -203,17 +201,7 @@ def predict_from_file(
     :return:
     """
     io_data = get_data_if_file(io_data)
-    if model == "rgcn":
-        model = RGCNModel(
-            hidden_size, A=io_data["dist_matrix"], flow_in_temp=flow_in_temp
-        )
-    elif model.startswith("lstm"):
-        model = LSTMModel(hidden_size)
-    elif model == "gru":
-        model = GRUModel(hidden_size)
-
-    model(io_data["x_tst"])
-    model.load_weights(model_weights_dir)
+    model = tf.keras.models.load_model(model_weights_dir)
     preds = predict(
         model, io_data, partition, outfile, logged_q=logged_q, half_tst=half_tst
     )

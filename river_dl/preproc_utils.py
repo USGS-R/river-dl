@@ -279,20 +279,52 @@ def reduce_training_data_random(
     return reduced_ds
 
 
+def filter_reduce_dates(df, start_date, end_date, reduce_between=False):
+    df_filt = df.copy()
+    df_filt = df_filt.reset_index()
+    if reduce_between:
+        df_filt = df_filt[
+            (df_filt["date"] > start_date) & (df_filt["date"] < end_date)
+        ]
+    else:
+        df_filt = df_filt[
+            (df_filt["date"] < start_date) | (df_filt["date"] > end_date)
+        ]
+    return df_filt.set_index(df.index.names)
+
+
 def reduce_training_data_continuous(
     data_file,
     reduce_start="1980-10-01",
     reduce_end="2004-09-30",
-    out_file=None,
+    train_start=None,
+    train_end=None,
     segs=None,
+    reduce_between=True,
+    out_file=None,
 ):
     """
-    artificially reduce the amount of training data in the training dataset
+    reduce the amount of data in the training dataset by replacing a section
+    or the inverse of that section with nan
+    :param data_file: [str] path to the observations data file
     :param reduce_start: [str] date (fmt YYYY-MM-DD) for when reduction data
     starts
     :param reduce_end: [str] date (fmt YYYY-MM-DD) for when reduction data
     ends
-    :param data_file: [str] path to the observations data file
+    :param train_start: [str] data (fmt YYYY-MM-DD) the start of the training
+    data. If left None (default) the reduction will be done for all of the
+    dates. This is only relevant if reduce_between == False, because in that
+    case, the inverse of the range (reduce_start, reduce_end) is used and it may
+    be necessary to limit making the nans to the training time period
+    :param train_end: [str] data (fmt YYYY-MM-DD) the end of the training
+    data. If left None (default) the reduction will be done for all of the
+    dates. This is only relevant if reduce_between == False, because in that
+    case, the inverse of the range (reduce_start, reduce_end) is used and it may
+    be necessary to limit making the nans to the training time period
+    :param segs: [list-like] segment id's for which the data should be reduced
+    :param reduce_between: [bool] if True the data *in* the range (reduce_start,
+    reduce_end) will be made nan. if False, the data *outside* of that range
+    will be made nan
     :param out_file: [str] file to which the reduced dataset will be written
     :return: [xarray dataset] updated weights (nan where reduced)
     """
@@ -300,9 +332,13 @@ def reduce_training_data_continuous(
     ds = xr.open_zarr(data_file)
     df = ds.to_dataframe()
     idx = pd.IndexSlice
-    df_red = df.loc[idx[reduce_start:reduce_end, :], :]
+    df_red = df.copy()
+    df_red = df_red.loc[idx[train_start:train_end, :]]
     if segs:
         df_red = df_red.loc[idx[:, segs], :]
+    df_red = filter_reduce_dates(
+        df_red, reduce_start, reduce_end, reduce_between
+    )
     df.loc[df_red.index] = np.nan
     reduced_ds = df.to_xarray()
     if out_file:

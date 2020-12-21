@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-@author: jeff sadler, Feb 2020
-based off code by Xiaowei Jia
-
-"""
-
 from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras import layers
-from river_dl.RGCN import rmse_masked_one_var
+from river_dl.loss_functions import rmse_masked_one_var
 
 
 class LSTMModel(tf.keras.Model):

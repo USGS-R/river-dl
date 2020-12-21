@@ -19,36 +19,30 @@ def rmse(y_true, y_pred, weights):
     return rmse_loss
 
 
-@tf.function
-def nnse(y_true, y_pred):
-    num_y_true = tf.cast(
-        tf.math.count_nonzero(~tf.math.is_nan(y_true)), tf.float32
+def nse(y_true, y_pred):
+    zero_or_error = tf.where(
+        tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
     )
-    if num_y_true > 0:
-        # get mean accounting for nans
-        zero_or_val = tf.where(
-            tf.math.is_nan(y_true), tf.zeros_like(y_true), y_true
-        )
-        obs_mean = tf.reduce_sum(zero_or_val) / num_y_true
 
-        zero_or_error = tf.where(
-            tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
-        )
+    numerator = tf.reduce_sum(tf.square(zero_or_error))
 
-        denom = tf.reduce_sum(tf.math.abs(zero_or_val - obs_mean))
-        numerator = tf.reduce_sum(zero_or_error)
-        nse = 1 - numerator / denom
-        nnse = 1 / (2 - nse)
-        nnse_loss = 1 - nnse
-    else:
-        nnse_loss = 0.0
-    return nnse_loss
+    deviation = dev_masked(y_true)
+    denominator = tf.reduce_sum(tf.square(deviation))
+    return 1 - numerator / denominator  
+
+
+def nnse(y_true, y_pred):
+    return 1 / (2 - nse(y_true, y_pred))
+
+
+def nnse_loss(y_true, y_pred):
+    return 1 - nnse(y_true, y_pred)
 
 
 @tf.function
 def nnse_masked_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
-    return nnse(y_true, y_pred, weights)
+    return nnse_loss(y_true, y_pred)
 
 
 @tf.function

@@ -346,7 +346,7 @@ def reduce_training_data_continuous(
     return reduced_ds
 
 
-def convert_batch_reshape(dataset):
+def convert_batch_reshape(dataset, seq_len=365):
     """
     convert xarray dataset into numpy array, swap the axes, batch the array and
     reshape for training
@@ -363,7 +363,7 @@ def convert_batch_reshape(dataset):
 
     # batch the data
     # after [nbatch, nseg, seq_len, nfeat]
-    batched = split_into_batches(arr)
+    batched = split_into_batches(arr, seq_len=seq_len)
 
     # reshape data
     # after [nbatch * nseg, seq_len, nfeat]
@@ -428,6 +428,7 @@ def prep_data(
     obs_flow_file,
     driver_file,
     x_vars=None,
+    y_vars=None,
     primary_variable="flow",
     catch_prop_file=None,
     test_start_date="2004-09-30",
@@ -436,6 +437,7 @@ def prep_data(
     log_q=False,
     out_file=None,
     segs=None,
+    normalize_y=True,
 ):
     """
     prepare input and output data for DL model training read in and process
@@ -487,10 +489,11 @@ def prep_data(
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # read, filter observations for finetuning
-    if primary_variable == "temp":
-        y_vars = ["seg_tave_water", "seg_outflow"]
-    else:
-        y_vars = ["seg_outflow", "seg_tave_water"]
+    if not y_vars:
+        if primary_variable == "temp":
+            y_vars = ["seg_tave_water", "seg_outflow"]
+        else:
+            y_vars = ["seg_outflow", "seg_tave_water"]
     y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], x_data)
     y_obs = y_obs[y_vars]
     if segs:
@@ -507,8 +510,12 @@ def prep_data(
     else:
         y_obs_wgts = initialize_weights(y_obs_trn)
 
-    # scale y training data and get the mean and std
-    y_trn_obs_scl, y_std, y_mean = scale(y_obs_trn)
+    if normalize_y:
+        # scale y training data and get the mean and std
+        y_obs_trn, y_std, y_mean = scale(y_obs_trn)
+    else:
+        _, y_std, y_mean = scale(y_obs_trn)
+
 
     data = {
         "x_trn": convert_batch_reshape(x_trn_scl),
@@ -520,7 +527,7 @@ def prep_data(
         "dates_trn": coord_as_reshaped_array(x_trn, "date"),
         "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat"),
         "dates_tst": coord_as_reshaped_array(x_tst, "date"),
-        "y_obs_trn": convert_batch_reshape(y_trn_obs_scl),
+        "y_obs_trn": convert_batch_reshape(y_obs_trn),
         "y_std": y_std.to_array().values,
         "y_mean": y_mean.to_array().values,
         "y_obs_wgts": convert_batch_reshape(y_obs_wgts),

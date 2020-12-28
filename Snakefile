@@ -4,7 +4,7 @@ import pandas as pd
 # add scripts dir to path
 
 from river_dl.preproc_utils import prep_data
-from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs
+from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs, plot_ts
 from river_dl.train import train_model
 
 out_dir = config['out_dir']
@@ -19,6 +19,15 @@ drivers = os.path.join(data_dir, config['drivers_file']),
 rule all:
     input:
         f"{out_dir}/exp_overall_metrics.csv",
+        expand("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_{variable}_ts.png",
+               outdir=out_dir,
+               segment=config['segments'],
+               variable=['flow'],
+               model=config['models'],
+               lamb=config['lambs'],
+               run_id=list(range(config['num_replicates'])),
+               partition=['trn', 'tst'],
+               )
 
 
 rule prep_io_data:
@@ -47,7 +56,7 @@ rule train_the_model:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], 20, params.run_dir,
-                    model_type=wildcards.model, lamb=float(wildcards.lamb), seed=int(wildcards.run_id))
+                    model_type=wildcards.model, lamb=float(wildcards.lamb), seed=int(wildcards.run_id), learning_rate_ft=.001)
 
 rule make_predictions:
     input:
@@ -151,3 +160,13 @@ rule combine_overall_metrics:
     run:
         combined = combine_exp_metrics(input)
         combined.to_csv(output[0], index=False)
+
+
+rule plot_timeseries:
+    input:
+         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_preds.feather",
+         os.path.join(data_dir, "obs_{variable}_camels")
+    output:
+         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_{variable}_ts.png"
+    run:
+         plot_ts(input[0], input[1], wildcards.variable, output[0])

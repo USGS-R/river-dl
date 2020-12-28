@@ -418,3 +418,10 @@ def plot_train_obs(prepped_data, variable, outfile):
     plt.tight_layout()
     plt.savefig(outfile)
 
+
+def plot_ts(pred_file, obs_file, variable, out_file):
+    combined = fmt_preds_obs(pred_file, obs_file, variable)
+    combined = combined.droplevel('seg_id_nat')
+    ax = combined.plot(alpha=0.65)
+    plt.tight_layout()
+    plt.savefig(out_file)

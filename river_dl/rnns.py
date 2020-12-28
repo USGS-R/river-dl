@@ -1,14 +1,8 @@
 # -*- coding: utf-8 -*-
-"""
-@author: jeff sadler, Feb 2020
-based off code by Xiaowei Jia
-
-"""
-
 from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras import layers
-from river_dl.RGCN import rmse_masked_one_var
+from river_dl.loss_functions import nnse_masked_one_var
 
 
 class LSTMModel(tf.keras.Model):
@@ -53,8 +47,8 @@ class LSTMModel(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             y_pred = self(x, training=True)  # forward pass
 
-            loss_main = rmse_masked_one_var(y, y_pred, 0)
-            loss_aux = rmse_masked_one_var(y, y_pred, 1)
+            loss_main = nnse_masked_one_var(y, y_pred, 0)
+            loss_aux = nnse_masked_one_var(y, y_pred, 1)
 
         trainable_vars = self.trainable_variables
 

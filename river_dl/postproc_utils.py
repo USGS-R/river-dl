@@ -6,6 +6,8 @@ import numpy as np
 from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.RGCN import RGCNModel
 from river_dl.train import get_data_if_file
+from river_dl.loss_functions import rmse, nse, kge
+
 
 
 def prepped_array_to_df(data_array, dates, ids, col_names):
@@ -70,38 +72,6 @@ def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
     return y_scl
 
 
-def rmse_masked(y_true, y_pred):
-    """
-    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
-    with 0 when y_s is nan; num_y_s is a count of just those non-nan
-    observations) so we're only looking at predictions with corresponding
-    observations available
-    (credit: @aappling-usgs)
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
-    :return: rmse (one value for each training sample)
-    """
-    # count the number of non-nans
-    num_y_true = np.sum(~np.isnan(y_true))
-    zero_or_error = np.where(np.isnan(y_true), 0, y_pred - y_true)
-    sum_squared_errors = np.sum(zero_or_error ** 2)
-    rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
-    return rmse_loss
-
-
-def nse(y_true, y_pred):
-    """
-    compute the nash-sutcliffe model efficiency coefficient
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
-    :return: [float] the nash-sutcliffe efficiency coefficient
-    """
-    q_mean = np.nanmean(y_true)
-    numerator = np.nansum((y_true - y_pred) ** 2)
-    denominator = np.nansum((y_true - q_mean) ** 2)
-    return 1 - (numerator / denominator)
-
-
 def filter_negative_preds(y_true, y_pred):
     # print a warning if there are a lot of negatives
     n_negative = len(y_pred[y_pred < 0])
@@ -125,7 +95,7 @@ def rmse_logged(y_true, y_pred):
     :return: [float] the rmse of the logged data
     """
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return rmse_masked(np.log(y_true), np.log(y_pred))
+    return rmse(np.log(y_true), np.log(y_pred))
 
 
 def nse_logged(y_true, y_pred):
@@ -325,18 +295,19 @@ def calc_metrics(df):
     pred = df["pred"].values
     if len(obs) > 10:
         metrics = {
-            "rmse": rmse_masked(obs, pred),
-            "nse": nse(obs, pred),
+            "rmse": rmse(obs, pred).numpy(),
+            "nse": nse(obs, pred).numpy(),
             "rmse_top10": percentile_metric(
-                obs, pred, rmse_masked, 90, less_than=False
-            ),
+                obs, pred, rmse, 90, less_than=False
+            ).numpy(),
             "rmse_bot10": percentile_metric(
-                obs, pred, rmse_masked, 10, less_than=True
-            ),
-            "rmse_logged": rmse_logged(obs, pred),
-            "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False),
-            "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True),
-            "nse_logged": nse_logged(obs, pred),
+                obs, pred, rmse, 10, less_than=True
+            ).numpy(),
+            "rmse_logged": rmse_logged(obs, pred).numpy(),
+            "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False).numpy(),
+            "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True).numpy(),
+            "nse_logged": nse_logged(obs, pred).numpy(),
+            "kge": kge(obs, pred).numpy(),
         }
 
     else:
@@ -349,6 +320,7 @@ def calc_metrics(df):
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
+            "kge": np.nan,
         }
     return pd.Series(metrics)
 
@@ -445,3 +417,11 @@ def plot_train_obs(prepped_data, variable, outfile):
     df_piv.plot(subplots=True, figsize=(8, 12))
     plt.tight_layout()
     plt.savefig(outfile)
+
+
+def plot_ts(pred_file, obs_file, variable, out_file):
+    combined = fmt_preds_obs(pred_file, obs_file, variable)
+    combined = combined.droplevel('seg_id_nat')
+    ax = combined.plot(alpha=0.65)
+    plt.tight_layout()
+    plt.savefig(out_file)

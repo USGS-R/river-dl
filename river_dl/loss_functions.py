@@ -1,8 +1,6 @@
 import numpy as np
 import tensorflow as tf
 
-# tf.enable_eager_execution()
-
 @tf.function
 def rmse(y_true, y_pred):
     y_true = tf.cast(y_true, tf.float32)

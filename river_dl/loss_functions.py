@@ -1,9 +1,12 @@
 import numpy as np
 import tensorflow as tf
 
+# tf.enable_eager_execution()
 
 @tf.function
-def rmse(y_true, y_pred, weights):
+def rmse(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
     num_y_true = tf.cast(
         tf.math.count_nonzero(~tf.math.is_nan(y_true)), tf.float32
     )
@@ -11,8 +14,7 @@ def rmse(y_true, y_pred, weights):
         zero_or_error = tf.where(
             tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
         )
-        wgt_zero_or_err = zero_or_error * weights
-        sum_squared_errors = tf.reduce_sum(tf.square(wgt_zero_or_err))
+        sum_squared_errors = tf.reduce_sum(tf.square(zero_or_error))
         rmse_loss = tf.sqrt(sum_squared_errors / num_y_true)
     else:
         rmse_loss = 0.0
@@ -20,6 +22,8 @@ def rmse(y_true, y_pred, weights):
 
 
 def nse(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
     zero_or_error = tf.where(
         tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
     )
@@ -69,7 +73,7 @@ def y_data_components(data, y_pred, var_idx):
 @tf.function
 def rmse_masked_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
-    return rmse(y_true, y_pred, weights)
+    return rmse(y_true, y_pred)
 
 
 @tf.function
@@ -130,6 +134,8 @@ def pearsons_r(y_true, y_pred):
 
 
 def kge(y_true, y_pred):
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
     r = pearsons_r(y_true, y_pred)
     mean_true = mean_masked(y_true)
     mean_pred = mean_masked(y_pred)
@@ -149,7 +155,7 @@ def norm_kge(y_true, y_pred):
     return 1 / (2 - kge(y_true, y_pred))
 
 
-def kge_loss(y_true, y_pred):
+def kge_norm_loss(y_true, y_pred):
     """
     making it a loss, so low is good, high is bad
     """
@@ -159,3 +165,7 @@ def kge_loss(y_true, y_pred):
 def kge_loss_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return kge_loss(y_true, y_pred)
+
+
+def kge_loss(y_true, y_pred):
+    return -1 * kge(y_true, y_pred)

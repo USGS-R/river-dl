@@ -613,3 +613,43 @@ def read_exclude_segs_file(exclude_file):
     with open(exclude_file, "r") as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]
+
+
+def prep_one_var_lstm_da(var_file, vars, seg_id, start_date_trn, end_date_trn,
+                         start_date_pred, end_date_pred, scale_data=False):
+    data = xr.open_zarr(var_file)
+    data = data[vars]
+    data = data.loc[dict(seg_id_nat=[seg_id])]
+    data_trn = data.loc[dict(date=slice(start_date_trn, end_date_trn))]
+    data_pred = data.loc[dict(date=slice(start_date_pred, end_date_pred))]
+    if scale_data:
+        data_trn, mean, std = scale(data_trn)
+        data_pred, _, _ = scale(data_pred, mean, std)
+    return data_trn, data_pred
+
+
+def fmt_dataset(dataset):
+    return np.expand_dims(dataset.to_array().values, 2)
+
+
+def prep_data_lstm_da(obs_temp_file, driver_file, seg_id, start_date_trn,
+                      end_date_trn, start_date_pred, end_date_pred,
+                      x_vars=['seg_tave_air'], y_vars=['temp_c'],
+                      out_file=None):
+    x_trn, x_pred = prep_one_var_lstm_da(driver_file, x_vars, seg_id, start_date_trn, end_date_trn, start_date_pred, end_date_pred, scale_data=True)
+    y_trn, y_pred = prep_one_var_lstm_da(obs_temp_file, y_vars, seg_id, start_date_trn, end_date_trn, start_date_pred, end_date_pred, scale_data=False)
+
+
+    data = {
+        "x_trn": (convert_batch_reshape(x_trn)),
+        "x_pred": (convert_batch_reshape(x_pred, seq_len=30)),
+        "dates_trn": (x_trn.date.values),
+        "dates_pred": (x_pred.date.values),
+        "y_trn": (convert_batch_reshape(y_trn)),
+        "y_pred": (convert_batch_reshape(y_pred, seq_len=30)),
+    }
+    if out_file:
+        np.savez_compressed(out_file, **data)
+    return data
+
+# d = prep_data_lstm_da('../../drb-dl-model/data/in/obs_temp_full', '../../drb-dl-model/data/in/uncal_sntemp_input_output', 1573, '2011-06-01', '2012-06-01', '2012-06-02', '2012-07-02', out_file='lstm_da_data_just_air_temp.npz')

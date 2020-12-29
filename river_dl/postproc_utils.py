@@ -427,7 +427,7 @@ def combined_metrics(
     return df_all
 
 
-def plot_train_obs(prepped_data, variable, outfile):
+def plot_obs(prepped_data, variable, outfile, partition='trn'):
     """
     plot training observations
     :param prepped_data: [str] path to npz file of prepped data
@@ -435,13 +435,20 @@ def plot_train_obs(prepped_data, variable, outfile):
     :param outfile: [str] where to store the resulting file
     :return: None
     """
-    data = np.load(prepped_data)
+    data = np.load(prepped_data, allow_pickle=True)
     df = prepped_array_to_df(
-        data["y_obs_trn"], data["dates_trn"], data["ids_trn"], data["y_vars"]
+        data[f"y_obs_{partition}"],
+        data[f"dates_{partition}"],
+        data[f"ids_{partition}"],
+        data["y_vars"],
     )
     _, seg_var = get_var_names(variable)
     df_piv = df.pivot(index="date", columns="seg_id_nat", values=seg_var)
     df_piv.dropna(axis=1, how="all", inplace=True)
-    df_piv.plot(subplots=True, figsize=(8, 12))
+    if not df.empty:
+        df_piv.plot(subplots=True, figsize=(8, 12))
+    else:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, 'NO DATA')
     plt.tight_layout()
     plt.savefig(outfile)

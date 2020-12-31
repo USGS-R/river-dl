@@ -417,9 +417,9 @@ def plot_obs(prepped_data, variable, outfile, partition='trn'):
     _, seg_var = get_var_names(variable)
     df_piv = df.pivot(index="date", columns="seg_id_nat", values=seg_var)
     df_piv.dropna(axis=1, how="all", inplace=True)
-    if not df.empty:
+    try:
         df_piv.plot(subplots=True, figsize=(8, 12))
-    else:
+    except TypeError:
         fig, ax = plt.subplots()
         ax.text(0.5, 0.5, 'NO DATA')
     plt.tight_layout()

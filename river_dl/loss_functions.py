@@ -19,6 +19,27 @@ def rmse(y_true, y_pred):
     return rmse_loss
 
 
+def sample_avg_nse(y_true, y_pred):
+    """
+    calculate the sample averaged nse, i.e., it will calculate the nse across
+    each of the samples (the 1st dimension of the arrays) and then average those
+    """
+    y_true = tf.cast(y_true, tf.float32)
+    y_pred = tf.cast(y_pred, tf.float32)
+    zero_or_error = tf.where(
+        tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
+    )
+
+    # add a small value to the deviation to prevent instability
+    deviation = dev_masked(y_true) + 0.1
+
+    numerator_samplewise = tf.reduce_sum(tf.square(zero_or_error), axis=1)
+    denomin_samplewise = tf.reduce_sum(tf.square(deviation), axis=1)
+    nse_samplewise = 1 - numerator_samplewise/denomin_samplewise
+    nse_samplewise_avg = tf.reduce_sum(nse_samplewise)/tf.cast(tf.shape(y_true)[0], tf.float32)
+    return nse_samplewise_avg
+
+
 def nse(y_true, y_pred):
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
@@ -26,11 +47,10 @@ def nse(y_true, y_pred):
         tf.math.is_nan(y_true), tf.zeros_like(y_true), y_pred - y_true
     )
 
-    numerator = tf.reduce_sum(tf.square(zero_or_error))
-
     deviation = dev_masked(y_true)
+    numerator = tf.reduce_sum(tf.square(zero_or_error))
     denominator = tf.reduce_sum(tf.square(deviation))
-    return 1 - numerator / denominator  
+    return 1 - numerator / denominator
 
 
 def nnse(y_true, y_pred):
@@ -41,11 +61,20 @@ def nnse_loss(y_true, y_pred):
     return 1 - nnse(y_true, y_pred)
 
 
+def samplewise_nnse_loss(y_true, y_pred):
+    nnse_val = 1 / (2 - sample_avg_nse(y_true, y_pred))
+    return 1 - nnse_val
+
+
 @tf.function
 def nnse_masked_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return nnse_loss(y_true, y_pred)
 
+@tf.function
+def nnse_one_var_samplewise(data, y_pred, var_idx):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+    return samplewise_nnse_loss(y_true, y_pred)
 
 @tf.function
 def y_data_components(data, y_pred, var_idx):

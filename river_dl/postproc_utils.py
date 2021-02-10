@@ -172,6 +172,7 @@ def predict_from_file(
     """
     io_data = get_data_if_file(io_data)
     model = tf.keras.models.load_model(model_weights_dir)
+    model.rnn_layer.build(input_shape=io_data['x_tst'].shape)
     preds = predict(
         model, io_data, partition, outfile, logged_q=logged_q, half_tst=half_tst
     )

@@ -35,7 +35,7 @@ def prepped_array_to_df(data_array, dates, ids, col_names):
     return df
 
 
-def take_first_half(df):
+def take_half(df, first_half=True):
     """
     filter out the second half of the dates in the predictions. this is to
     retain a "test" set of the i/o data for evaluation
@@ -47,9 +47,12 @@ def take_first_half(df):
     df.sort_index(inplace=True)
     unique_dates = df.index.unique()
     halfway_date = unique_dates[int(len(unique_dates) / 2)]
-    df_first_half = df.loc[:halfway_date]
-    df_first_half.reset_index(inplace=True)
-    return df_first_half
+    if first_half:
+        df_half = df.loc[:halfway_date]
+    else:
+        df_half = df.loc[halfway_date:]
+    df_half.reset_index(inplace=True)
+    return df_half
 
 
 def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
@@ -172,7 +175,6 @@ def predict_from_file(
     """
     io_data = get_data_if_file(io_data)
     model = tf.keras.models.load_model(model_weights_dir)
-    model.rnn_layer.build(input_shape=io_data['x_tst'].shape)
     preds = predict(
         model, io_data, partition, outfile, logged_q=logged_q, half_tst=half_tst
     )
@@ -198,11 +200,16 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     """
     io_data = get_data_if_file(io_data)
 
-    # evaluate training
-    if partition == "trn" or partition == "tst":
+    if partition in ["trn", "tst", "ver"]:
         pass
     else:
-        raise ValueError('partition arg needs to be "trn" or "tst"')
+        raise ValueError('partition arg needs to be "trn" or "tst" or "ver"')
+
+    if partition == "ver":
+        partition = "tst"
+        tst_partition = "ver"
+    elif partition == "tst":
+        tst_partition = "tst"
 
     num_segs = len(np.unique(io_data["ids_trn"]))
     y_pred = model.predict(io_data[f"x_{partition}"], batch_size=num_segs)
@@ -221,8 +228,12 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
         logged_q,
     )
 
-    if half_tst and partition == "tst":
-        y_pred_pp = take_first_half(y_pred_pp)
+    if partition == "tst":
+        if half_tst and tst_partition == "tst":
+            y_pred_pp = take_half(y_pred_pp, first_half=True)
+
+        if half_tst and tst_partition == "ver":
+            y_pred_pp = take_half(y_pred_pp, first_half=False)
 
     y_pred_pp.to_feather(outfile)
     return y_pred_pp
@@ -373,13 +384,14 @@ def overall_metrics(
 
 
 def combined_metrics(
-    pred_trn, pred_tst, obs_temp, obs_flow, grp=None, outfile=None
+    pred_trn, pred_tst,  obs_temp, obs_flow, pred_ver=None, grp=None, outfile=None
 ):
     """
     calculate the metrics for flow and temp and training and test sets for a
     given grouping
     :param pred_trn: [str] path to training prediction feather file
     :param pred_tst: [str] path to testing prediction feather file
+    :param pred_tst: [str] path to verification prediction feather file
     :param obs_temp: [str] path to observations temperature zarr file
     :param obs_flow: [str] path to observations flow zarr file
     :param group: [str or list] which group the metrics should be computed for.
@@ -393,7 +405,10 @@ def combined_metrics(
     trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", grp)
     tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
     tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
-    df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
+    if pred_ver:
+        ver_temp = overall_metrics(pred_ver, obs_temp, "temp", "ver", grp)
+        ver_flow = overall_metrics(pred_ver, obs_flow, "flow", "ver", grp)
+    df_all = [trn_temp, tst_temp, trn_flow, tst_flow, ver_temp, ver_flow]
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)

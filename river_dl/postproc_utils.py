@@ -405,10 +405,11 @@ def combined_metrics(
     trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", grp)
     tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
     tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
+    df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
     if pred_ver:
         ver_temp = overall_metrics(pred_ver, obs_temp, "temp", "ver", grp)
         ver_flow = overall_metrics(pred_ver, obs_flow, "flow", "ver", grp)
-    df_all = [trn_temp, tst_temp, trn_flow, tst_flow, ver_temp, ver_flow]
+        df_all.extend([ver_temp, ver_flow])
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)

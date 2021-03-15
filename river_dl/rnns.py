@@ -1,19 +1,18 @@
 # -*- coding: utf-8 -*-
-"""
-@author: jeff sadler, Feb 2020
-based off code by Xiaowei Jia
-
-"""
-
 from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras import layers
-from river_dl.RGCN import rmse_masked_one_var
+from river_dl.loss_functions import nnse_masked_one_var, nnse_one_var_samplewise
 
 
 class LSTMModel(tf.keras.Model):
     def __init__(
-        self, hidden_size, gradient_correction=False, lamb=1, grad_log_file=None
+        self,
+        hidden_size,
+        gradient_correction=False,
+        lamb=1,
+        dropout=0,
+        grad_log_file=None
     ):
         """
         :param hidden_size: [int] the number of hidden units
@@ -23,7 +22,10 @@ class LSTMModel(tf.keras.Model):
         self.grad_log_file = grad_log_file
         self.lamb = lamb
         self.rnn_layer = layers.LSTM(
-            hidden_size, return_sequences=True, name="rnn_shared"
+            hidden_size,
+            return_sequences=True,
+            name="rnn_shared",
+            recurrent_dropout=dropout
         )
         self.dense_main = layers.Dense(1, name="dense_main")
         self.dense_aux = layers.Dense(1, name="dense_aux")
@@ -45,8 +47,8 @@ class LSTMModel(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             y_pred = self(x, training=True)  # forward pass
 
-            loss_main = rmse_masked_one_var(y, y_pred, 0)
-            loss_aux = rmse_masked_one_var(y, y_pred, 1)
+            loss_main = nnse_one_var_samplewise(y, y_pred, 0)
+            loss_aux = nnse_one_var_samplewise(y, y_pred, 1)
 
         trainable_vars = self.trainable_variables
 

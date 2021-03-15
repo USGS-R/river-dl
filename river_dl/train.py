@@ -4,7 +4,7 @@ import numpy as np
 from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
-from river_dl.loss_functions import weighted_masked_rmse
+from river_dl.RGCN import RGCNModel, weighted_masked_rmse
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -17,7 +17,7 @@ def get_data_if_file(d):
     if isinstance(d, NpzFile) or isinstance(d, dict):
         return d
     else:
-        return np.load(d, allow_pickle=True)
+        return np.load(d)
 
 
 def train_model(
@@ -26,9 +26,9 @@ def train_model(
     finetune_epochs,
     hidden_units,
     out_dir,
+    flow_in_temp=False,
     model_type="rgcn",
     seed=None,
-    dropout=0,
     lamb=1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
@@ -59,6 +59,7 @@ def train_model(
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
+    dist_matrix = io_data["dist_matrix"]
 
     n_seg = len(np.unique(io_data["ids_trn"]))
     if n_seg > 1:
@@ -69,13 +70,19 @@ def train_model(
 
     if model_type == "lstm":
         model = LSTMModel(hidden_units, lamb=lamb)
+    elif model_type == "rgcn":
+        model = RGCNModel(
+            hidden_units,
+            flow_in_temp=flow_in_temp,
+            A=dist_matrix,
+            rand_seed=seed,
+        )
     elif model_type == "lstm_grad_correction":
         grad_log_file = os.path.join(out_dir, "grad_correction.txt")
         model = LSTMModel(
             hidden_units,
             gradient_correction=True,
             lamb=lamb,
-            dropout=dropout,
             grad_log_file=grad_log_file,
         )
     elif model_type == "gru":
@@ -117,7 +124,7 @@ def train_model(
             callbacks=[csv_log_pre],
         )
 
-        model.save(os.path.join(out_dir, "pretrained_model/"))
+        model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
 
     pre_train_time = datetime.datetime.now()
     pre_train_time_elapsed = pre_train_time - start_time
@@ -156,7 +163,7 @@ def train_model(
             callbacks=[csv_log_ft],
         )
 
-        model.save(os.path.join(out_dir, f"trained_model/"))
+        model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 
     finetune_time = datetime.datetime.now()
     finetune_time_elapsed = finetune_time - pre_train_time

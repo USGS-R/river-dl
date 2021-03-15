@@ -9,7 +9,6 @@ from river_dl.train import get_data_if_file
 from river_dl.loss_functions import rmse, nse, kge
 
 
-
 def prepped_array_to_df(data_array, dates, ids, col_names):
     """
     convert prepped x or y data in numpy array to pandas df
@@ -316,8 +315,12 @@ def calc_metrics(df):
                 obs, pred, rmse, 10, less_than=True
             ).numpy(),
             "rmse_logged": rmse_logged(obs, pred).numpy(),
-            "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False).numpy(),
-            "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True).numpy(),
+            "nse_top10": percentile_metric(
+                obs, pred, nse, 90, less_than=False
+            ).numpy(),
+            "nse_bot10": percentile_metric(
+                obs, pred, nse, 10, less_than=True
+            ).numpy(),
             "nse_logged": nse_logged(obs, pred).numpy(),
             "kge": kge(obs, pred).numpy(),
         }
@@ -384,7 +387,13 @@ def overall_metrics(
 
 
 def combined_metrics(
-    pred_trn, pred_tst,  obs_temp, obs_flow, pred_ver=None, grp=None, outfile=None
+    pred_trn,
+    pred_tst,
+    obs_temp,
+    obs_flow,
+    pred_ver=None,
+    grp=None,
+    outfile=None,
 ):
     """
     calculate the metrics for flow and temp and training and test sets for a
@@ -416,7 +425,7 @@ def combined_metrics(
     return df_all
 
 
-def plot_obs(prepped_data, variable, outfile, partition='trn'):
+def plot_obs(prepped_data, variable, outfile, partition="trn"):
     """
     plot training observations
     :param prepped_data: [str] path to npz file of prepped data
@@ -438,14 +447,14 @@ def plot_obs(prepped_data, variable, outfile, partition='trn'):
         df_piv.plot(subplots=True, figsize=(8, 12))
     except TypeError:
         fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, 'NO DATA')
+        ax.text(0.5, 0.5, "NO DATA")
     plt.tight_layout()
     plt.savefig(outfile)
 
 
 def plot_ts(pred_file, obs_file, variable, out_file):
     combined = fmt_preds_obs(pred_file, obs_file, variable)
-    combined = combined.droplevel('seg_id_nat')
+    combined = combined.droplevel("seg_id_nat")
     ax = combined.plot(alpha=0.65)
     plt.tight_layout()
     plt.savefig(out_file)

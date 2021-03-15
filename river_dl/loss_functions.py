@@ -1,6 +1,7 @@
 import numpy as np
 import tensorflow as tf
 
+
 @tf.function
 def rmse(y_true, y_pred):
     y_true = tf.cast(y_true, tf.float32)
@@ -35,8 +36,10 @@ def sample_avg_nse(y_true, y_pred):
 
     numerator_samplewise = tf.reduce_sum(tf.square(zero_or_error), axis=1)
     denomin_samplewise = tf.reduce_sum(tf.square(deviation), axis=1)
-    nse_samplewise = 1 - numerator_samplewise/denomin_samplewise
-    nse_samplewise_avg = tf.reduce_sum(nse_samplewise)/tf.cast(tf.shape(y_true)[0], tf.float32)
+    nse_samplewise = 1 - numerator_samplewise / denomin_samplewise
+    nse_samplewise_avg = tf.reduce_sum(nse_samplewise) / tf.cast(
+        tf.shape(y_true)[0], tf.float32
+    )
     return nse_samplewise_avg
 
 
@@ -71,10 +74,12 @@ def nnse_masked_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return nnse_loss(y_true, y_pred)
 
+
 @tf.function
 def nnse_one_var_samplewise(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return samplewise_nnse_loss(y_true, y_pred)
+
 
 @tf.function
 def y_data_components(data, y_pred, var_idx):
@@ -121,33 +126,25 @@ def weighted_masked_rmse(lamb=0.5):
 
 
 def mean_masked(y):
-    num_vals = tf.cast(
-        tf.math.count_nonzero(~tf.math.is_nan(y)), tf.float32
-    )
+    num_vals = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y)), tf.float32)
     # get mean accounting for nans
-    zero_or_val = tf.where(
-        tf.math.is_nan(y), tf.zeros_like(y), y
-    )
+    zero_or_val = tf.where(tf.math.is_nan(y), tf.zeros_like(y), y)
     mean = tf.reduce_sum(zero_or_val) / num_vals
     return mean
 
 
 def dev_masked(y):
     mean = mean_masked(y)
-    zero_or_dev = tf.where(
-        tf.math.is_nan(y), tf.zeros_like(y), y - mean
-    )
+    zero_or_dev = tf.where(tf.math.is_nan(y), tf.zeros_like(y), y - mean)
     return zero_or_dev
 
 
 def std_masked(y):
     dev = dev_masked(y)
-    num_vals = tf.cast(
-        tf.math.count_nonzero(~tf.math.is_nan(y)), tf.float32
-    )
+    num_vals = tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y)), tf.float32)
     numerator = tf.reduce_sum(tf.square(dev))
     denominator = num_vals - 1
-    return tf.sqrt(numerator/denominator)
+    return tf.sqrt(numerator / denominator)
 
 
 def pearsons_r(y_true, y_pred):
@@ -157,7 +154,7 @@ def pearsons_r(y_true, y_pred):
     ss_dev_true = tf.reduce_sum(tf.square(y_true_dev))
     ss_pred_true = tf.reduce_sum(tf.square(y_pred_dev))
     denominator = tf.sqrt(ss_dev_true * ss_pred_true)
-    return numerator/denominator
+    return numerator / denominator
 
 
 def kge(y_true, y_pred):
@@ -170,8 +167,8 @@ def kge(y_true, y_pred):
     std_pred = std_masked(y_pred)
 
     r_component = tf.square(r - 1)
-    std_component = tf.square((std_pred/std_true) - 1)
-    bias_component = tf.square((mean_pred/mean_true) - 1)
+    std_component = tf.square((std_pred / std_true) - 1)
+    bias_component = tf.square((mean_pred / mean_true) - 1)
     return 1 - tf.sqrt(r_component + std_component + bias_component)
 
 

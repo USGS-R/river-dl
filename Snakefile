@@ -4,63 +4,62 @@ import pandas as pd
 # add scripts dir to path
 
 from river_dl.preproc_utils import prep_data
-from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs, plot_ts
+from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs
 from river_dl.train import train_model
 
 out_dir = config['out_dir']
 data_dir = config['data_dir']
 x_vars = config['x_vars']
 num_replicates = config['num_replicates']
-obs_temp = os.path.join(data_dir, config['obs_temp']),
-obs_flow = os.path.join(data_dir, config['obs_flow']),
-drivers = os.path.join(data_dir, config['drivers_file']),
 
 
 rule all:
     input:
         f"{out_dir}/exp_overall_metrics.csv",
-        expand("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_{variable}_ts.png",
-               outdir=out_dir,
-               segment=config['segments'],
-               variable=['flow'],
-               model=config['models'],
-               lamb=config['lambs'],
-               run_id=list(range(config['num_replicates'])),
-               partition=['trn', 'tst'],
-               )
 
 
 rule prep_io_data:
     input:
-        obs_temp,
-        obs_flow,
-        drivers,
+         os.path.join(data_dir, 'obs_temp_full'),
+         os.path.join(data_dir, 'obs_flow_full'),
+         os.path.join(data_dir, 'uncal_sntemp_input_output'),
+         os.path.join(data_dir, 'distance_matrix_subset.npz'),
+         catch_attr = os.path.join(data_dir, "seg_attr_drb.feather")
     output:
         "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
+
+    params:
+        test_start_date='2004-09-30',
+        n_test_yr=12,
     run:
-        prep_data(input[0], input[1], input[2],
-                  test_start_date=config['test_start_date'],
+        prep_data(input[0], input[1], input[2], input[3], x_vars,
+                  catch_prop_file=input['catch_attr'],
+                  exclude_file=None,
+                  test_start_date=params.test_start_date,
                   primary_variable=wildcards.variable,
-                  log_q=False, segs=[wildcards.segment],
-                  n_test_yr=config['n_test_yr'], out_file=output[0])
+                  log_q=False, segs=[int(wildcards.segment)],
+                  n_test_yr=params.n_test_yr, out_file=output[0])
 
 
-rule train_the_model:
+rule train_model:
     input:
         "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     output:
-        directory("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_model/"),
+        directory("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_weights/"),
+        directory("{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/pretrained_weights/"),
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+        pt_epochs=50,
+        ft_epochs=50,
     run:
-        train_model(input[0], config['pt_epochs'], config['ft_epochs'], 20, params.run_dir,
-                    model_type=wildcards.model, lamb=float(wildcards.lamb), seed=int(wildcards.run_id), learning_rate_ft=.001)
+        train_model(input[0], params.pt_epochs, params.ft_epochs, 20, params.run_dir,
+                    model_type=wildcards.model, lamb=float(wildcards.lamb), seed=int(wildcards.run_id))
 
 rule make_predictions:
     input:
-        "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_model/",
+        "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trained_weights/",
         "{outdir}/seg_{segment}/var_{variable}/prepped.npz"
     params:
         hidden_size=20,
@@ -69,9 +68,10 @@ rule make_predictions:
         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_preds.feather",
     run:
         weight_dir = input[0] + '/'
-        predict_from_file(weight_dir, input[1],
-                          wildcards.partition, output[0],
+        predict_from_file(weight_dir, input[1], params.hidden_size,
+                          wildcards.partition, output[0], flow_in_temp=True,
                           half_tst=params.half_tst,
+                          model=wildcards.model,
                           logged_q=False)
 
 
@@ -90,14 +90,14 @@ rule combine_metrics:
     input:
          "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/trn_preds.feather",
          "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/tst_preds.feather",
-         obs_temp,
-         obs_flow,
+         f"{data_dir}/obs_temp_full",
+         f"{data_dir}/obs_flow_full"
     output:
          "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{metric_type}_metrics.csv"
     params:
         grp_arg = get_grp_arg
     run:
-        combined_metrics(input[0], input[1], input[2], input[3], params.grp_arg, output[0])
+        combined_metrics(input[0], input[1], input[2], input[3], params.grp_arg, output[0], full_slate=False)
 
 def get_exp_name(model, lamb):
     if model == 'lstm' and lamb==0:
@@ -159,14 +159,5 @@ rule combine_overall_metrics:
         "{outdir}/exp_{metric_type}_metrics.csv"
     run:
         combined = combine_exp_metrics(input)
+        #combined = combined.to_xarray()
         combined.to_csv(output[0], index=False)
-
-
-rule plot_timeseries:
-    input:
-         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_preds.feather",
-         os.path.join(data_dir, "obs_{variable}_camels")
-    output:
-         "{outdir}/seg_{segment}/var_{variable}/mod_{model}/lamb_{lamb}/{run_id}/{partition}_{variable}_ts.png"
-    run:
-         plot_ts(input[0], input[1], wildcards.variable, output[0])

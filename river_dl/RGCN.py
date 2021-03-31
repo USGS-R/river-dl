@@ -269,7 +269,6 @@ def rmse_masked_one_var(data, y_pred, var_idx):
     return rmse(y_true, y_pred, weights)
 
 
-@tf.function
 def weighted_masked_rmse(lamb=0.5):
     """
     calculate a weighted, masked rmse.
@@ -280,7 +279,7 @@ def weighted_masked_rmse(lamb=0.5):
     def rmse_masked_combined(data, y_pred):
         rmse_main = rmse_masked_one_var(data, y_pred, 0)
         rmse_aux = rmse_masked_one_var(data, y_pred, 1)
-        rmse_loss = (1 - lamb) * rmse_main + lamb * rmse_aux
+        rmse_loss =  rmse_main + lamb * rmse_aux
         return rmse_loss
 
     return rmse_masked_combined

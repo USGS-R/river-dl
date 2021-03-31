@@ -212,7 +212,6 @@ def predict_from_file(
     elif model == "gru":
         model = GRUModel(hidden_size)
 
-    model(io_data["x_tst"])
     model.load_weights(model_weights_dir)
     preds = predict(
         model, io_data, partition, outfile, logged_q=logged_q, half_tst=half_tst
@@ -408,7 +407,7 @@ def overall_metrics(
     metrics["variable"] = variable
     metrics["partition"] = partition
     if outfile:
-        metrics.to_csv(outfile, header=False)
+        metrics.to_csv(outfile, header=True, index=False)
     return metrics
 
 

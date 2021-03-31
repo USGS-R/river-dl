@@ -103,6 +103,8 @@ def read_multiple_obs(obs_files, pre_train_file):
     for filename in obs_files:
         ds = xr.open_zarr(filename)
         obs.append(ds)
+        if 'site_id' in ds.variables:
+            del ds['site_id']
     obs = xr.merge(obs, join="left")
     obs = obs[["temp_c", "discharge_cms"]]
     obs = obs.rename(
@@ -124,7 +126,7 @@ def join_catch_properties(x_data_ts, catch_props):
     return xr.merge([x_data_ts, ds_catch], join="left")
 
 
-def prep_catch_props(x_data_ts, catch_prop_file):
+def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
     """
     read catch property file and join with ts data
     :param x_data_ts: [xr dataset] timeseries x-data
@@ -132,6 +134,9 @@ def prep_catch_props(x_data_ts, catch_prop_file):
     :return: [xr dataset] merged datasets
     """
     df_catch_props = pd.read_feather(catch_prop_file)
+    # replace nans with column means
+    if replace_nan_with_mean:
+        df_catch_props = df_catch_props.apply(lambda x: x.fillna(x.mean()),axis=0)
     ds_catch_props = df_catch_props.set_index("seg_id_nat").to_xarray()
     return join_catch_properties(x_data_ts, ds_catch_props)
 
@@ -319,7 +324,12 @@ def convert_batch_reshape(dataset):
     """
     # convert xr.dataset to numpy array
     dataset = dataset.transpose("seg_id_nat", "date")
+
     arr = dataset.to_array().values
+
+    # if the dataset is empty, just return it as is
+    if dataset.date.size == 0:
+        return arr
 
     # before [nfeat, nseg, ndates]; after [nseg, ndates, nfeat]
     # this is the order that the split into batches expects
@@ -434,9 +444,12 @@ def prep_data(
                             data [n_yrs, n_seg, len_seq, 2]
     """
     ds_pre = xr.open_zarr(pretrain_file)
+
     if segs:
         ds_pre = ds_pre.loc[dict(seg_id_nat=segs)]
+
     x_data = ds_pre[x_vars]
+
     if catch_prop_file:
         x_data = prep_catch_props(x_data, catch_prop_file)
     # make sure we don't have any weird input values

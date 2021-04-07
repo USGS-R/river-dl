@@ -11,10 +11,10 @@ There are functions for facilitating pre-processing and post-processing of the d
 
 ### To run the Snakemake workflow:
 
-    1. Install the dependencies in the `environment.yaml` file. With conda you can do this with `conda env create -f environment.yaml`
-    2. Install the local `river-dl` package by `pip install path/to/river-dl/`
-    3. Edit the river-dl run configuration (including paths for I/O data) in `config.yml`
-    4. Run Snakemake by `snakemake --configfile config.yml`
+1. Install the dependencies in the `environment.yaml` file. With conda you can do this with `conda env create -f environment.yaml`
+2. Install the local `river-dl` package by `pip install path/to/river-dl/`
+3. Edit the river-dl run configuration (including paths for I/O data) in `config.yml`
+4. Run Snakemake by `snakemake --configfile config.yml`
 
 ### The data
 The data used to run this model currently are specific to the Delaware River Basin but will soon be made more generic.

@@ -10,6 +10,7 @@ There are functions for facilitating pre-processing and post-processing of the d
 
 
 ### To run the Snakemake workflow:
+
     1. Install the dependencies in the `environment.yaml` file. With conda you can do this with `conda env create -f environment.yaml`
     2. Install the local `river-dl` package by `pip install path/to/river-dl/`
     3. Edit the river-dl run configuration (including paths for I/O data) in `config.yml`

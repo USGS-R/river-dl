@@ -8,7 +8,6 @@ based off code by Xiaowei Jia
 from __future__ import print_function, division
 import tensorflow as tf
 from tensorflow.keras import layers
-import numpy as np
 
 
 class RGCN(layers.Layer):

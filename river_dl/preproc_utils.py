@@ -66,31 +66,6 @@ def split_into_batches(data_array, seq_len=365, offset=1):
     return combined
 
 
-def get_unique_dates(partition, x_data_file):
-    """
-    get the unique dates for a partition
-    :param partition: [str] 'tst', 'trn', or 'both'
-    :param x_data_file: [str] path to x_data_file
-    :return: [np array] unique dates
-    """
-    return np.sort(np.unique(np.load(x_data_file)[f"dates_{partition}"]))
-
-
-def get_dates(partition, x_data_file):
-    """
-    get the dates for a certain partition
-    :param partition: [str] 'tst', 'trn', or 'both'
-    :param x_data_file: [str] path to x_data_file
-    :return: [array] dates
-    """
-    if partition == "both":
-        trn_dates = get_unique_dates("trn", x_data_file)
-        tst_dates = get_unique_dates("tst", x_data_file)
-        return np.sort(np.concatenate([trn_dates, tst_dates]))
-    else:
-        return get_unique_dates(partition, x_data_file)
-
-
 def read_multiple_obs(obs_files, x_data):
     """
     read and format multiple observation files. we read in the pretrain data to
@@ -406,31 +381,6 @@ def log_discharge(y):
     y["seg_outflow"].loc[:, :] = y["seg_outflow"] + 1e-6
     y["seg_outflow"].loc[:, :] = xr.ufuncs.log(y["seg_outflow"])
     return y
-
-
-def get_y_partition(ds_y, x_data_file, partition):
-    """
-    get the parition for a y dataset
-    :param ds_y: [xr dataset] an xarray dataset of the y
-    :param x_data_file: [str] path to x_data_file
-    :param partition: [str] 'trn' or 'tst'
-    :return: partitioned data
-    """
-    dates = get_unique_dates(partition, x_data_file)
-    return ds_y.sel(date=dates)
-
-
-def get_y_obs(obs_files, pretrain_file, finetune_vars):
-    """
-    get y_obs_trn and y_obs_tst
-    :param obs_files: [list] observation files
-    :param pretrain_file: [str] path to pretrain file
-    :param finetune_vars: [list] variables that will be used in finetuning
-    :return: [xr datasets]
-    """
-    ds_y_obs = read_multiple_obs(obs_files, pretrain_file)
-    ds_y_obs = ds_y_obs[finetune_vars]
-    return ds_y_obs
 
 
 def prep_data(

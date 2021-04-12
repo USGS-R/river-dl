@@ -409,7 +409,7 @@ def prep_data(
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
     :param distfile: [str] path to the distance matrix .npz file
     :param x_vars: [list] variables that should be used as input. If None, all
-    of the var
+    of the variables will be used
     :param primary_variable: [str] which variable the model should focus on
     'temp' or 'flow'. This determines the order of the variables.
     :param catch_prop_file: [str] the path to the catchment properties file. If

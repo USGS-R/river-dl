@@ -1,10 +1,13 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import xarray as xr
+import tensorflow as tf
 import numpy as np
 from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.RGCN import RGCNModel
 from river_dl.train import get_data_if_file
+from river_dl.loss_functions import rmse, nse, kge
+
 
 def prepped_array_to_df(data_array, dates, ids, col_names):
     """
@@ -31,7 +34,7 @@ def prepped_array_to_df(data_array, dates, ids, col_names):
     return df
 
 
-def take_first_half(df):
+def take_half(df, first_half=True):
     """
     filter out the second half of the dates in the predictions. this is to
     retain a "test" set of the i/o data for evaluation
@@ -43,9 +46,12 @@ def take_first_half(df):
     df.sort_index(inplace=True)
     unique_dates = df.index.unique()
     halfway_date = unique_dates[int(len(unique_dates) / 2)]
-    df_first_half = df.loc[:halfway_date]
-    df_first_half.reset_index(inplace=True)
-    return df_first_half
+    if first_half:
+        df_half = df.loc[:halfway_date]
+    else:
+        df_half = df.loc[halfway_date:]
+    df_half.reset_index(inplace=True)
+    return df_half
 
 
 def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
@@ -66,38 +72,6 @@ def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
     if logged_q:
         y_scl["seg_outflow"] = np.exp(y_scl["seg_outflow"])
     return y_scl
-
-
-def rmse_masked(y_true, y_pred):
-    """
-    Compute cost as RMSE with masking (the tf.where call replaces pred_s-y_s
-    with 0 when y_s is nan; num_y_s is a count of just those non-nan
-    observations) so we're only looking at predictions with corresponding
-    observations available
-    (credit: @aappling-usgs)
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
-    :return: rmse (one value for each training sample)
-    """
-    # count the number of non-nans
-    num_y_true = np.sum(~np.isnan(y_true))
-    zero_or_error = np.where(np.isnan(y_true), 0, y_pred - y_true)
-    sum_squared_errors = np.sum(zero_or_error ** 2)
-    rmse_loss = np.sqrt(sum_squared_errors / num_y_true)
-    return rmse_loss
-
-
-def nse(y_true, y_pred):
-    """
-    compute the nash-sutcliffe model efficiency coefficient
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
-    :return: [float] the nash-sutcliffe efficiency coefficient
-    """
-    q_mean = np.nanmean(y_true)
-    numerator = np.nansum((y_true - y_pred) ** 2)
-    denominator = np.nansum((y_true - q_mean) ** 2)
-    return 1 - (numerator / denominator)
 
 
 def filter_negative_preds(y_true, y_pred):
@@ -123,7 +97,7 @@ def rmse_logged(y_true, y_pred):
     :return: [float] the rmse of the logged data
     """
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return rmse_masked(np.log(y_true), np.log(y_pred))
+    return rmse(np.log(y_true), np.log(y_pred))
 
 
 def nse_logged(y_true, y_pred):
@@ -177,13 +151,10 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
 def predict_from_file(
     model_weights_dir,
     io_data,
-    hidden_size,
     partition,
     outfile,
-    flow_in_temp=False,
     logged_q=False,
     half_tst=False,
-    model="rgcn",
 ):
     """
     make predictions from trained model
@@ -236,15 +207,19 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     :return:[none]
     """
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data["dist_matrix"]
 
-    # evaluate training
-    if partition == "trn" or partition == "tst":
+    if partition in ["trn", "tst", "ver"]:
         pass
     else:
-        raise ValueError('partition arg needs to be "trn" or "tst"')
+        raise ValueError('partition arg needs to be "trn" or "tst" or "ver"')
 
-    num_segs = dist_matrix.shape[0]
+    if partition == "ver":
+        partition = "tst"
+        tst_partition = "ver"
+    elif partition == "tst":
+        tst_partition = "tst"
+
+    num_segs = len(np.unique(io_data["ids_trn"]))
     y_pred = model.predict(io_data[f"x_{partition}"], batch_size=num_segs)
     y_pred_pp = prepped_array_to_df(
         y_pred,
@@ -261,8 +236,12 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
         logged_q,
     )
 
-    if half_tst and partition == "tst":
-        y_pred_pp = take_first_half(y_pred_pp)
+    if partition == "tst":
+        if half_tst and tst_partition == "tst":
+            y_pred_pp = take_half(y_pred_pp, first_half=True)
+
+        if half_tst and tst_partition == "ver":
+            y_pred_pp = take_half(y_pred_pp, first_half=False)
 
     y_pred_pp.to_feather(outfile)
     return y_pred_pp
@@ -336,11 +315,11 @@ def calc_metrics(df):
     pred = df["pred"].values
     if len(obs) > 10:
         metrics = {
-            "rmse": rmse_masked(obs, pred),
-            "nse": nse(obs, pred),
+            "rmse": rmse(obs, pred).numpy(),
+            "nse": nse(obs, pred).numpy(),
             "rmse_top10": percentile_metric(
-                obs, pred, rmse_masked, 90, less_than=False
-            ),
+                obs, pred, rmse, 90, less_than=False
+            ).numpy(),
             "rmse_bot10": percentile_metric(
                 obs, pred, rmse, 10, less_than=True
             ).numpy(),
@@ -371,6 +350,7 @@ def calc_metrics(df):
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
+            "kge": np.nan,
         }
     return pd.Series(metrics)
 
@@ -435,6 +415,7 @@ def combined_metrics(
     given grouping
     :param pred_trn: [str] path to training prediction feather file
     :param pred_tst: [str] path to testing prediction feather file
+    :param pred_tst: [str] path to verification prediction feather file
     :param obs_temp: [str] path to observations temperature zarr file
     :param obs_flow: [str] path to observations flow zarr file
     :param group: [str or list] which group the metrics should be computed for.
@@ -449,13 +430,17 @@ def combined_metrics(
     tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
     tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
     df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
+    if pred_ver:
+        ver_temp = overall_metrics(pred_ver, obs_temp, "temp", "ver", grp)
+        ver_flow = overall_metrics(pred_ver, obs_flow, "flow", "ver", grp)
+        df_all.extend([ver_temp, ver_flow])
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)
     return df_all
 
 
-def plot_train_obs(prepped_data, variable, outfile):
+def plot_obs(prepped_data, variable, outfile, partition='trn'):
     """
     plot training observations
     :param prepped_data: [str] path to npz file of prepped data
@@ -463,13 +448,28 @@ def plot_train_obs(prepped_data, variable, outfile):
     :param outfile: [str] where to store the resulting file
     :return: None
     """
-    data = np.load(prepped_data)
+    data = np.load(prepped_data, allow_pickle=True)
     df = prepped_array_to_df(
-        data["y_obs_trn"], data["dates_trn"], data["ids_trn"], data["y_vars"]
+        data[f"y_obs_{partition}"],
+        data[f"dates_{partition}"],
+        data[f"ids_{partition}"],
+        data["y_vars"],
     )
     _, seg_var = get_var_names(variable)
     df_piv = df.pivot(index="date", columns="seg_id_nat", values=seg_var)
     df_piv.dropna(axis=1, how="all", inplace=True)
-    df_piv.plot(subplots=True, figsize=(8, 12))
+    try:
+        df_piv.plot(subplots=True, figsize=(8, 12))
+    except TypeError:
+        fig, ax = plt.subplots()
+        ax.text(0.5, 0.5, 'NO DATA')
     plt.tight_layout()
     plt.savefig(outfile)
+
+
+def plot_ts(pred_file, obs_file, variable, out_file):
+    combined = fmt_preds_obs(pred_file, obs_file, variable)
+    combined = combined.droplevel('seg_id_nat')
+    ax = combined.plot(alpha=0.65)
+    plt.tight_layout()
+    plt.savefig(out_file)

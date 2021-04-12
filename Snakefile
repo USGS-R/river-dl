@@ -8,7 +8,7 @@ shell.prefix("module load analytics cuda10.0/toolkit/10.0.130 \n \
 # add scripts dir to path
 
 from river_dl.preproc_utils import prep_data
-from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs
+from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs, plot_ts
 from river_dl.train import train_model
 
 out_dir = config['out_dir']
@@ -25,7 +25,6 @@ rule all:
                 plt_variable=['temp', 'flow'],
                 partition=['trn', 'tst'],
         ),
-
 
 rule prep_io_data:
     input:
@@ -130,5 +129,3 @@ rule plot_prepped_data:
         "{outdir}/{variable}_{partition}.png",
     run:
         plot_train_obs(input[0], wildcards.variable, output[0])
-
-

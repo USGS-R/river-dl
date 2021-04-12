@@ -1,21 +1,19 @@
-# file paths
-data_dir: "../drb_ml_streamflow_paper/data/camels/1_data/out"
-out_dir:  "data/out/test_snakemake/test_camels"
-# Assumes that the obs files and drivers files are in the same directory
-drivers_file: "drivers_camels"
-obs_flow: "obs_flow_camels"
-obs_temp: "obs_temp_camels"
+# Input files
+obs_flow: "/home/jsadler/drb_data/obs_flow_full"
+obs_temp: "/home/jsadler/drb_data/obs_temp_full"
+sntemp_file: "/home/jsadler/drb_data/uncal_sntemp_input_output"
+catchment_attr: "/home/jsadler/drb_data/seg_attr_drb.feather"
+dist_matrix: "/home/jsadler/drb_data/distance_matrix.npz"
 
-num_replicates: 1
+out_dir: "/caldera/projects/usgs/water/iidd/datasci/drb_ml_model/test_run2"
+code_dir: "/home/jsadler/river-dl/river_dl"
 
-# run configs
-x_vars: ['seg_rain', 'seg_tave_air', 'seginc_swrad', 'seg_length', 'seginc_potet', 'seg_slope', 'seg_humid', 'seg_elev']
-primary_variables: ['flow']
-models: ['gru']
-lambs: [1]
-#segments: [1568, 1578, 1462, 1565, 1566, 1457, 1450, 2037, 2012, 2014]
-segments: ['01022500']
-test_start_date: '2004-09-30'
-n_test_yr: 12
-pt_epochs: 0
-ft_epochs: 50
+x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
+primary_variable: "flow"
+lamb: 1
+test_start_date: '2010-09-30'
+n_test_yr: 6
+pt_epochs: 1
+ft_epochs: 1
+hidden_size: 20
+half_test: True

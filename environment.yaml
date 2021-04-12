@@ -4,6 +4,7 @@ channels:
     - defaults
     - bioconda
 dependencies:
+    - dask
     - dvc
     - ipython
     - matplotlib

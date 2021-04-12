@@ -387,7 +387,7 @@ def prep_data(
     obs_temper_file,
     obs_flow_file,
     pretrain_file,
-    dist_file,
+    distfile,
     x_vars=None,
     y_vars=None,
     primary_variable="flow",

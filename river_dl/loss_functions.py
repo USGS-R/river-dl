@@ -66,17 +66,16 @@ def samplewise_nnse_loss(y_true, y_pred):
     return 1 - nnse_val
 
 
-@tf.function
 def nnse_masked_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return nnse_loss(y_true, y_pred)
 
-@tf.function
+
 def nnse_one_var_samplewise(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return samplewise_nnse_loss(y_true, y_pred)
 
-@tf.function
+
 def y_data_components(data, y_pred, var_idx):
     weights = data[:, :, -2:]
     y_true = data[:, :, :-2]
@@ -97,13 +96,11 @@ def y_data_components(data, y_pred, var_idx):
     return y_true, y_pred, weights
 
 
-@tf.function
 def rmse_masked_one_var(data, y_pred, var_idx):
     y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
     return rmse(y_true, y_pred)
 
 
-@tf.function
 def weighted_masked_rmse(lamb=0.5):
     """
     calculate a weighted, masked rmse.

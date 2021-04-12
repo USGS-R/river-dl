@@ -165,7 +165,7 @@ def predict(model_file, io_data, partition, outfile, logged_q=False, half_tst=Fa
     the exponent of the discharge will be taken in the model unscaling
     :return:[none]
     """
-    model = tf.keras.models.load_model(model_file)
+    model = tf.keras.models.load_model(model_file, compile=False)
     io_data = get_data_if_file(io_data)
 
     if partition in ["trn", "tst", "ver"]:
@@ -360,10 +360,10 @@ def overall_metrics(
 
 
 def combined_metrics(
-    pred_trn,
-    pred_tst,
     obs_temp,
     obs_flow,
+    pred_trn=None,
+    pred_tst=None,
     pred_ver=None,
     grp=None,
     outfile=None,
@@ -373,7 +373,7 @@ def combined_metrics(
     given grouping
     :param pred_trn: [str] path to training prediction feather file
     :param pred_tst: [str] path to testing prediction feather file
-    :param pred_tst: [str] path to verification prediction feather file
+    :param pred_ver: [str] path to verification prediction feather file
     :param obs_temp: [str] path to observations temperature zarr file
     :param obs_flow: [str] path to observations flow zarr file
     :param group: [str or list] which group the metrics should be computed for.
@@ -383,11 +383,15 @@ def combined_metrics(
     :param outfile: [str] csv file where the metrics should be written
     :return: combined metrics
     """
-    trn_temp = overall_metrics(pred_trn, obs_temp, "temp", "trn", grp)
-    trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", grp)
-    tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
-    tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
-    df_all = [trn_temp, tst_temp, trn_flow, tst_flow]
+    df_all = []
+    if pred_trn:
+        trn_temp = overall_metrics(pred_trn, obs_temp, "temp", "trn", grp)
+        trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", grp)
+        df_all.extend([trn_temp, trn_flow])
+    if pred_tst:
+        tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
+        tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
+        df_all.extend([tst_temp, tst_flow])
     if pred_ver:
         ver_temp = overall_metrics(pred_ver, obs_temp, "temp", "ver", grp)
         ver_flow = overall_metrics(pred_ver, obs_flow, "flow", "ver", grp)

@@ -8,7 +8,7 @@ shell.prefix("module load analytics cuda10.0/toolkit/10.0.130 \n \
 # add scripts dir to path
 
 from river_dl.preproc_utils import prep_data
-from river_dl.postproc_utils import predict_from_file, combined_metrics, plot_train_obs, plot_ts
+from river_dl.postproc_utils import predict, combined_metrics, plot_obs
 from river_dl.train import train_model
 
 out_dir = config['out_dir']
@@ -32,12 +32,11 @@ rule prep_io_data:
          config['obs_flow'],
          config['sntemp_file'],
          config['dist_matrix'],
-         catch_attr = config['catchment_attr'],
     output:
         "{outdir}/prepped.npz"
     run:
         prep_data(input[0], input[1], input[2], input[3], config['x_vars'],
-                  catch_prop_file=input['catch_attr'],
+                  catch_prop_file=None,
                   exclude_file=None,
                   test_start_date=config['test_start_date'],
                   primary_variable=config['primary_variable'],
@@ -46,54 +45,52 @@ rule prep_io_data:
 
 
 # use "train" if wanting to use GPU on HPC
-rule train:
-    input:
-        "{outdir}/prepped.npz"
-    output:
-        directory("{outdir}/trained_weights/"),
-        directory("{outdir}/pretrained_weights/"),
-    params:
-        # getting the base path to put the training outputs in
-        # I omit the last slash (hence '[:-1]' so the split works properly
-        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-        pt_epochs=config['pt_epochs'],
-        ft_epochs=config['ft_epochs'],
-        lamb=config['lamb'],
-    group: 'train_predict_evaluate'
-    shell:
-        """
-        "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -m {output[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --model rgcn -s 135"
-        """
-
-# use "train_model" if wanting to use CPU or local GPU
-#rule train_model:
+# rule train:
 #    input:
 #        "{outdir}/prepped.npz"
 #    output:
-#        directory("{outdir}/trained_weights/"),
-#        directory("{outdir}/pretrained_weights/"),
+#        directory("{outdir}/trained_model/"),
+#        directory("{outdir}/pretrained_model/"),
 #    params:
 #        # getting the base path to put the training outputs in
 #        # I omit the last slash (hence '[:-1]' so the split works properly
 #        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#    run:
-#        train_model(input[0], config['pt_epochs'], config['ft_epochs'], 20, params.run_dir,
-#                    model_type='rgcn', lamb=config['lamb'])
+#        pt_epochs=config['pt_epochs'],
+#        ft_epochs=config['ft_epochs'],
+#        lamb=config['lamb'],
+#    group: 'train_predict_evaluate'
+#    shell:
+#        """
+#        "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -m {output[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --model rgcn -s 135"
+#        """
+
+# use "train_model" if wanting to use CPU or local GPU
+rule train_model:
+    input:
+        "{outdir}/prepped.npz"
+    output:
+        directory("{outdir}/trained_model/"),
+        directory("{outdir}/pretrained_model/"),
+    params:
+        # getting the base path to put the training outputs in
+        # I omit the last slash (hence '[:-1]' so the split works properly
+        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+    run:
+        train_model(input[0], config['pt_epochs'], config['ft_epochs'], 20, params.run_dir,
+                    model_type='rgcn', lamb=config['lamb'])
 
 rule make_predictions:
     input:
-        "{outdir}/trained_weights/",
+        "{outdir}/trained_model/",
         "{outdir}/prepped.npz"
     output:
         "{outdir}/{partition}_preds.feather",
     group: 'train_predict_evaluate'
     run:
-        weight_dir = input[0] + '/'
-        predict_from_file(weight_dir, input[1], config['hidden_size'],
-                          wildcards.partition, output[0], flow_in_temp=False,
-                          half_tst=config['half_test'],
-                          model='rgcn',
-                          logged_q=False)
+        model_dir = input[0] + '/'
+        predict(model_dir, input[1], partition=wildcards.partition,
+                outfile=output[0], half_tst=config['half_test'],
+                logged_q=False)
 
 
 def get_grp_arg(wildcards):
@@ -109,17 +106,22 @@ def get_grp_arg(wildcards):
 
 rule combine_metrics:
     input:
-         "{outdir}/trn_preds.feather",
-         "{outdir}/tst_preds.feather",
          config['obs_temp'],
-         config['obs_flow']
+         config['obs_flow'],
+         "{outdir}/trn_preds.feather",
+         "{outdir}/tst_preds.feather"
     output:
          "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'
     params:
         grp_arg = get_grp_arg
     run:
-        combined_metrics(input[0], input[1], input[2], input[3], params.grp_arg, output[0])
+        combined_metrics(obs_temp=input[0],
+                         obs_flow=input[1],
+                         pred_trn=input[2],
+                         pred_tst=input[3],
+                         grp=params.grp_arg,
+                         outfile=output[0])
 
 
 rule plot_prepped_data:
@@ -128,4 +130,5 @@ rule plot_prepped_data:
     output:
         "{outdir}/{variable}_{partition}.png",
     run:
-        plot_train_obs(input[0], wildcards.variable, output[0])
+        plot_obs(input[0], wildcards.variable, output[0],
+                 partition=wildcards.partition)

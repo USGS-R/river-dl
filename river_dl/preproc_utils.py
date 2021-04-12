@@ -386,7 +386,8 @@ def log_discharge(y):
 def prep_data(
     obs_temper_file,
     obs_flow_file,
-    driver_file,
+    pretrain_file,
+    dist_file,
     x_vars=None,
     y_vars=None,
     primary_variable="flow",
@@ -405,6 +406,8 @@ def prep_data(
     scaled to have a std of 1 and a mean of zero
     :param obs_temper_file: [str] temperature observations file (csv)
     :param obs_flow_file:[str] discharge observations file (csv)
+    :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
+    :param distfile: [str] path to the distance matrix .npz file
     :param x_vars: [list] variables that should be used as input. If None, all
     of the variables will be used
     :param primary_variable: [str] which variable the model should focus on
@@ -456,16 +459,22 @@ def prep_data(
             y_vars = ["seg_tave_water", "seg_outflow"]
         else:
             y_vars = ["seg_outflow", "seg_tave_water"]
+
     y_obs = read_multiple_obs([obs_temper_file, obs_flow_file], x_data)
     y_obs = y_obs[y_vars]
+    y_pre = ds_pre[y_vars]
+
     if segs:
         y_obs = y_obs.loc[dict(seg_id_nat=segs)]
     y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
+    y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)
 
     if log_q:
         y_obs_trn = log_discharge(y_obs_trn)
+        y_pre_trn = log_discharge(y_pre_trn)
 
     # filter pretrain/finetune y
+    y_pre_wgts = initialize_weights(y_pre_trn)
     if exclude_file:
         exclude_segs = read_exclude_segs_file(exclude_file)
         y_obs_wgts = exclude_segments(y_obs_trn, exclude_segs=exclude_segs)
@@ -475,6 +484,7 @@ def prep_data(
     if normalize_y:
         # scale y training data and get the mean and std
         y_obs_trn, y_std, y_mean = scale(y_obs_trn)
+        y_pre_trn, _, _ = scale(y_pre_trn, y_std, y_mean)
     else:
         _, y_std, y_mean = scale(y_obs_trn)
 
@@ -490,11 +500,14 @@ def prep_data(
         "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat"),
         "dates_tst": coord_as_reshaped_array(x_tst, "date"),
         "y_obs_trn": convert_batch_reshape(y_obs_trn),
+        "y_pre_trn": convert_batch_reshape(y_pre_trn),
+        "y_pre_wgts": convert_batch_reshape(y_pre_wgts),
         "y_std": y_std.to_array().values,
         "y_mean": y_mean.to_array().values,
         "y_obs_wgts": convert_batch_reshape(y_obs_wgts),
         "y_vars": np.array(y_vars),
         "y_obs_tst": convert_batch_reshape(y_obs_tst),
+        "dist_matrix": prep_adj_matrix(distfile, "upstream")
     }
     if out_file:
         np.savez_compressed(out_file, **data)

@@ -148,53 +148,12 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
     return metric(y_true_filt, y_pred_filt)
 
 
-def predict_from_file(
-    model_weights_dir,
-    io_data,
-    partition,
-    outfile,
-    logged_q=False,
-    half_tst=False,
-):
-    """
-    make predictions from trained model
-    :param model_weights_dir: [str] directory to saved model weights
-    :param io_file: [str] directory to prepped data file
-    :param hidden_size: [int] the number of hidden units in model
-    :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
-    for the train or the dev period
-    :param outfile: [str] the file where the output data should be stored
-    :param flow_in_temp: [bool] whether the flow should be an input into temp
-    :param logged_q: [bool] whether the discharge was logged in training. if True
-    the exponent of the discharge will be taken in the model unscaling
-    :param half_tst: [bool] whether or not to halve the testing data so some
-    can be held out
-    :param model: [str] model to use either 'rgcn', 'lstm', or 'gru'
-    :return:
-    """
-    io_data = get_data_if_file(io_data)
-    if model == "rgcn":
-        model = RGCNModel(
-            hidden_size, A=io_data["dist_matrix"], flow_in_temp=flow_in_temp
-        )
-    elif model.startswith("lstm"):
-        model = LSTMModel(hidden_size)
-    elif model == "gru":
-        model = GRUModel(hidden_size)
-
-    model.load_weights(model_weights_dir)
-    preds = predict(
-        model, io_data, partition, outfile, logged_q=logged_q, half_tst=half_tst
-    )
-    return preds
-
-
-def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
+def predict(model_file, io_data, partition, outfile, logged_q=False, half_tst=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
     predictions feather file.
-    :param model: the trained TF model
+    :param model_file: the trained TF model
     :param io_data: [dict] dictionary or .npz file with all x_data, y_data,
     and dist matrix
     :param half_tst: [bool] whether or not to halve the testing data so some
@@ -206,6 +165,7 @@ def predict(model, io_data, partition, outfile, logged_q=False, half_tst=False):
     the exponent of the discharge will be taken in the model unscaling
     :return:[none]
     """
+    model = tf.keras.models.load_model(model_file)
     io_data = get_data_if_file(io_data)
 
     if partition in ["trn", "tst", "ver"]:
@@ -332,12 +292,10 @@ def calc_metrics(df):
             ).numpy(),
             "nse_logged": nse_logged(obs, pred).numpy(),
             "kge": kge(obs, pred).numpy(),
-                obs, pred, rmse_masked, 10, less_than=True
-            ),
             "rmse_logged": rmse_logged(obs, pred),
             "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False),
             "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True),
-            "nse_logged": nse_logged(obs, pred),
+            "nse_logged": nse_logged(obs, pred)
         }
 
     else:
@@ -350,7 +308,7 @@ def calc_metrics(df):
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
-            "kge": np.nan,
+            "kge": np.nan
         }
     return pd.Series(metrics)
 

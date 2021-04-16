@@ -1,5 +1,4 @@
 import os
-import pandas as pd
 
 # this is needed for running on HPC if using GPU
 shell.prefix("module load analytics cuda10.0/toolkit/10.0.130 \n \
@@ -38,10 +37,15 @@ rule prep_io_data:
         prep_data(input[0], input[1], input[2], input[3], config['x_vars'],
                   catch_prop_file=None,
                   exclude_file=None,
+                  train_start_date=config['train_start_date'],
+                  train_end_date=config['train_end_date'],
+                  val_start_date=config['val_start_date'],
+                  val_end_date=config['val_end_date'],
                   test_start_date=config['test_start_date'],
+                  test_end_date=config['test_end_date'],
                   primary_variable=config['primary_variable'],
                   log_q=False, segs=None,
-                  n_test_yr=config['n_test_yr'], out_file=output[0])
+                  out_file=output[0])
 
 
 # use "train" if wanting to use GPU on HPC
@@ -65,7 +69,7 @@ rule prep_io_data:
 #        """
 
 # use "train_model" if wanting to use CPU or local GPU
-rule train_model:
+rule train_model_local_or_cpu:
     input:
         "{outdir}/prepped.npz"
     output:
@@ -109,7 +113,7 @@ rule combine_metrics:
          config['obs_temp'],
          config['obs_flow'],
          "{outdir}/trn_preds.feather",
-         "{outdir}/tst_preds.feather"
+         "{outdir}/val_preds.feather"
     output:
          "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'

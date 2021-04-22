@@ -3,3 +3,6 @@ data/
 *.npz
 DRB_data/
 config.yml
+DRB_output/
+DRB_outputs/
+

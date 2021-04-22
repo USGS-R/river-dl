@@ -1,0 +1,179 @@
+Building DAG of jobs...
+Using shell: /bin/bash
+Provided cores: 1 (use --cores to define parallelism)
+Rules claiming more threads will be scaled down.
+Job counts:
+	count	jobs
+	1	all
+	1	calc_GW_metrics
+	4	combine_metrics
+	2	make_predictions
+	4	plot_prepped_data
+	1	prep_ann_temp
+	1	prep_io_data
+	1	train_model
+	15
+
+[Thu Apr 22 13:10:02 2021]
+rule prep_io_data:
+    input: DRB_data/obs_temp_subset, DRB_data/obs_flow_subset, DRB_data/uncal_sntemp_input_output_subset, DRB_data/distance_matrix_subset.npz
+    output: DRB_outputs/prepped.npz
+    jobid: 4
+    wildcards: outdir=DRB_outputs
+
+[Thu Apr 22 13:10:13 2021]
+Finished job 4.
+1 of 15 steps (7%) done
+
+[Thu Apr 22 13:10:13 2021]
+rule train_model:
+    input: DRB_outputs/prepped.npz
+    output: DRB_outputs/trained_model, DRB_outputs/pretrained_model
+    jobid: 3
+    wildcards: outdir=DRB_outputs
+
+[Thu Apr 22 13:20:14 2021]
+Finished job 3.
+2 of 15 steps (13%) done
+
+[Thu Apr 22 13:20:14 2021]
+rule make_predictions:
+    input: DRB_outputs/trained_model, DRB_outputs/prepped.npz
+    output: DRB_outputs/trn_preds.feather
+    jobid: 2
+    wildcards: outdir=DRB_outputs, partition=trn
+
+[Thu Apr 22 13:22:06 2021]
+Finished job 2.
+3 of 15 steps (20%) done
+
+[Thu Apr 22 13:22:06 2021]
+rule make_predictions:
+    input: DRB_outputs/trained_model, DRB_outputs/prepped.npz
+    output: DRB_outputs/tst_preds.feather
+    jobid: 5
+    wildcards: outdir=DRB_outputs, partition=tst
+
+[Thu Apr 22 13:23:52 2021]
+Finished job 5.
+4 of 15 steps (27%) done
+
+[Thu Apr 22 13:23:52 2021]
+rule plot_prepped_data:
+    input: DRB_outputs/prepped.npz
+    output: DRB_outputs/temp_tst.png
+    jobid: 10
+    wildcards: outdir=DRB_outputs, variable=temp, partition=tst
+
+[Thu Apr 22 13:24:02 2021]
+Finished job 10.
+5 of 15 steps (33%) done
+
+[Thu Apr 22 13:24:02 2021]
+rule plot_prepped_data:
+    input: DRB_outputs/prepped.npz
+    output: DRB_outputs/flow_tst.png
+    jobid: 12
+    wildcards: outdir=DRB_outputs, variable=flow, partition=tst
+
+[Thu Apr 22 13:24:12 2021]
+Finished job 12.
+6 of 15 steps (40%) done
+
+[Thu Apr 22 13:24:12 2021]
+rule plot_prepped_data:
+    input: DRB_outputs/prepped.npz
+    output: DRB_outputs/temp_trn.png
+    jobid: 9
+    wildcards: outdir=DRB_outputs, variable=temp, partition=trn
+
+[Thu Apr 22 13:24:27 2021]
+Finished job 9.
+7 of 15 steps (47%) done
+
+[Thu Apr 22 13:24:27 2021]
+rule plot_prepped_data:
+    input: DRB_outputs/prepped.npz
+    output: DRB_outputs/flow_trn.png
+    jobid: 11
+    wildcards: outdir=DRB_outputs, variable=flow, partition=trn
+
+[Thu Apr 22 13:24:38 2021]
+Finished job 11.
+8 of 15 steps (53%) done
+
+[Thu Apr 22 13:24:38 2021]
+rule combine_metrics:
+    input: DRB_data/obs_temp_subset, DRB_data/obs_flow_subset, DRB_outputs/trn_preds.feather, DRB_outputs/tst_preds.feather
+    output: DRB_outputs/overall_metrics.csv
+    jobid: 1
+    wildcards: outdir=DRB_outputs, metric_type=overall
+
+[Thu Apr 22 13:24:56 2021]
+Finished job 1.
+9 of 15 steps (60%) done
+
+[Thu Apr 22 13:24:56 2021]
+rule combine_metrics:
+    input: DRB_data/obs_temp_subset, DRB_data/obs_flow_subset, DRB_outputs/trn_preds.feather, DRB_outputs/tst_preds.feather
+    output: DRB_outputs/month_reach_metrics.csv
+    jobid: 8
+    wildcards: outdir=DRB_outputs, metric_type=month_reach
+
+[Thu Apr 22 13:26:05 2021]
+Finished job 8.
+10 of 15 steps (67%) done
+
+[Thu Apr 22 13:26:05 2021]
+rule combine_metrics:
+    input: DRB_data/obs_temp_subset, DRB_data/obs_flow_subset, DRB_outputs/trn_preds.feather, DRB_outputs/tst_preds.feather
+    output: DRB_outputs/reach_metrics.csv
+    jobid: 7
+    wildcards: outdir=DRB_outputs, metric_type=reach
+
+[Thu Apr 22 13:26:27 2021]
+Finished job 7.
+11 of 15 steps (73%) done
+
+[Thu Apr 22 13:26:27 2021]
+rule combine_metrics:
+    input: DRB_data/obs_temp_subset, DRB_data/obs_flow_subset, DRB_outputs/trn_preds.feather, DRB_outputs/tst_preds.feather
+    output: DRB_outputs/month_metrics.csv
+    jobid: 6
+    wildcards: outdir=DRB_outputs, metric_type=month
+
+[Thu Apr 22 13:26:46 2021]
+Finished job 6.
+12 of 15 steps (80%) done
+
+[Thu Apr 22 13:26:46 2021]
+rule prep_ann_temp:
+    input: DRB_data/obs_temp_subset, DRB_data/uncal_sntemp_input_output_subset
+    output: DRB_outputs/GW.npz
+    jobid: 14
+    wildcards: outdir=DRB_outputs
+
+[Thu Apr 22 13:26:57 2021]
+Finished job 14.
+13 of 15 steps (87%) done
+
+[Thu Apr 22 13:26:57 2021]
+rule calc_GW_metrics:
+    input: DRB_outputs/GW.npz, DRB_outputs/trn_preds.feather, DRB_outputs/tst_preds.feather
+    output: DRB_outputs/GW_stats_trn.csv, DRB_outputs/GW_stats_tst.csv
+    jobid: 13
+    wildcards: outdir=DRB_outputs
+
+[Thu Apr 22 13:27:06 2021]
+Finished job 13.
+14 of 15 steps (93%) done
+
+[Thu Apr 22 13:27:06 2021]
+localrule all:
+    input: DRB_outputs/overall_metrics.csv, DRB_outputs/month_metrics.csv, DRB_outputs/reach_metrics.csv, DRB_outputs/month_reach_metrics.csv, DRB_outputs/temp_trn.png, DRB_outputs/temp_tst.png, DRB_outputs/flow_trn.png, DRB_outputs/flow_tst.png, DRB_outputs/GW_stats_trn.csv, DRB_outputs/GW_stats_tst.csv
+    jobid: 0
+
+[Thu Apr 22 13:27:06 2021]
+Finished job 0.
+15 of 15 steps (100%) done
+Complete log: /home/jovyan/river-dl/.snakemake/log/2021-04-22T130958.105548.snakemake.log

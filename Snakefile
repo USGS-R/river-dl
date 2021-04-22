@@ -10,6 +10,7 @@ shell.prefix("module load analytics cuda10.0/toolkit/10.0.130 \n \
 from river_dl.preproc_utils import prep_data
 from river_dl.postproc_utils import predict, combined_metrics, plot_obs
 from river_dl.train import train_model
+from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
 
 out_dir = config['out_dir']
 code_dir = config['code_dir']
@@ -24,6 +25,12 @@ rule all:
                 outdir=out_dir,
                 plt_variable=['temp', 'flow'],
                 partition=['trn', 'tst'],
+        ),
+        expand("{outdir}/GW_stats_{partition}.csv",
+                outdir=out_dir,
+                partition=['trn', 'tst']
+        ),
+        expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
 
 rule prep_io_data:
@@ -42,7 +49,18 @@ rule prep_io_data:
                   primary_variable=config['primary_variable'],
                   log_q=False, segs=None,
                   n_test_yr=config['n_test_yr'], out_file=output[0])
-
+                  
+rule prep_ann_temp:
+    input:
+         config['obs_temp'],
+         config['sntemp_file'],
+    output:
+        "{outdir}/GW.npz"
+    run:
+        prep_annual_signal_data(input[0], input[1],
+                  test_start_date=config['test_start_date'],
+                  n_test_yr=config['n_test_yr'], out_file=output[0])
+                  
 
 # use "train" if wanting to use GPU on HPC
 # rule train:
@@ -132,3 +150,25 @@ rule plot_prepped_data:
     run:
         plot_obs(input[0], wildcards.variable, output[0],
                  partition=wildcards.partition)
+
+
+rule compile_pred_GW_stats:
+    input:
+        "{outdir}/GW.npz",
+        "{outdir}/trn_preds.feather",
+        "{outdir}/tst_preds.feather"
+    output:
+        "{outdir}/GW_stats_trn.csv",
+        "{outdir}/GW_stats_tst.csv",
+    run: 
+        calc_pred_ann_temp(input[0],input[1],input[2], output[0], output[1])
+        
+rule calc_gw_summary_metrics:
+    input:
+        "{outdir}/GW_stats_trn.csv",
+        "{outdir}/GW_stats_tst.csv",
+    output:
+        "{outdir}/GW_summary.csv",
+        "{outdir}/GW.png"
+    run:
+        calc_gw_metrics(input[0],input[1],output[0], output[1])

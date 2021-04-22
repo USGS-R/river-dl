@@ -1,0 +1,3 @@
+SyntaxError in line 57 of /home/jovyan/river-dl/river_dl/gw_utils.py:
+non-default argument follows default argument (gw_utils.py, line 57)
+  File "/home/jovyan/river-dl/Snakefile", line 13, in <module>

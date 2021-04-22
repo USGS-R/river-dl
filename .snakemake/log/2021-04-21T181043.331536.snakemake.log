@@ -1,0 +1,4 @@
+Building DAG of jobs...
+WildcardError in line 18 of /home/jovyan/river-dl/Snakefile:
+Wildcards in input files cannot be determined from output files:
+'outdir'

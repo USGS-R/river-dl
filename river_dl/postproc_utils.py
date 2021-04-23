@@ -137,7 +137,7 @@ def predict_from_weights(
     outfile,
     flow_in_temp=False,
     logged_q=False,
-    ):
+):
     """
     make predictions from trained model
     :param model_weights_dir: [str] directory to saved model weights
@@ -157,7 +157,7 @@ def predict_from_weights(
     io_data = get_data_if_file(io_data)
     if model_type == "rgcn":
         model = RGCNModel(
-        hidden_size, A=io_data["dist_matrix"], flow_in_temp=flow_in_temp
+            hidden_size, A=io_data["dist_matrix"], flow_in_temp=flow_in_temp
         )
     elif model_type.startswith("lstm"):
         model = LSTMModel(hidden_size)
@@ -302,7 +302,7 @@ def calc_metrics(df):
             "rmse_logged": rmse_logged(obs, pred),
             "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False),
             "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True),
-            "nse_logged": nse_logged(obs, pred)
+            "nse_logged": nse_logged(obs, pred),
         }
 
     else:
@@ -315,7 +315,7 @@ def calc_metrics(df):
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
-            "kge": np.nan
+            "kge": np.nan,
         }
     return pd.Series(metrics)
 
@@ -409,7 +409,7 @@ def combined_metrics(
     return df_all
 
 
-def plot_obs(prepped_data, variable, outfile, partition='trn'):
+def plot_obs(prepped_data, variable, outfile, partition="trn"):
     """
     plot training observations
     :param prepped_data: [str] path to npz file of prepped data
@@ -431,14 +431,14 @@ def plot_obs(prepped_data, variable, outfile, partition='trn'):
         df_piv.plot(subplots=True, figsize=(8, 12))
     except TypeError:
         fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, 'NO DATA')
+        ax.text(0.5, 0.5, "NO DATA")
     plt.tight_layout()
     plt.savefig(outfile)
 
 
 def plot_ts(pred_file, obs_file, variable, out_file):
     combined = fmt_preds_obs(pred_file, obs_file, variable)
-    combined = combined.droplevel('seg_id_nat')
+    combined = combined.droplevel("seg_id_nat")
     ax = combined.plot(alpha=0.65)
     plt.tight_layout()
     plt.savefig(out_file)

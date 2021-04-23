@@ -110,9 +110,7 @@ def train_model(
         )
 
         if model_type == "rgcn":
-            model.compile(
-                optimizer_pre, loss=weighted_masked_rmse(lamb=lamb)
-            )
+            model.compile(optimizer_pre, loss=weighted_masked_rmse(lamb=lamb))
         else:
             model.compile(optimizer_pre)
 
@@ -143,9 +141,7 @@ def train_model(
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
         if model_type == "rgcn":
-            model.compile(
-                optimizer_ft, loss=weighted_masked_rmse(lamb=lamb)
-            )
+            model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
         else:
             model.compile(optimizer_ft)
 

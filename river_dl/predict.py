@@ -1,34 +1,9 @@
 import numpy as np
-import pandas as pd
 
 from RGCN import RGCNModel
+from postproc_utils import prepped_array_to_df
 from rnns import LSTMModel, GRUModel
 from train import get_data_if_file
-
-
-def prepped_array_to_df(data_array, dates, ids, col_names):
-    """
-    convert prepped x or y data in numpy array to pandas df
-    (reshape and make into pandas DFs)
-    :param data_array:[numpy array] array of x or y data [nbatch, seq_len,
-    n_out]
-    :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
-    :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]
-    :return:[pd dataframe] df with cols
-    ['date', 'seg_id_nat', 'temp_c', 'discharge_cms]
-    """
-    data_array = np.reshape(
-        data_array,
-        [data_array.shape[0] * data_array.shape[1], data_array.shape[2]],
-    )
-
-    dates = np.reshape(dates, [dates.shape[0] * dates.shape[1], dates.shape[2]])
-    ids = np.reshape(ids, [ids.shape[0] * ids.shape[1], ids.shape[2]])
-    df_preds = pd.DataFrame(data_array, columns=col_names)
-    df_dates = pd.DataFrame(dates, columns=["date"])
-    df_ids = pd.DataFrame(ids, columns=["seg_id_nat"])
-    df = pd.concat([df_dates, df_ids, df_preds], axis=1)
-    return df
 
 
 def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):

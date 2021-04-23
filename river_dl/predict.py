@@ -89,9 +89,9 @@ def predict_from_io_data(
     )
     
     if partition != 'trn':
-        keep_only_first_half = True
+        keep_only_second_half = True
     else:
-        keep_only_first_half = False
+        keep_only_second_half = False
         
     preds = predict(
         model,
@@ -101,7 +101,7 @@ def predict_from_io_data(
         io_data[f"y_std"],
         io_data[f"y_mean"],
         io_data[f"y_vars"],
-        keep_only_first_half=keep_only_first_half,
+        keep_only_second_half=keep_only_second_half,
         outfile=outfile,
         logged_q=logged_q,
     )
@@ -116,7 +116,7 @@ def predict(
     y_stds,
     y_means,
     y_vars,
-    keep_only_first_half=True,
+    keep_only_second_half=True,
     outfile=None,
     logged_q=False,
 ):
@@ -129,7 +129,7 @@ def predict(
     :param pred_ids: [np array] the ids of the segments (same shape as x_data)
     :param pred_dates: [np array] the dates of the segments (same shape as
     x_data)
-    :param keep_only_first_half: [bool] whether or not to remove the first half
+    :param keep_only_second_half: [bool] whether or not to remove the first half
     of the sequence predictions. This allows states to "warm up"
     :param y_stds:[np array] the standard deviation of the y data
     :param y_means:[np array] the means of the y data
@@ -141,7 +141,7 @@ def predict(
     """
     num_segs = len(np.unique(pred_ids))
     y_pred = model.predict(x_data, batch_size=num_segs)
-    if keep_only_first_half:
+    if keep_only_second_half:
         half_seq_len = round(y_pred.shape[1]/2)
         y_pred = y_pred[:, half_seq_len:, :]
         pred_ids = pred_ids[:, half_seq_len:, :]

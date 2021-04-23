@@ -1,9 +1,9 @@
 import numpy as np
 
-from RGCN import RGCNModel
-from postproc_utils import prepped_array_to_df
-from rnns import LSTMModel, GRUModel
-from train import get_data_if_file
+from river_dl.RGCN import RGCNModel
+from river_dl.postproc_utils import prepped_array_to_df
+from river_dl.rnns import LSTMModel, GRUModel
+from river_dl.train import get_data_if_file
 
 
 def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
@@ -26,7 +26,35 @@ def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
     return y_scl
 
 
-def predict_from_weights(
+def load_model_from_weights(
+    model_type,
+    model_weights_dir,
+    hidden_size,
+    dist_matrix=None,
+    flow_in_temp=False,
+):
+    """
+
+    :param flow_in_temp:
+    :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
+    :param model_weights_dir: [str] directory to saved model weights
+    :param hidden_size: [int] the number of hidden units in model
+    :param dist_matrix: [np array] the distance matrix if using 'rgcn'
+    :param flow_in_temp: [bool] whether the flow should be an input into temp
+    :return:
+    """
+    if model_type == "rgcn":
+        model = RGCNModel(hidden_size, A=dist_matrix, flow_in_temp=flow_in_temp)
+    elif model_type.startswith("lstm"):
+        model = LSTMModel(hidden_size)
+    elif model_type == "gru":
+        model = GRUModel(hidden_size)
+
+    model.load_weights(model_weights_dir)
+    return model
+
+
+def predict_from_io_data(
     model_type,
     model_weights_dir,
     hidden_size,
@@ -38,8 +66,9 @@ def predict_from_weights(
 ):
     """
     make predictions from trained model
+    :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
     :param model_weights_dir: [str] directory to saved model weights
-    :param io_file: [str] directory to prepped data file
+    :param io_data: [str] directory to prepped data file
     :param hidden_size: [int] the number of hidden units in model
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period
@@ -47,66 +76,81 @@ def predict_from_weights(
     :param flow_in_temp: [bool] whether the flow should be an input into temp
     :param logged_q: [bool] whether the discharge was logged in training. if True
     the exponent of the discharge will be taken in the model unscaling
-    :param half_tst: [bool] whether or not to halve the testing data so some
-    can be held out
-    :param model: [str] model to use either 'rgcn', 'lstm', or 'gru'
-    :return:
+    :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
-    if model_type == "rgcn":
-        model = RGCNModel(
-            hidden_size, A=io_data["dist_matrix"], flow_in_temp=flow_in_temp
-        )
-    elif model_type.startswith("lstm"):
-        model = LSTMModel(hidden_size)
-    elif model_type == "gru":
-        model = GRUModel(hidden_size)
 
-    model.load_weights(model_weights_dir)
-    preds = predict(model, io_data, partition, outfile, logged_q=logged_q)
+    model = load_model_from_weights(
+        model_type,
+        model_weights_dir,
+        hidden_size,
+        io_data.get("dist_matrix"),
+        flow_in_temp,
+    )
+    
+    if partition != 'trn':
+        keep_only_first_half = True
+    else:
+        keep_only_first_half = False
+        
+    preds = predict(
+        model,
+        io_data[f"x_{partition}"],
+        io_data[f"ids_{partition}"],
+        io_data[f"dates_{partition}"],
+        io_data[f"y_std"],
+        io_data[f"y_mean"],
+        io_data[f"y_vars"],
+        keep_only_first_half=keep_only_first_half,
+        outfile=outfile,
+        logged_q=logged_q,
+    )
     return preds
 
 
-def predict(model, io_data, partition, outfile, logged_q=False):
+def predict(
+    model,
+    x_data,
+    pred_ids,
+    pred_dates,
+    y_stds,
+    y_means,
+    y_vars,
+    keep_only_first_half=True,
+    outfile=None,
+    logged_q=False,
+):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
     predictions feather file.
-    :param model_file: the trained TF model
-    :param io_data: [dict] dictionary or .npz file with all x_data, y_data,
-    and dist matrix
-    :param half_tst: [bool] whether or not to halve the testing data so some
-    can be held out
-    :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
-    for the train or the dev period
+    :param model: the trained TF model
+    :param x_data: [np array] numpy array of scaled and centered x_data
+    :param pred_ids: [np array] the ids of the segments (same shape as x_data)
+    :param pred_dates: [np array] the dates of the segments (same shape as
+    x_data)
+    :param keep_only_first_half: [bool] whether or not to remove the first half
+    of the sequence predictions. This allows states to "warm up"
+    :param y_stds:[np array] the standard deviation of the y data
+    :param y_means:[np array] the means of the y data
+    :param y_vars:[np array] the variable names of the y data
     :param outfile: [str] the file where the output data should be stored
     :param logged_q: [str] whether the discharge was logged in training. if True
     the exponent of the discharge will be taken in the model unscaling
-    :return:[none]
+    :return: out predictions
     """
-    io_data = get_data_if_file(io_data)
+    num_segs = len(np.unique(pred_ids))
+    y_pred = model.predict(x_data, batch_size=num_segs)
+    if keep_only_first_half:
+        half_seq_len = round(y_pred.shape[1]/2)
+        y_pred = y_pred[:, half_seq_len:, :]
+        pred_ids = pred_ids[:, half_seq_len:, :]
+        pred_dates = pred_dates[:, half_seq_len:, :]
+        
+    y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars,)
 
-    if partition in ["trn", "val", "tst"]:
-        pass
-    else:
-        raise ValueError('partition arg needs to be "trn" or "val" or "tst"')
+    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, logged_q,)
 
-    num_segs = len(np.unique(io_data["ids_trn"]))
-    y_pred = model.predict(io_data[f"x_{partition}"], batch_size=num_segs)
-    y_pred_pp = prepped_array_to_df(
-        y_pred,
-        io_data[f"dates_{partition}"],
-        io_data[f"ids_{partition}"],
-        io_data["y_vars"],
-    )
-
-    y_pred_pp = unscale_output(
-        y_pred_pp,
-        io_data["y_std"],
-        io_data["y_mean"],
-        io_data["y_vars"],
-        logged_q,
-    )
-
-    y_pred_pp.to_feather(outfile)
+    if outfile:
+        y_pred_pp.to_feather(outfile)
     return y_pred_pp

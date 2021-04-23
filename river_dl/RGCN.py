@@ -196,5 +196,3 @@ class RGCNModel(tf.keras.Model):
     def call(self, inputs, **kwargs):
         output = self.rgcn_layer(inputs)
         return output
-
-

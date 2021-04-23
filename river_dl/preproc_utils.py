@@ -372,11 +372,14 @@ def reduce_training_data_continuous(
     return reduced_ds
 
 
-def convert_batch_reshape(dataset, seq_len=365):
+def convert_batch_reshape(dataset, seq_len=365, offset=1):
     """
     convert xarray dataset into numpy array, swap the axes, batch the array and
     reshape for training
-    :param dataset: [xr dataset] x or y data
+    :param dataset: [xr dataset] data to be batched
+    :param seq_len: [int] length of sequences (i.e., 365)
+    :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
+    the first batch will be 0-365 and the second will be 182-547)
     :return: [numpy array] batched and reshaped dataset
     """
     # convert xr.dataset to numpy array
@@ -394,7 +397,7 @@ def convert_batch_reshape(dataset, seq_len=365):
 
     # batch the data
     # after [nbatch, nseg, seq_len, nfeat]
-    batched = split_into_batches(arr, seq_len=seq_len)
+    batched = split_into_batches(arr, seq_len=seq_len, offset=offset)
 
     # reshape data
     # after [nbatch * nseg, seq_len, nfeat]
@@ -402,14 +405,16 @@ def convert_batch_reshape(dataset, seq_len=365):
     return reshaped
 
 
-def coord_as_reshaped_array(dataset, coord_name):
+def coord_as_reshaped_array(dataset, coord_name, seq_len=365, offset=1):
     # I need one variable name. It can be any in the dataset, but I'll use the
     # first
     first_var = next(iter(dataset.data_vars.keys()))
     coord_array = xr.broadcast(dataset[coord_name], dataset[first_var])[0]
     new_var_name = coord_name + "1"
     dataset[new_var_name] = coord_array
-    reshaped_np_arr = convert_batch_reshape(dataset[[new_var_name]])
+    reshaped_np_arr = convert_batch_reshape(dataset[[new_var_name]],
+                                            seq_len=seq_len,
+                                            offset=offset)
     return reshaped_np_arr
 
 
@@ -575,26 +580,26 @@ def prep_data(
 
     data = {
         "x_trn": convert_batch_reshape(x_trn_scl),
-        "x_val": convert_batch_reshape(x_val_scl),
-        "x_tst": convert_batch_reshape(x_tst_scl),
+        "x_val": convert_batch_reshape(x_val_scl, offset=0.5),
+        "x_tst": convert_batch_reshape(x_tst_scl, offset=0.5),
         "x_std": x_std.to_array().values,
         "x_mean": x_mean.to_array().values,
         "x_cols": np.array(x_vars),
         "ids_trn": coord_as_reshaped_array(x_trn, "seg_id_nat"),
         "dates_trn": coord_as_reshaped_array(x_trn, "date"),
-        "ids_val": coord_as_reshaped_array(x_val, "seg_id_nat"),
-        "dates_val": coord_as_reshaped_array(x_val, "date"),
-        "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat"),
-        "dates_tst": coord_as_reshaped_array(x_tst, "date"),
-        "y_obs_trn": convert_batch_reshape(y_obs_trn),
-        "y_obs_val": convert_batch_reshape(y_obs_val),
+        "ids_val": coord_as_reshaped_array(x_val, "seg_id_nat", offset=0.5),
+        "dates_val": coord_as_reshaped_array(x_val, "date", offset=0.5),
+        "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat", offset=0.5),
+        "dates_tst": coord_as_reshaped_array(x_tst, "date", offset=0.5),
         "y_pre_trn": convert_batch_reshape(y_pre_trn),
         "y_pre_wgts": convert_batch_reshape(y_pre_wgts),
+        "y_obs_trn": convert_batch_reshape(y_obs_trn),
+        "y_obs_wgts": convert_batch_reshape(y_obs_wgts),
+        "y_obs_val": convert_batch_reshape(y_obs_val, offset=0.5),
+        "y_obs_tst": convert_batch_reshape(y_obs_tst, offset=0.5),
         "y_std": y_std.to_array().values,
         "y_mean": y_mean.to_array().values,
-        "y_obs_wgts": convert_batch_reshape(y_obs_wgts),
         "y_vars": np.array(y_vars),
-        "y_obs_tst": convert_batch_reshape(y_obs_tst),
         "dist_matrix": prep_adj_matrix(distfile, "upstream"),
     }
     if out_file:

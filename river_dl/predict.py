@@ -57,6 +57,10 @@ def load_model_from_weights(
         model = LSTMModel(hidden_size)
     elif model_type == "gru":
         model = GRUModel(hidden_size)
+    else:
+        raise ValueError(
+            f'model_type must be "lstm", "gru" or "rgcn", (not {model_type})'
+        )
 
     model.load_weights(model_weights_dir)
     return model
@@ -82,8 +86,8 @@ def predict_from_io_data(
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
     :param flow_in_temp: [bool] whether the flow should be an input into temp
-    :param logged_q: [bool] whether the discharge was logged in training. if True
-    the exponent of the discharge will be taken in the model unscaling
+    :param logged_q: [bool] whether the discharge was logged in training. if
+    True the exponent of the discharge will be taken in the model unscaling
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -187,9 +191,27 @@ def predict_one_date_range(
     start_date,
     end_date,
     logged_q=False,
-    keep_second_half=True,
+    keep_only_second_half=True,
     offset=0.5,
 ):
+    """
+    make predictions for one date range. This was broken out to be able to do
+    the "beginning - middle - end" predictions more easily
+
+    :param model: loaded tensorflow model
+    :param ds_x_scaled: [xr array] scaled x data
+    :param train_io_data: [np NpzFile] data containing the y_std, y_mean, y_vars
+    :param seq_len: [int] length of the prediction sequences (usu. 365)
+    :param start_date: [str or date] the start date of the predictions
+    :param end_date: [str or date] the end date of the predictions
+    :param logged_q: [bool] whether the model predicted log of discharge. if
+    true, the exponent of the discharge will be executed
+    :param keep_only_second_half: [bool] whether or not to remove the first half
+    of the sequence predictions. This allows states to "warm up"
+    :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
+    the first batch will be 0-365 and the second will be 182-547)
+    :return: [pd dataframe] the predictions
+    """
     ds_x_scaled = ds_x_scaled[train_io_data["x_cols"]]
     x_data = ds_x_scaled.sel(date=slice(start_date, end_date))
     x_batches = convert_batch_reshape(x_data, seq_len=seq_len, offset=offset)
@@ -207,7 +229,7 @@ def predict_one_date_range(
         train_io_data["y_std"],
         train_io_data["y_mean"],
         train_io_data["y_vars"],
-        keep_only_second_half=keep_second_half,
+        keep_only_second_half=keep_only_second_half,
         logged_q=logged_q,
     )
     return predictions
@@ -226,18 +248,28 @@ def predict_from_arbitrary_data(
     logged_q=False,
 ):
     """
+    make predictions given raw data that is potentially independent from the
+    data used to train the model
 
-    :param raw_data_file:
-    :param pred_start_date:
-    :param pred_end_date:
-    :param train_io_data:
-    :param model_weights_dir:
-    :param model_type:
-    :param hidden_size:
-    :param dist_matrix:
-    :param flow_in_temp:
-    :param logged_q:
-    :return:
+    :param raw_data_file: [str] path to zarr dataset with x data that you want
+    to use to make predictions
+    :param pred_start_date: [str] start date of predictions (fmt: YYYY-MM-DD)
+    :param pred_end_date: [str] end date of predictions (fmt: YYYY-MM-DD)
+    :param train_io_data: [str or np NpzFile] the path to or the loaded data
+    that was used to train the model. This file must contain the variables
+    names, the standard deviations, and the means of the X and Y variables. Only
+    in with this information can the model be used properly
+    :param model_weights_dir: [str] path to the directory where the TF model
+    weights are stored
+    :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
+    :param hidden_size: [int] the number of hidden units in model
+    :param dist_matrix: [np array] the distance matrix if using 'rgcn'. if not
+    provided, will look for it in the "train_io_data" file.
+    :param flow_in_temp: [bool] whether the flow should be an input into temp
+    for the rgcn model
+    :param logged_q: [bool] whether the model predicted log of discharge. if
+    true, the exponent of the discharge will be executed
+    :return: [pd dataframe] the predictions
     """
     train_io_data = get_data_if_file(train_io_data)
 
@@ -275,7 +307,7 @@ def predict_from_arbitrary_data(
         inputs_start_date,
         pred_end_date,
         logged_q,
-        keep_second_half=True,
+        keep_only_second_half=True,
         offset=0.5,
     )
 
@@ -290,7 +322,7 @@ def predict_from_arbitrary_data(
         pred_start_date,
         start_dates_end,
         logged_q,
-        keep_second_half=False,
+        keep_only_second_half=False,
         offset=1,
     )
 
@@ -308,7 +340,7 @@ def predict_from_arbitrary_data(
         end_dates_start,
         end_date_end,
         logged_q,
-        keep_second_half=False,
+        keep_only_second_half=False,
         offset=1,
     )
 

@@ -5,21 +5,19 @@ import xarray as xr
 import datetime
 
 
-def scale(data_arr, std=None, mean=None):
+def scale(dataset, std=None, mean=None):
     """
     scale the data so it has a standard deviation of 1 and a mean of zero
-    :param data_arr: [numpy array] input or output data with dims
-    [nseg, ndates, nfeats]
-    :param std: [numpy array] standard deviation if scaling test data with dims
-    [nfeats]
-    :param mean: [numpy array] mean if scaling test data with dims [nfeats]
+    :param dataset: [xr dataset] input or output data
+    :param std: [xr dataset] standard deviation if scaling test data with dims
+    :param mean: [xr dataset] mean if scaling test data with dims
     :return: scaled data with original dims
     """
     if not isinstance(std, xr.Dataset) or not isinstance(mean, xr.Dataset):
-        std = data_arr.std(skipna=True)
-        mean = data_arr.mean(skipna=True)
+        std = dataset.std(skipna=True)
+        mean = dataset.mean(skipna=True)
     # adding small number in case there is a std of zero
-    scaled = (data_arr - mean) / (std + 1e-10)
+    scaled = (dataset - mean) / (std + 1e-10)
     check_if_finite(std)
     check_if_finite(mean)
     return scaled, std, mean

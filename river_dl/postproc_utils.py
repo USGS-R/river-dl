@@ -34,26 +34,6 @@ def prepped_array_to_df(data_array, dates, ids, col_names):
     return df
 
 
-def take_half(df, first_half=True):
-    """
-    filter out the second half of the dates in the predictions. this is to
-    retain a "test" set of the i/o data for evaluation
-    :param df:[pd dataframe] df of predictions or observations cols ['date',
-    'seg_id_nat', 'temp_c', 'discharge_cms']
-    :return: [pd dataframe] same cols as input, but only the first have of dates
-    """
-    df.set_index("date", inplace=True)
-    df.sort_index(inplace=True)
-    unique_dates = df.index.unique()
-    halfway_date = unique_dates[int(len(unique_dates) / 2)]
-    if first_half:
-        df_half = df.loc[:halfway_date]
-    else:
-        df_half = df.loc[halfway_date:]
-    df_half.reset_index(inplace=True)
-    return df_half
-
-
 def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
     """
     unscale output data given a standard deviation and a mean value for the
@@ -148,7 +128,48 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
     return metric(y_true_filt, y_pred_filt)
 
 
-def predict(model_file, io_data, partition, outfile, logged_q=False, half_tst=False):
+def predict_from_weights(
+    model_type,
+    model_weights_dir,
+    hidden_size,
+    io_data,
+    partition,
+    outfile,
+    flow_in_temp=False,
+    logged_q=False,
+):
+    """
+    make predictions from trained model
+    :param model_weights_dir: [str] directory to saved model weights
+    :param io_file: [str] directory to prepped data file
+    :param hidden_size: [int] the number of hidden units in model
+    :param partition: [str] must be 'trn', 'val', or 'tst'; whether you want to predict
+    for the train or the dev period
+    :param outfile: [str] the file where the output data should be stored
+    :param flow_in_temp: [bool] whether the flow should be an input into temp
+    :param logged_q: [bool] whether the discharge was logged in training. if True
+    the exponent of the discharge will be taken in the model unscaling
+    :param half_tst: [bool] whether or not to halve the testing data so some
+    can be held out
+    :param model: [str] model to use either 'rgcn', 'lstm', or 'gru'
+    :return:
+    """
+    io_data = get_data_if_file(io_data)
+    if model_type == "rgcn":
+        model = RGCNModel(
+            hidden_size, A=io_data["dist_matrix"], flow_in_temp=flow_in_temp
+        )
+    elif model_type.startswith("lstm"):
+        model = LSTMModel(hidden_size)
+    elif model_type == "gru":
+        model = GRUModel(hidden_size)
+
+    model.load_weights(model_weights_dir)
+    preds = predict(model, io_data, partition, outfile, logged_q=logged_q)
+    return preds
+
+
+def predict(model, io_data, partition, outfile, logged_q=False):
     """
     use trained model to make predictions and then evaluate those predictions.
     nothing is returned but three files are saved an rmse_flow, rmse_temp, and
@@ -165,19 +186,12 @@ def predict(model_file, io_data, partition, outfile, logged_q=False, half_tst=Fa
     the exponent of the discharge will be taken in the model unscaling
     :return:[none]
     """
-    model = tf.keras.models.load_model(model_file, compile=False)
     io_data = get_data_if_file(io_data)
 
-    if partition in ["trn", "tst", "ver"]:
+    if partition in ["trn", "val", "tst"]:
         pass
     else:
-        raise ValueError('partition arg needs to be "trn" or "tst" or "ver"')
-
-    if partition == "ver":
-        partition = "tst"
-        tst_partition = "ver"
-    elif partition == "tst":
-        tst_partition = "tst"
+        raise ValueError('partition arg needs to be "trn" or "val" or "tst"')
 
     num_segs = len(np.unique(io_data["ids_trn"]))
     y_pred = model.predict(io_data[f"x_{partition}"], batch_size=num_segs)
@@ -195,13 +209,6 @@ def predict(model_file, io_data, partition, outfile, logged_q=False, half_tst=Fa
         io_data["y_vars"],
         logged_q,
     )
-
-    if partition == "tst":
-        if half_tst and tst_partition == "tst":
-            y_pred_pp = take_half(y_pred_pp, first_half=True)
-
-        if half_tst and tst_partition == "ver":
-            y_pred_pp = take_half(y_pred_pp, first_half=False)
 
     y_pred_pp.to_feather(outfile)
     return y_pred_pp
@@ -295,7 +302,7 @@ def calc_metrics(df):
             "rmse_logged": rmse_logged(obs, pred),
             "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False),
             "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True),
-            "nse_logged": nse_logged(obs, pred)
+            "nse_logged": nse_logged(obs, pred),
         }
 
     else:
@@ -308,7 +315,7 @@ def calc_metrics(df):
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
-            "kge": np.nan
+            "kge": np.nan,
         }
     return pd.Series(metrics)
 
@@ -363,8 +370,8 @@ def combined_metrics(
     obs_temp,
     obs_flow,
     pred_trn=None,
+    pred_val=None,
     pred_tst=None,
-    pred_ver=None,
     grp=None,
     outfile=None,
 ):
@@ -372,8 +379,8 @@ def combined_metrics(
     calculate the metrics for flow and temp and training and test sets for a
     given grouping
     :param pred_trn: [str] path to training prediction feather file
+    :param pred_val: [str] path to validation prediction feather file
     :param pred_tst: [str] path to testing prediction feather file
-    :param pred_ver: [str] path to verification prediction feather file
     :param obs_temp: [str] path to observations temperature zarr file
     :param obs_flow: [str] path to observations flow zarr file
     :param group: [str or list] which group the metrics should be computed for.
@@ -388,21 +395,21 @@ def combined_metrics(
         trn_temp = overall_metrics(pred_trn, obs_temp, "temp", "trn", grp)
         trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", grp)
         df_all.extend([trn_temp, trn_flow])
+    if pred_val:
+        val_temp = overall_metrics(pred_val, obs_temp, "temp", "val", grp)
+        val_flow = overall_metrics(pred_val, obs_flow, "flow", "val", grp)
+        df_all.extend([val_temp, val_flow])
     if pred_tst:
         tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
         tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
         df_all.extend([tst_temp, tst_flow])
-    if pred_ver:
-        ver_temp = overall_metrics(pred_ver, obs_temp, "temp", "ver", grp)
-        ver_flow = overall_metrics(pred_ver, obs_flow, "flow", "ver", grp)
-        df_all.extend([ver_temp, ver_flow])
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)
     return df_all
 
 
-def plot_obs(prepped_data, variable, outfile, partition='trn'):
+def plot_obs(prepped_data, variable, outfile, partition="trn"):
     """
     plot training observations
     :param prepped_data: [str] path to npz file of prepped data
@@ -424,14 +431,14 @@ def plot_obs(prepped_data, variable, outfile, partition='trn'):
         df_piv.plot(subplots=True, figsize=(8, 12))
     except TypeError:
         fig, ax = plt.subplots()
-        ax.text(0.5, 0.5, 'NO DATA')
+        ax.text(0.5, 0.5, "NO DATA")
     plt.tight_layout()
     plt.savefig(outfile)
 
 
 def plot_ts(pred_file, obs_file, variable, out_file):
     combined = fmt_preds_obs(pred_file, obs_file, variable)
-    combined = combined.droplevel('seg_id_nat')
+    combined = combined.droplevel("seg_id_nat")
     ax = combined.plot(alpha=0.65)
     plt.tight_layout()
     plt.savefig(out_file)

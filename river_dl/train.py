@@ -110,9 +110,7 @@ def train_model(
         )
 
         if model_type == "rgcn":
-            model.compile(
-                optimizer_pre, loss=weighted_masked_rmse(lamb=lamb)
-            )
+            model.compile(optimizer_pre, loss=weighted_masked_rmse(lamb=lamb))
         else:
             model.compile(optimizer_pre)
 
@@ -127,7 +125,7 @@ def train_model(
             callbacks=[csv_log_pre],
         )
 
-        model.save(os.path.join(out_dir, "pretrained_model/"))
+        model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
 
     pre_train_time = datetime.datetime.now()
     pre_train_time_elapsed = pre_train_time - start_time
@@ -143,9 +141,7 @@ def train_model(
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
         if model_type == "rgcn":
-            model.compile(
-                optimizer_ft, loss=weighted_masked_rmse(lamb=lamb)
-            )
+            model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
         else:
             model.compile(optimizer_ft)
 
@@ -166,7 +162,7 @@ def train_model(
             callbacks=[csv_log_ft],
         )
 
-        model.save(os.path.join(out_dir, f"trained_model/"))
+        model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 
     finetune_time = datetime.datetime.now()
     finetune_time_elapsed = finetune_time - pre_train_time

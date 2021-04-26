@@ -3,7 +3,6 @@ import numpy as np
 import yaml
 import xarray as xr
 import datetime
-from dateutil.relativedelta import relativedelta
 
 
 def scale(data_arr, std=None, mean=None):
@@ -26,22 +25,67 @@ def scale(data_arr, std=None, mean=None):
     return scaled, std, mean
 
 
-def separate_trn_tst(dataset, test_start, n_test_years):
+def sel_partition_data(dataset, start_dates, end_dates):
+    """
+    select the data from a date range or a set of date ranges
+    :param dataset: [xr dataset] input or output data with date dimension
+    :param start_dates: [str or list] fmt: "YYYY-MM-DD"; date(s) to start period
+    (can have multiple discontinuos periods)
+    :param end_dates: [str or list] fmt: "YYYY-MM-DD"; date(s) to end period
+    (can have multiple discontinuos periods)
+    :return: dataset of just those dates
+    """
+    # if it just one date range
+    if isinstance(start_dates, str):
+        if isinstance(end_dates, str):
+            return dataset.sel(date=slice(start_dates, end_dates))
+        else:
+            raise ValueError("start_dates is str but not end_date")
+    # if it's a list of date ranges
+    elif isinstance(start_dates, list) or isinstance(start_dates, tuple):
+        if len(start_dates) == len(end_dates):
+            data_list = []
+            for i in range(len(start_dates)):
+                date_slice = slice(start_dates[i], end_dates[i])
+                data_list.append(dataset.sel(date=date_slice))
+            return xr.concat(data_list, dim="date")
+        else:
+            raise ValueError("start_dates and end_dates must have same length")
+    else:
+        raise ValueError("start_dates must be either str, list, or tuple")
+
+
+def separate_trn_tst(
+    dataset,
+    train_start_date,
+    train_end_date,
+    val_start_date,
+    val_end_date,
+    test_start_date,
+    test_end_date,
+):
     """
     separate the train data from the test data according to the start and end
     dates. This assumes your training data is in one continuous block and all
     the dates that are not in the training are in the testing.
     :param dataset: [xr dataset] input or output data with dims
-    :param test_start: [str] date where training data should start
-    :param n_test_years: [int] number of years to take for the test period
+    :param train_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    train period (can have multiple discontinuos periods)
+    :param train_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end train
+     period (can have multiple discontinuos periods)
+    :param val_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+     validation period (can have multiple discontinuos periods)
+    :param val_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end
+    validation period (can have multiple discontinuos periods)
+    :param test_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    test period (can have multiple discontinuos periods)
+    :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
+    period (can have multiple discontinuos periods)
     """
-    start_date = datetime.datetime.strptime(test_start, "%Y-%m-%d")
-    test_end = start_date + relativedelta(years=n_test_years)
-    tst = dataset.sel(date=slice(test_start, test_end))
-    # take all the rest
-    trn_dates = dataset.date[~dataset.date.isin(tst.date)]
-    trn = dataset.sel(date=trn_dates)
-    return trn, tst
+    train = sel_partition_data(dataset, train_start_date, train_end_date)
+    val = sel_partition_data(dataset, val_start_date, val_end_date)
+    test = sel_partition_data(dataset, test_start_date, test_end_date)
+    return train, val, test
 
 
 def split_into_batches(data_array, seq_len=365, offset=1):
@@ -78,8 +122,8 @@ def read_multiple_obs(obs_files, x_data):
     for filename in obs_files:
         ds = xr.open_zarr(filename)
         obs.append(ds)
-        if 'site_id' in ds.variables:
-            del ds['site_id']
+        if "site_id" in ds.variables:
+            del ds["site_id"]
     obs = xr.merge(obs, join="left")
     obs = obs[["temp_c", "discharge_cms"]]
     obs = obs.rename(
@@ -111,7 +155,9 @@ def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
     df_catch_props = pd.read_feather(catch_prop_file)
     # replace nans with column means
     if replace_nan_with_mean:
-        df_catch_props = df_catch_props.apply(lambda x: x.fillna(x.mean()),axis=0)
+        df_catch_props = df_catch_props.apply(
+            lambda x: x.fillna(x.mean()), axis=0
+        )
     ds_catch_props = df_catch_props.set_index("seg_id_nat").to_xarray()
     return join_catch_properties(x_data_ts, ds_catch_props)
 
@@ -388,12 +434,16 @@ def prep_data(
     obs_flow_file,
     pretrain_file,
     distfile,
+    train_start_date,
+    train_end_date,
+    val_start_date,
+    val_end_date,
+    test_start_date,
+    test_end_date,
     x_vars=None,
     y_vars=None,
     primary_variable="flow",
     catch_prop_file=None,
-    test_start_date="2004-09-30",
-    n_test_yr=12,
     exclude_file=None,
     log_q=False,
     out_file=None,
@@ -408,14 +458,24 @@ def prep_data(
     :param obs_flow_file:[str] discharge observations file (csv)
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
     :param distfile: [str] path to the distance matrix .npz file
+    :param train_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    train period (can have multiple discontinuos periods)
+    :param train_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end train
+    period (can have multiple discontinuos periods)
+    :param val_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    validation period (can have multiple discontinuos periods)
+    :param val_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end
+    validation period (can have multiple discontinuos periods)
+    :param test_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    test period (can have multiple discontinuos periods)
+    :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
+    period (can have multiple discontinuos periods)
     :param x_vars: [list] variables that should be used as input. If None, all
     of the variables will be used
     :param primary_variable: [str] which variable the model should focus on
     'temp' or 'flow'. This determines the order of the variables.
     :param catch_prop_file: [str] the path to the catchment properties file. If
     left unfilled, the catchment properties will not be included as predictors
-    :param test_start_date: [str] the date to start for the test period
-    :param n_test_yr: [int] number of years to take for the test period
     :param exclude_file: [str] path to exclude file
     :param log_q: [bool] whether or not to take the log of discharge in training
     :param out_file: [str] file to where the values will be written
@@ -446,11 +506,20 @@ def prep_data(
         x_data = prep_catch_props(x_data, catch_prop_file)
     # make sure we don't have any weird input values
     check_if_finite(x_data)
-    x_trn, x_tst = separate_trn_tst(x_data, test_start_date, n_test_yr)
+    x_trn, x_val, x_tst = separate_trn_tst(
+        x_data,
+        train_start_date,
+        train_end_date,
+        val_start_date,
+        val_end_date,
+        test_start_date,
+        test_end_date,
+    )
 
     x_scl, x_std, x_mean = scale(x_data)
 
     x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
+    x_val_scl, _, _ = scale(x_val, std=x_std, mean=x_mean)
     x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
 
     # read, filter observations for finetuning
@@ -466,8 +535,24 @@ def prep_data(
 
     if segs:
         y_obs = y_obs.loc[dict(seg_id_nat=segs)]
-    y_obs_trn, y_obs_tst = separate_trn_tst(y_obs, test_start_date, n_test_yr)
-    y_pre_trn, _ = separate_trn_tst(y_pre, test_start_date, n_test_yr)
+    y_obs_trn, y_obs_val, y_obs_tst = separate_trn_tst(
+        y_obs,
+        train_start_date,
+        train_end_date,
+        val_start_date,
+        val_end_date,
+        test_start_date,
+        test_end_date,
+    )
+    y_pre_trn, _, _ = separate_trn_tst(
+        y_pre,
+        train_start_date,
+        train_end_date,
+        val_start_date,
+        val_end_date,
+        test_start_date,
+        test_end_date,
+    )
 
     if log_q:
         y_obs_trn = log_discharge(y_obs_trn)
@@ -488,18 +573,21 @@ def prep_data(
     else:
         _, y_std, y_mean = scale(y_obs_trn)
 
-
     data = {
         "x_trn": convert_batch_reshape(x_trn_scl),
+        "x_val": convert_batch_reshape(x_val_scl),
         "x_tst": convert_batch_reshape(x_tst_scl),
         "x_std": x_std.to_array().values,
         "x_mean": x_mean.to_array().values,
         "x_cols": np.array(x_vars),
         "ids_trn": coord_as_reshaped_array(x_trn, "seg_id_nat"),
         "dates_trn": coord_as_reshaped_array(x_trn, "date"),
+        "ids_val": coord_as_reshaped_array(x_val, "seg_id_nat"),
+        "dates_val": coord_as_reshaped_array(x_val, "date"),
         "ids_tst": coord_as_reshaped_array(x_tst, "seg_id_nat"),
         "dates_tst": coord_as_reshaped_array(x_tst, "date"),
         "y_obs_trn": convert_batch_reshape(y_obs_trn),
+        "y_obs_val": convert_batch_reshape(y_obs_val),
         "y_pre_trn": convert_batch_reshape(y_pre_trn),
         "y_pre_wgts": convert_batch_reshape(y_pre_wgts),
         "y_std": y_std.to_array().values,
@@ -507,7 +595,7 @@ def prep_data(
         "y_obs_wgts": convert_batch_reshape(y_obs_wgts),
         "y_vars": np.array(y_vars),
         "y_obs_tst": convert_batch_reshape(y_obs_tst),
-        "dist_matrix": prep_adj_matrix(distfile, "upstream")
+        "dist_matrix": prep_adj_matrix(distfile, "upstream"),
     }
     if out_file:
         np.savez_compressed(out_file, **data)

@@ -410,9 +410,9 @@ def coord_as_reshaped_array(dataset, coord_name, seq_len=365, offset=1):
     coord_array = xr.broadcast(dataset[coord_name], dataset[first_var])[0]
     new_var_name = coord_name + "1"
     dataset[new_var_name] = coord_array
-    reshaped_np_arr = convert_batch_reshape(dataset[[new_var_name]],
-                                            seq_len=seq_len,
-                                            offset=offset)
+    reshaped_np_arr = convert_batch_reshape(
+        dataset[[new_var_name]], seq_len=seq_len, offset=offset
+    )
     return reshaped_np_arr
 
 

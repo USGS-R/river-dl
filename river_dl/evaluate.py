@@ -215,5 +215,3 @@ def combined_metrics(
     if outfile:
         df_all.to_csv(outfile, index=False)
     return df_all
-
-

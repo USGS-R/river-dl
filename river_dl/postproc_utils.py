@@ -143,7 +143,7 @@ def predict_from_weights(
     :param model_weights_dir: [str] directory to saved model weights
     :param io_file: [str] directory to prepped data file
     :param hidden_size: [int] the number of hidden units in model
-    :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
+    :param partition: [str] must be 'trn', 'val', or 'tst'; whether you want to predict
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
     :param flow_in_temp: [bool] whether the flow should be an input into temp

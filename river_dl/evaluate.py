@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 
-from postproc_utils import fmt_preds_obs
+from river_dl.postproc_utils import fmt_preds_obs
 from river_dl.loss_functions import rmse, nse, kge
 
 

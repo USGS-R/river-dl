@@ -42,6 +42,8 @@ def annTempStats(thisData):
     air_phi=[]
     water_amp_obs = []
     water_phi_obs = []
+    water_amp_sntemp = []
+    water_phi_sntemp = []
     
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
@@ -52,6 +54,11 @@ def annTempStats(thisData):
         amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values)
         air_amp.append(amp)
         air_phi.append(phi)
+        
+        #get the sntemp water temp properties
+        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_water_sntemp'][:,i].values)
+        water_amp_sntemp.append(amp)
+        water_phi_sntemp.append(phi)
         
         #get the water temp properties
         if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>365: #this requires at least 1 year of data, need to add other data requirements here
@@ -65,7 +72,10 @@ def annTempStats(thisData):
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
     delPhi_obs = [(water_phi_obs[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     
-    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs})
+    Ar_sntemp = [water_amp_sntemp[x]/air_amp[x] for x in range(len(water_amp_sntemp))]
+    delPhi_sntemp = [(water_phi_sntemp[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_sntemp))]
+    
+    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'water_amp_sntemp':water_amp_sntemp,'water_phi_sntemp':water_phi_sntemp,'Ar_sntemp':Ar_sntemp,'delPhi_sntemp':delPhi_sntemp})
     
     return tempDF
 
@@ -99,7 +109,8 @@ def prep_annual_signal_data(
     obs = [ds_pre.sortby(["seg_id_nat","date"])]
     obs.append(xr.open_zarr(obs_temper_file).transpose())
     obs=xr.merge(obs,join="left")
-    obs=obs[["seg_tave_air","temp_c"]]
+    obs=obs[["seg_tave_air","seg_tave_water","temp_c"]]
+    obs = obs.rename({"seg_tave_water": "seg_tave_water_sntemp"})
     obs = obs.rename({"temp_c": "seg_tave_water"})
     
     #split into testing and training
@@ -167,11 +178,18 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
             tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_pred".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_pred".format(thisVar):"pred"}))).T
             tempDF['variable']=thisVar
             tempDF['partition']=partition
+            tempDF['model']='RGCN'
 
             if type(resultsDF)==int:
                 resultsDF = tempDF
             else:
                 resultsDF = resultsDF.append(tempDF,ignore_index=True)
+                
+            tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_sntemp".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_sntemp".format(thisVar):"pred"}))).T
+            tempDF['variable']=thisVar
+            tempDF['partition']=partition
+            tempDF['model']='SNTemp'
+            resultsDF = resultsDF.append(tempDF,ignore_index=True)
                 
     resultsDF.to_csv(outFile,header=True, index=False)
     
@@ -179,7 +197,10 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     ax = fig.add_subplot(2, 2, 1, aspect='equal')
     ax.set_title('Ar, Training')
     ax.axline((np.nanmean(trnDF.Ar_pred),np.nanmean(trnDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
-    ax.scatter(x=trnDF.Ar_obs,y=trnDF.Ar_pred)
+    ax.scatter(x=trnDF.Ar_obs,y=trnDF.Ar_pred, label="RGCN",color="blue")
+    ax.scatter(x=trnDF.Ar_obs,y=trnDF.Ar_sntemp, label="SNTemp", color="red")
+    for i, label in enumerate(trnDF.seg_id_nat):
+        ax.annotate(int(label), (trnDF.Ar_obs[i],trnDF.Ar_pred[i]))
     ax.legend()
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
@@ -187,21 +208,30 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     ax = fig.add_subplot(2, 2, 2, aspect='equal')
     ax.set_title('delta Phi, Training')
     ax.axline((np.nanmean(trnDF.delPhi_pred),np.nanmean(trnDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
-    ax.scatter(x=trnDF.delPhi_obs,y=trnDF.delPhi_pred)
+    ax.scatter(x=trnDF.delPhi_obs,y=trnDF.delPhi_pred,color="blue")
+    ax.scatter(x=trnDF.delPhi_obs,y=trnDF.delPhi_sntemp,color="red")
+    for i, label in enumerate(trnDF.seg_id_nat):
+        ax.annotate(int(label), (trnDF.delPhi_obs[i],trnDF.delPhi_pred[i]))
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 
     ax = fig.add_subplot(2, 2, 3, aspect='equal')
     ax.set_title('Ar, Testing')
     ax.axline((np.nanmean(tstDF.Ar_pred),np.nanmean(tstDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
-    ax.scatter(x=tstDF.Ar_obs,y=tstDF.Ar_pred)
+    ax.scatter(x=tstDF.Ar_obs,y=tstDF.Ar_pred, color="blue")
+    ax.scatter(x=tstDF.Ar_obs,y=tstDF.Ar_sntemp, color="red")
+    for i, label in enumerate(tstDF.seg_id_nat):
+        ax.annotate(int(label), (tstDF.Ar_obs[i],tstDF.Ar_pred[i]))
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 
     ax = fig.add_subplot(2, 2, 4, aspect='equal')
     ax.set_title('delta Phi, Testing')
     ax.axline((np.nanmean(tstDF.delPhi_pred),np.nanmean(tstDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
-    ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_pred)
+    ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_pred,color="blue")
+    ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_sntemp,color="red")
+    for i, label in enumerate(tstDF.seg_id_nat):
+        ax.annotate(int(label), (tstDF.delPhi_obs[i],tstDF.delPhi_pred[i]))
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 

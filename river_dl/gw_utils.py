@@ -10,16 +10,21 @@ import matplotlib.pyplot as plt
 from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs
 from river_dl.postproc_utils import calc_metrics
 
-def amp_phi (Date, temp):
+def amp_phi (Date, temp, isWater=False):
     """
     calculate the annual signal properties (phase and amplitude) for a temperature times series
     :param Date: vector of dates
     :param temp: vector of temperatures
+    :param isWater: boolean indicator if the temp data is water temps (versus air)
     :returns: amplitude and phase
     """
     #convert the date to decimal data
-    
     date_decimal = [float(x)/365 for x in ((Date-np.datetime64('1980-10-01'))/np.timedelta64(1, 'D'))]
+    
+    #remove water temps below 1C or above 60C
+    #if isWater:
+    #    print(temp)
+    #    temp = [x if x >=1 and x<=60 else np.nan for x in temp]
     
     x = [[math.sin(2*math.pi*j),math.cos(2*math.pi*j)] for j in date_decimal]
     model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
@@ -36,7 +41,6 @@ def annTempStats(thisData):
     phase shift and amplitude ratio for each segment
     """
 
-    print("annTempStats started")
     
     air_amp=[]
     air_phi=[]
@@ -48,21 +52,46 @@ def annTempStats(thisData):
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
-        
 
         #get the air temp properties
-        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values)
+        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values,isWater=False)
         air_amp.append(amp)
         air_phi.append(phi)
-        
+
         #get the sntemp water temp properties
-        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_water_sntemp'][:,i].values)
+        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_water_sntemp'][:,i].values,isWater=True)
         water_amp_sntemp.append(amp)
         water_phi_sntemp.append(phi)
         
         #get the water temp properties
-        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>365: #this requires at least 1 year of data, need to add other data requirements here
-            amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_water'][:,i].values)
+        #ensure sufficient data
+        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365*2): #this requires at least 2 years of data, other requirements added below
+            waterDF = pd.DataFrame({'date':thisData['date'].values,'seg_tave_water':thisData['seg_tave_water'][:,i].values})
+            #require temps > 1 and <60 C for signal analysis
+            waterDF.loc[(waterDF.seg_tave_water>=1)&(waterDF.seg_tave_water<60),"seg_tave_water"]=np.nan
+            waterDF.dropna(inplace=True)
+            
+            if waterDF.shape[0]<(365*2):
+                amp = np.nan
+                phi = np.nan
+            else:
+            
+                #get the longest set of temp records with no gaps >30 days
+                dateDiff = [0]
+                dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
+                waterDF['dateDiff']=dateDiff
+                waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.dateDiff>31) | (waterDF.dateDiff==0)].values, include_lowest=True, labels=False)
+                waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
+                #keep the longest series
+                waterDF = waterDF.loc[waterDF.bin==waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]]
+
+                if waterDF.shape[0]>=(365*2):
+                    print(waterDF.shape)
+                    amp, phi = amp_phi(waterDF.date.values,waterDF.seg_tave_water.values,isWater=True)
+                else:
+                    amp = np.nan
+                    phi = np.nan
+            
         else:
             amp=np.nan
             phi=np.nan
@@ -71,6 +100,19 @@ def annTempStats(thisData):
 
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
     delPhi_obs = [(water_phi_obs[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
+    
+    #remove Ar >1.1
+    delPhi_obs=[delPhi_obs[i] if Ar_obs[i] <=1.1 else np.nan for i in range(len(delPhi_obs))]
+    Ar_obs = [x if x <= 1.1 else np.nan for x in Ar_obs]
+    
+    #remove delPhi <-10
+    Ar_obs = [Ar_obs[i] if delPhi_obs[i] >=-10 else np.nan for i in range(len(Ar_obs))]
+    delPhi_obs = [x if x >=-10 else np.nan for x in delPhi_obs]
+    
+    #reset delPhi -10 to 0
+    delPhi_obs = [x if x >0 else 0 for x in delPhi_obs]
+    
+    
     
     Ar_sntemp = [water_amp_sntemp[x]/air_amp[x] for x in range(len(water_amp_sntemp))]
     delPhi_sntemp = [(water_phi_sntemp[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_sntemp))]
@@ -116,8 +158,6 @@ def prep_annual_signal_data(
     #split into testing and training
     obs_trn, obs_tst = separate_trn_tst(obs, test_start_date, n_test_yr)
     
-    print("test and train datasets created")
-    
     #get the annual signal properties for the training and testing data
     GW_trn = annTempStats(obs_trn)
     GW_tst = annTempStats(obs_tst)
@@ -134,7 +174,7 @@ def calc_amp_phi(thisData):
     water_amp_preds = []
     water_phi_preds = []
     for thisSeg in segList:
-        amp, phi = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,"seg_tave_water"])
+        amp, phi = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,"seg_tave_water"],isWater=True)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
@@ -236,3 +276,4 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     ax.set_ylabel("Predicted")
 
     plt.savefig(figFile)
+    

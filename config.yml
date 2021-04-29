@@ -11,9 +11,23 @@ code_dir: "river_dl"
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 primary_variable: "temp"
 lamb: 0
-test_start_date: '2010-09-30'
-n_test_yr: 6
+
 pt_epochs: 200
 ft_epochs: 100
+
+train_start_date:
+  - '1985-10-01'
+  - '2016-10-01'
+train_end_date:
+  - '2006-09-30'
+  - '2020-09-30'
+val_start_date: '2006-10-01'
+val_end_date: '2016-09-30'
+test_start_date:
+  - '1980-10-01'
+  - '2020-10-01'
+test_end_date:
+  - '1985-09-30'
+  - '2021-09-30'
+
 hidden_size: 20
-half_test: True

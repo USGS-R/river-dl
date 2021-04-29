@@ -12,7 +12,7 @@ class LSTMModel(tf.keras.Model):
         gradient_correction=False,
         lamb=1,
         dropout=0,
-        grad_log_file=None
+        grad_log_file=None,
     ):
         """
         :param hidden_size: [int] the number of hidden units
@@ -25,7 +25,7 @@ class LSTMModel(tf.keras.Model):
             hidden_size,
             return_sequences=True,
             name="rnn_shared",
-            recurrent_dropout=dropout
+            recurrent_dropout=dropout,
         )
         self.dense_main = layers.Dense(1, name="dense_main")
         self.dense_aux = layers.Dense(1, name="dense_aux")

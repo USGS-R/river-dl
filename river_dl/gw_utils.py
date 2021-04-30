@@ -67,7 +67,7 @@ def annTempStats(thisData):
         if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365*2): #this requires at least 2 years of data, other requirements added below
             waterDF = pd.DataFrame({'date':thisData['date'].values,'seg_tave_water':thisData['seg_tave_water'][:,i].values})
             #require temps > 1 and <60 C for signal analysis
-            waterDF.loc[(waterDF.seg_tave_water>=1)&(waterDF.seg_tave_water<60),"seg_tave_water"]=np.nan
+            waterDF.loc[(waterDF.seg_tave_water<1)|(waterDF.seg_tave_water>60),"seg_tave_water"]=np.nan
             waterDF.dropna(inplace=True)
             
             if waterDF.shape[0]<(365*2):
@@ -79,11 +79,13 @@ def annTempStats(thisData):
                 dateDiff = [0]
                 dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
                 waterDF['dateDiff']=dateDiff
-                waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.dateDiff>31) | (waterDF.dateDiff==0)].values, include_lowest=True, labels=False)
-                waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
-                #keep the longest series
-                waterDF = waterDF.loc[waterDF.bin==waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]]
-
+                if max(dateDiff)>31:
+                    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.dateDiff>31) | (waterDF.dateDiff==0)].values, include_lowest=True, labels=False)
+                    waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
+                    #keep the longest series
+                    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
+                    waterDF = waterDF.loc[waterDF.bin==maxBin]
+                
                 if waterDF.shape[0]>=(365*2):
                     amp, phi = amp_phi(waterDF.date.values,waterDF.seg_tave_water.values,isWater=True)
                 else:
@@ -108,7 +110,7 @@ def annTempStats(thisData):
     delPhi_obs = [x if x >=-10 else np.nan for x in delPhi_obs]
     
     #reset delPhi -10 to 0
-    delPhi_obs = [x if x >0 else 0 for x in delPhi_obs]
+    delPhi_obs = [x if x > 0 else 0 if np.isfinite(x) else np.nan for x in delPhi_obs]
     
     
     

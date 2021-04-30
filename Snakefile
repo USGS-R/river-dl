@@ -180,7 +180,8 @@ rule calc_gw_summary_metrics:
         "{outdir}/GW_stats_val.csv",
     output:
         "{outdir}/GW_summary.csv",
-        "{outdir}/GW.png",
+        "{outdir}/GW_scatter.png",
+        "{outdir}/GW_boxplot.png",
     run:
-        calc_gw_metrics(input[0],input[1],input[2],output[0], output[1])
+        calc_gw_metrics(input[0],input[1],input[2],output[0], output[1], output[2])
         

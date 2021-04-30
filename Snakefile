@@ -23,7 +23,7 @@ rule all:
         ),
         expand("{outdir}/GW_stats_{partition}.csv",
                 outdir=out_dir,
-                partition=['trn', 'tst']
+                partition=['trn', 'tst','val']
         ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
@@ -59,8 +59,13 @@ rule prep_ann_temp:
         "{outdir}/GW.npz"
     run:
         prep_annual_signal_data(input[0], input[1],
+                  train_start_date=config['train_start_date'],
+                  train_end_date=config['train_end_date'],
+                  val_start_date=config['val_start_date'],
+                  val_end_date=config['val_end_date'],
                   test_start_date=config['test_start_date'],
-                  n_test_yr=config['n_test_yr'], out_file=output[0])
+                  test_end_date=config['test_end_date'], 
+                  out_file=output[0])
                   
 
 # use "train" if wanting to use GPU on HPC
@@ -159,19 +164,23 @@ rule compile_pred_GW_stats:
     input:
         "{outdir}/GW.npz",
         "{outdir}/trn_preds.feather",
-        "{outdir}/tst_preds.feather"
+        "{outdir}/tst_preds.feather",
+        "{outdir}/val_preds.feather"
     output:
         "{outdir}/GW_stats_trn.csv",
         "{outdir}/GW_stats_tst.csv",
+        "{outdir}/GW_stats_val.csv",
     run: 
-        calc_pred_ann_temp(input[0],input[1],input[2], output[0], output[1])
+        calc_pred_ann_temp(input[0],input[1],input[2], input[3], output[0], output[1], output[2])
         
 rule calc_gw_summary_metrics:
     input:
         "{outdir}/GW_stats_trn.csv",
         "{outdir}/GW_stats_tst.csv",
+        "{outdir}/GW_stats_val.csv",
     output:
         "{outdir}/GW_summary.csv",
-        "{outdir}/GW.png"
+        "{outdir}/GW.png",
     run:
-        calc_gw_metrics(input[0],input[1],output[0], output[1])
+        calc_gw_metrics(input[0],input[1],input[2],output[0], output[1])
+        

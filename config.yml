@@ -5,7 +5,7 @@ sntemp_file: "DRB_data/uncal_sntemp_input_output_subset"
 catchment_attr: "DRB_data/seg_attr_drb.feather"
 dist_matrix: "DRB_data/distance_matrix_subset.npz"
 
-out_dir: "DRB_outputs"
+out_dir: "DRB_output_subset"
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]

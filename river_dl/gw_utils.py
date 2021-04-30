@@ -6,6 +6,7 @@ from datetime import datetime
 import math
 from itertools import compress
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs
 from river_dl.postproc_utils import calc_metrics
@@ -217,7 +218,7 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     gw_stats_tst.to_csv(tst_output)
     gw_stats_val.to_csv(val_output)
     
-def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile):
+def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
     trnDF = pd.read_csv(trnFile)
     tstDF = pd.read_csv(tstFile)
     valDF = pd.read_csv(valFile)
@@ -253,67 +254,50 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile):
                 
     resultsDF.to_csv(outFile,header=True, index=False)
     
-    fig = plt.figure(figsize=(15, 10))
-    ax = fig.add_subplot(3, 2, 1, aspect='equal')
-    ax.set_title('Ar, Training')
-    ax.axline((np.nanmean(trnDF.Ar_pred),np.nanmean(trnDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
-    ax.scatter(x=trnDF.Ar_obs,y=trnDF.Ar_pred, label="RGCN",color="blue")
-    ax.scatter(x=trnDF.Ar_obs,y=trnDF.Ar_sntemp, label="SNTemp", color="red")
-    for i, label in enumerate(trnDF.seg_id_nat):
-        ax.annotate(int(label), (trnDF.Ar_obs[i],trnDF.Ar_pred[i]))
-    ax.legend()
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Predicted")
+    fig = plt.figure(figsize=(15, 15))
+    partDict = {'Training':trnDF,'Testing':tstDF,'Validation':valDF}
+    metricLst = ['Ar','delPhi']
+    thisFig = 0
+    for thisPart in partDict.keys():
+            thisData = partDict[thisPart]
+            for thisMetric in metricLst:
+                thisFig = thisFig + 1
+                ax = fig.add_subplot(len(partDict), len(metricLst), thisFig, aspect='equal')
+                ax.set_title('{}, {}'.format(thisMetric, thisPart))
+                ax.axline((np.nanmean(thisData['{}_pred'.format(thisMetric)]),np.nanmean(thisData['{}_pred'.format(thisMetric)])), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
+                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
+                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
+                for i, label in enumerate(thisData.seg_id_nat):
+                    ax.annotate(int(label), (thisData['{}_obs'.format(thisMetric)][i],thisData['{}_pred'.format(thisMetric)][i]))
+                if thisFig==1:
+                          ax.legend()
+                ax.set_xlabel("Observed")
+                ax.set_ylabel("Predicted")
 
-    ax = fig.add_subplot(3, 2, 2, aspect='equal')
-    ax.set_title('delta Phi, Training')
-    ax.axline((np.nanmean(trnDF.delPhi_pred),np.nanmean(trnDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
-    ax.scatter(x=trnDF.delPhi_obs,y=trnDF.delPhi_pred,color="blue")
-    ax.scatter(x=trnDF.delPhi_obs,y=trnDF.delPhi_sntemp,color="red")
-    for i, label in enumerate(trnDF.seg_id_nat):
-        ax.annotate(int(label), (trnDF.delPhi_obs[i],trnDF.delPhi_pred[i]))
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Predicted")
-
-    ax = fig.add_subplot(3, 2, 3, aspect='equal')
-    ax.set_title('Ar, Testing')
-    ax.axline((np.nanmean(tstDF.Ar_pred),np.nanmean(tstDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
-    ax.scatter(x=tstDF.Ar_obs,y=tstDF.Ar_pred, color="blue")
-    ax.scatter(x=tstDF.Ar_obs,y=tstDF.Ar_sntemp, color="red")
-    for i, label in enumerate(tstDF.seg_id_nat):
-        ax.annotate(int(label), (tstDF.Ar_obs[i],tstDF.Ar_pred[i]))
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Predicted")
-
-    ax = fig.add_subplot(3, 2, 4, aspect='equal')
-    ax.set_title('delta Phi, Testing')
-    ax.axline((np.nanmean(tstDF.delPhi_pred),np.nanmean(tstDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
-    ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_pred,color="blue")
-    ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_sntemp,color="red")
-    for i, label in enumerate(tstDF.seg_id_nat):
-        ax.annotate(int(label), (tstDF.delPhi_obs[i],tstDF.delPhi_pred[i]))
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Predicted")
+    plt.savefig(figFile1)
     
-    ax = fig.add_subplot(3, 2, 5, aspect='equal')
-    ax.set_title('Ar, Validation')
-    ax.axline((np.nanmean(valDF.Ar_pred),np.nanmean(valDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
-    ax.scatter(x=valDF.Ar_obs,y=valDF.Ar_pred, color="blue")
-    ax.scatter(x=valDF.Ar_obs,y=valDF.Ar_sntemp, color="red")
-    for i, label in enumerate(valDF.seg_id_nat):
-        ax.annotate(int(label), (valDF.Ar_obs[i],valDF.Ar_pred[i]))
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Predicted")
+    fig = plt.figure(figsize=(15, 15))
+    partDict = {'Training':trnDF,'Testing':tstDF,'Validation':valDF}
+    metricLst = ['Ar','delPhi']
+    thisFig = 0
+    for thisPart in partDict.keys():
+            thisData = partDict[thisPart]
+            for thisMetric in metricLst:
+                thisFig = thisFig + 1
+                colsToPlot = ['{}_obs'.format(thisMetric),'{}_sntemp'.format(thisMetric),'{}_pred'.format(thisMetric)]
+                nObs =["n: " + str(np.sum(np.isfinite(thisData[thisCol].values))) for thisCol in colsToPlot]
+                ax = fig.add_subplot(len(partDict), len(metricLst), thisFig)
+                ax.set_title('{}, {}'.format(thisMetric, thisPart))
+                ax=sns.boxplot(data=thisData[colsToPlot])
+                # Add it to the plot
+                pos = range(len(nObs))
+                for tick,label in zip(pos,ax.get_xticklabels()):
+                    ax.text(pos[tick],
+                            np.nanmin(thisData[colsToPlot].values)-0.1*(np.nanmax(thisData[colsToPlot].values)-np.nanmin(thisData[colsToPlot].values)),
+                            nObs[tick],
+                            horizontalalignment='center',
+                            weight='semibold')
+                ax.set_ylim(np.nanmin(thisData[colsToPlot].values)-0.2*(np.nanmax(thisData[colsToPlot].values)-np.nanmin(thisData[colsToPlot].values)),np.nanmax(thisData[colsToPlot].values))
 
-    ax = fig.add_subplot(3, 2, 6, aspect='equal')
-    ax.set_title('delta Phi, Validation')
-    ax.axline((np.nanmean(valDF.delPhi_pred),np.nanmean(valDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
-    ax.scatter(x=valDF.delPhi_obs,y=valDF.delPhi_pred,color="blue")
-    ax.scatter(x=valDF.delPhi_obs,y=valDF.delPhi_sntemp,color="red")
-    for i, label in enumerate(valDF.seg_id_nat):
-        ax.annotate(int(label), (valDF.delPhi_obs[i],valDF.delPhi_pred[i]))
-    ax.set_xlabel("Observed")
-    ax.set_ylabel("Predicted")
-
-    plt.savefig(figFile)
+    plt.savefig(figFile2)
     

@@ -52,7 +52,6 @@ def annTempStats(thisData):
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
-
         #get the air temp properties
         amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values,isWater=False)
         air_amp.append(amp)
@@ -86,7 +85,6 @@ def annTempStats(thisData):
                 waterDF = waterDF.loc[waterDF.bin==waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]]
 
                 if waterDF.shape[0]>=(365*2):
-                    print(waterDF.shape)
                     amp, phi = amp_phi(waterDF.date.values,waterDF.seg_tave_water.values,isWater=True)
                 else:
                     amp = np.nan
@@ -124,8 +122,12 @@ def annTempStats(thisData):
 def prep_annual_signal_data(
     obs_temper_file,
     pretrain_file,
-    test_start_date="2004-09-30",
-    n_test_yr=12,
+    train_start_date,
+    train_end_date,
+    val_start_date,
+    val_end_date,
+    test_start_date,
+    test_end_date,
     out_file=None
 ):
     """
@@ -156,16 +158,24 @@ def prep_annual_signal_data(
     obs = obs.rename({"temp_c": "seg_tave_water"})
     
     #split into testing and training
-    obs_trn, obs_tst = separate_trn_tst(obs, test_start_date, n_test_yr)
+    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, train_start_date,
+        train_end_date,
+        val_start_date,
+        val_end_date,
+        test_start_date,
+        test_end_date)
+    
     
     #get the annual signal properties for the training and testing data
     GW_trn = annTempStats(obs_trn)
     GW_tst = annTempStats(obs_tst)
+    GW_val = annTempStats(obs_val)
     
     #save the GW data
     data = {}
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
+    data['GW_val']=GW_val
     data['GW_cols']=GW_trn.columns.values.astype('str')
     np.savez_compressed(out_file, **data)
 
@@ -186,33 +196,41 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     obsDF['delPhi_pred'] = (obsDF['water_phi_pred']-obsDF['air_phi'])*365/(2*math.pi)
     return obsDF
     
-def calc_pred_ann_temp(GW_data,trn_data,tst_data, trn_output, tst_output):
+def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output):
     gw_obs = np.load(GW_data)
     
     trn_preds = pd.read_feather(trn_data)
     tst_preds = pd.read_feather(tst_data)
+    val_preds = pd.read_feather(val_data)
     
     gw_trn = calc_amp_phi(trn_preds)
     gw_tst = calc_amp_phi(tst_preds)
+    gw_val = calc_amp_phi(val_preds)
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)
+    gw_stats_val = merge_pred_obs(gw_obs,'GW_val',gw_val)
                        
     gw_stats_trn.to_csv(trn_output)
     gw_stats_tst.to_csv(tst_output)
+    gw_stats_val.to_csv(val_output)
     
-def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
+def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile):
     trnDF = pd.read_csv(trnFile)
     tstDF = pd.read_csv(tstFile)
+    valDF = pd.read_csv(valFile)
     
     resultsDF = 0
-    for i in range(2):
+    for i in range(3):
         if i==0:
             thisData=trnDF
             partition="trn"
         elif i==1:
             thisData = tstDF
             partition="tst"
+        elif i==2:
+            thisData = valDF
+            partition="val"
         for thisVar in ['Ar','delPhi']:
             print(thisVar)
             tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_pred".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_pred".format(thisVar):"pred"}))).T
@@ -234,7 +252,7 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     resultsDF.to_csv(outFile,header=True, index=False)
     
     fig = plt.figure(figsize=(15, 10))
-    ax = fig.add_subplot(2, 2, 1, aspect='equal')
+    ax = fig.add_subplot(3, 2, 1, aspect='equal')
     ax.set_title('Ar, Training')
     ax.axline((np.nanmean(trnDF.Ar_pred),np.nanmean(trnDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
     ax.scatter(x=trnDF.Ar_obs,y=trnDF.Ar_pred, label="RGCN",color="blue")
@@ -245,7 +263,7 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 
-    ax = fig.add_subplot(2, 2, 2, aspect='equal')
+    ax = fig.add_subplot(3, 2, 2, aspect='equal')
     ax.set_title('delta Phi, Training')
     ax.axline((np.nanmean(trnDF.delPhi_pred),np.nanmean(trnDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
     ax.scatter(x=trnDF.delPhi_obs,y=trnDF.delPhi_pred,color="blue")
@@ -255,7 +273,7 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 
-    ax = fig.add_subplot(2, 2, 3, aspect='equal')
+    ax = fig.add_subplot(3, 2, 3, aspect='equal')
     ax.set_title('Ar, Testing')
     ax.axline((np.nanmean(tstDF.Ar_pred),np.nanmean(tstDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
     ax.scatter(x=tstDF.Ar_obs,y=tstDF.Ar_pred, color="blue")
@@ -265,13 +283,33 @@ def calc_gw_metrics(trnFile,tstFile,outFile,figFile):
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 
-    ax = fig.add_subplot(2, 2, 4, aspect='equal')
+    ax = fig.add_subplot(3, 2, 4, aspect='equal')
     ax.set_title('delta Phi, Testing')
     ax.axline((np.nanmean(tstDF.delPhi_pred),np.nanmean(tstDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
     ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_pred,color="blue")
     ax.scatter(x=tstDF.delPhi_obs,y=tstDF.delPhi_sntemp,color="red")
     for i, label in enumerate(tstDF.seg_id_nat):
         ax.annotate(int(label), (tstDF.delPhi_obs[i],tstDF.delPhi_pred[i]))
+    ax.set_xlabel("Observed")
+    ax.set_ylabel("Predicted")
+    
+    ax = fig.add_subplot(3, 2, 5, aspect='equal')
+    ax.set_title('Ar, Validation')
+    ax.axline((np.nanmean(valDF.Ar_pred),np.nanmean(valDF.Ar_pred)), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
+    ax.scatter(x=valDF.Ar_obs,y=valDF.Ar_pred, color="blue")
+    ax.scatter(x=valDF.Ar_obs,y=valDF.Ar_sntemp, color="red")
+    for i, label in enumerate(valDF.seg_id_nat):
+        ax.annotate(int(label), (valDF.Ar_obs[i],valDF.Ar_pred[i]))
+    ax.set_xlabel("Observed")
+    ax.set_ylabel("Predicted")
+
+    ax = fig.add_subplot(3, 2, 6, aspect='equal')
+    ax.set_title('delta Phi, Validation')
+    ax.axline((np.nanmean(valDF.delPhi_pred),np.nanmean(valDF.delPhi_pred)), slope=1.0,linewidth=1, color='r')
+    ax.scatter(x=valDF.delPhi_obs,y=valDF.delPhi_pred,color="blue")
+    ax.scatter(x=valDF.delPhi_obs,y=valDF.delPhi_sntemp,color="red")
+    for i, label in enumerate(valDF.seg_id_nat):
+        ax.annotate(int(label), (valDF.delPhi_obs[i],valDF.delPhi_pred[i]))
     ax.set_xlabel("Observed")
     ax.set_ylabel("Predicted")
 

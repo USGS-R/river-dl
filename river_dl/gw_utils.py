@@ -81,7 +81,7 @@ def annTempStats(thisData):
                 dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
                 waterDF['dateDiff']=dateDiff
                 if max(dateDiff)>31:
-                    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.dateDiff>50) | (waterDF.dateDiff==0)].values, include_lowest=True, labels=False)
+                    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF.date))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF.date==np.nanmax(waterDF.date))].values, include_lowest=True, labels=False)
                     waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
                     #keep the longest series
                     maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]

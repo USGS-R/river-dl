@@ -2,13 +2,14 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 from sklearn.linear_model import LinearRegression
+import statsmodels.api as sm
 from datetime import datetime
 import math
-from itertools import compress
+from itertools import compress, product
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs
+from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs, convert_batch_reshape
 from river_dl.postproc_utils import calc_metrics
 
 def amp_phi (Date, temp, isWater=False):
@@ -28,11 +29,26 @@ def amp_phi (Date, temp, isWater=False):
     #    temp = [x if x >=1 and x<=60 else np.nan for x in temp]
     
     x = [[math.sin(2*math.pi*j),math.cos(2*math.pi*j)] for j in date_decimal]
-    model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
-    amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
-    phi = math.asin(model.coef_[1]/amp)
+#     model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
+#     amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
+#     phi = math.asin(model.coef_[1]/amp)
+    X = sm.add_constant(x)
+    model = sm.OLS(temp,X)
+    results = model.fit()
     
-    return amp, phi
+    confInt = np.array(results.conf_int())
+      
+    amp = math.sqrt(results.params[1]**2+results.params[2]**2)
+    amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
+    amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
+    phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
+    phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
+    phi_low = np.min(phiRange)
+    phi_high = np.max(phiRange)
+    
+    
+    return amp, phi, amp_low, amp_high, phi_low, phi_high
+
 
 def annTempStats(thisData):
     """
@@ -44,63 +60,105 @@ def annTempStats(thisData):
 
     
     air_amp=[]
+    air_amp_low=[]
+    air_amp_high=[]
     air_phi=[]
+    air_phi_low=[]
+    air_phi_high=[]
     water_amp_obs = []
+    water_amp_low_obs = []
+    water_amp_high_obs = []
     water_phi_obs = []
+    water_phi_low_obs = []
+    water_phi_high_obs = []        
     water_amp_sntemp = []
+    water_amp_low_sntemp = []
+    water_amp_high_sntemp = []
     water_phi_sntemp = []
+    water_phi_low_sntemp = []
+    water_phi_high_sntemp = []
     
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
         #get the air temp properties
-        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values,isWater=False)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values,isWater=False)
         air_amp.append(amp)
+        air_amp_low.append(amp_low)
+        air_amp_high.append(amp_high)
         air_phi.append(phi)
+        air_phi_low.append(phi_low)
+        air_phi_high.append(phi_high)
 
         #get the sntemp water temp properties
-        amp, phi = amp_phi(thisData['date'].values,thisData['seg_tave_water_sntemp'][:,i].values,isWater=True)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData['seg_tave_water_sntemp'][:,i].values,isWater=True)
         water_amp_sntemp.append(amp)
+        water_amp_low_sntemp.append(amp_low)
+        water_amp_high_sntemp.append(amp_high)
         water_phi_sntemp.append(phi)
+        water_phi_low_sntemp.append(phi_low)
+        water_phi_high_sntemp.append(phi_high)
         
         #get the water temp properties
         #ensure sufficient data
-        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365*2): #this requires at least 2 years of data, other requirements added below
+        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365): #this requires at least 2 years of data, other requirements added below
             waterDF = pd.DataFrame({'date':thisData['date'].values,'seg_tave_water':thisData['seg_tave_water'][:,i].values})
             #require temps > 1 and <60 C for signal analysis
             waterDF.loc[(waterDF.seg_tave_water<1)|(waterDF.seg_tave_water>60),"seg_tave_water"]=np.nan
             waterDF.dropna(inplace=True)
             
-            if waterDF.shape[0]<(365*2):
+            if waterDF.shape[0]<(365):
                 amp = np.nan
                 phi = np.nan
+                amp_low = np.nan
+                amp_high = np.nan
+                phi_low = np.nan
+                phi_high = np.nan
             else:
             
                 #get the longest set of temp records with no gaps >49 days
-                dateDiff = [0]
-                dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
-                waterDF['dateDiff']=dateDiff
-                if max(dateDiff)>31:
-                    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF.date))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF.date==np.nanmax(waterDF.date))].values, include_lowest=True, labels=False)
-                    waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
-                    #keep the longest series
-                    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
-                    waterDF = waterDF.loc[waterDF.bin==maxBin]
+                #dateDiff = [0]
+                #dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
+                #waterDF['dateDiff']=dateDiff
+                #if max(dateDiff)>31:
+                #    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF.date))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF.date==np.nanmax(waterDF.date))].values, include_lowest=True, labels=False)
+                #    waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
+                #    #keep the longest series
+                #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
+                #    waterDF = waterDF.loc[waterDF.bin==maxBin]
                 
-                if waterDF.shape[0]>=(365*2):
-                    amp, phi = amp_phi(waterDF.date.values,waterDF.seg_tave_water.values,isWater=True)
+                if waterDF.shape[0]>=(365):
+                    amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.seg_tave_water.values,isWater=True)
                 else:
                     amp = np.nan
                     phi = np.nan
+                    amp_low = np.nan
+                    amp_high = np.nan
+                    phi_low = np.nan
+                    phi_high = np.nan
             
         else:
-            amp=np.nan
-            phi=np.nan
+            amp = np.nan
+            phi = np.nan
+            amp_low = np.nan
+            amp_high = np.nan
+            phi_low = np.nan
+            phi_high = np.nan
         water_amp_obs.append(amp)
+        water_amp_low_obs.append(amp_low)
+        water_amp_high_obs.append(amp_high)
         water_phi_obs.append(phi)
+        water_phi_low_obs.append(phi_low)
+        water_phi_high_obs.append(phi_high)
 
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
     delPhi_obs = [(water_phi_obs[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
+    
+    Ar_low_obs = [water_amp_low_obs[x]/air_amp_high[x] for x in range(len(water_amp_obs))]
+    Ar_high_obs = [water_amp_high_obs[x]/air_amp_low[x] for x in range(len(water_amp_obs))]
+    
+    delPhi_low_obs = [(water_phi_low_obs[x]-air_phi_high[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
+    delPhi_high_obs = [(water_phi_high_obs[x]-air_phi_low[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     
     #remove Ar >1.1
     delPhi_obs=[delPhi_obs[i] if Ar_obs[i] <=1.1 else np.nan for i in range(len(delPhi_obs))]
@@ -118,20 +176,23 @@ def annTempStats(thisData):
     Ar_sntemp = [water_amp_sntemp[x]/air_amp[x] for x in range(len(water_amp_sntemp))]
     delPhi_sntemp = [(water_phi_sntemp[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_sntemp))]
     
-    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'water_amp_sntemp':water_amp_sntemp,'water_phi_sntemp':water_phi_sntemp,'Ar_sntemp':Ar_sntemp,'delPhi_sntemp':delPhi_sntemp})
+    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_sntemp':water_amp_sntemp,'water_phi_sntemp':water_phi_sntemp,'Ar_sntemp':Ar_sntemp,'delPhi_sntemp':delPhi_sntemp})
     
     return tempDF
 
 def prep_annual_signal_data(
     obs_temper_file,
     pretrain_file,
+    io_data_file,
     train_start_date,
     train_end_date,
     val_start_date,
     val_end_date,
     test_start_date,
     test_end_date,
-    out_file=None
+    gwVarList,
+    out_file=None,
+    out_file2=None,
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -174,20 +235,30 @@ def prep_annual_signal_data(
     GW_tst = annTempStats(obs_tst)
     GW_val = annTempStats(obs_val)
     
+    #add the GW data to the y dataset
+    preppedData = np.load(io_data_file)
+    data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
+
+    data['y_obs_trn'] = np.concatenate([preppedData['y_obs_trn'],make_GW_dataset(GW_trn,obs_trn,gwVarList)], axis=2)
+    data['y_obs_tst'] = np.concatenate([preppedData['y_obs_tst'],make_GW_dataset(GW_tst,obs_tst,gwVarList)], axis=2)
+    data['y_obs_val'] = np.concatenate([preppedData['y_obs_val'],make_GW_dataset(GW_val,obs_val,gwVarList)], axis=2)
+    data['y_vars'] = np.append(data['y_vars'],gwVarList)
+    np.savez_compressed(out_file2, **data)
+    
     #save the GW data
-    data = {}
-    data['GW_tst']=GW_tst
-    data['GW_trn']=GW_trn
-    data['GW_val']=GW_val
-    data['GW_cols']=GW_trn.columns.values.astype('str')
-    np.savez_compressed(out_file, **data)
+    data2 = {}
+    data2['GW_tst']=GW_tst
+    data2['GW_trn']=GW_trn
+    data2['GW_val']=GW_val
+    data2['GW_cols']=GW_trn.columns.values.astype('str')
+    np.savez_compressed(out_file, **data2)
 
 def calc_amp_phi(thisData):
     segList = np.unique(thisData['seg_id_nat'])
     water_amp_preds = []
     water_phi_preds = []
     for thisSeg in segList:
-        amp, phi = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,"seg_tave_water"],isWater=True)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,"seg_tave_water"],isWater=True)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
@@ -198,6 +269,20 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     obsDF['Ar_pred']=obsDF['water_amp_pred']/obsDF['air_amp']
     obsDF['delPhi_pred'] = (obsDF['water_phi_pred']-obsDF['air_phi'])*365/(2*math.pi)
     return obsDF
+
+def make_GW_dataset (GW_data,x_data,varList):
+    prod = pd.DataFrame(product(np.unique(GW_data.seg_id_nat),x_data['date'].values),columns=['seg_id_nat','date'])
+    prod = prod.merge(GW_data)
+    prod['dec_date']=[float(x)/365 for x in ((prod.date-np.datetime64('1980-10-01'))/np.timedelta64(1, 'D'))]
+    prod['sin_wt']=[math.sin(2*math.pi*x) for x in prod['dec_date']]
+    prod['cos_wt']=[math.cos(2*math.pi*x) for x in prod['dec_date']]
+    obs2 = [x_data.sortby(["seg_id_nat", "date"])]
+    obs2.append(prod.set_index(['date','seg_id_nat']).to_xarray())
+    GW_ds = xr.merge(obs2, join="left")
+    GW_ds = GW_ds[varList]
+    GW_Arr = convert_batch_reshape(GW_ds)
+    
+    return GW_Arr
     
 def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output):
     gw_obs = np.load(GW_data)
@@ -265,6 +350,8 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
                 ax = fig.add_subplot(len(partDict), len(metricLst), thisFig, aspect='equal')
                 ax.set_title('{}, {}'.format(thisMetric, thisPart))
                 ax.axline((np.nanmean(thisData['{}_pred'.format(thisMetric)]),np.nanmean(thisData['{}_pred'.format(thisMetric)])), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
+                for x in range(len(thisData['{}_obs'.format(thisMetric)])):
+                    ax.plot([thisData['{}_obs'.format(thisMetric+"_low")][x],thisData['{}_obs'.format(thisMetric+"_high")][x]],[thisData['{}_pred'.format(thisMetric)][x],thisData['{}_pred'.format(thisMetric)][x]], color="blue")
                 ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
                 ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
                 for i, label in enumerate(thisData.seg_id_nat):

@@ -55,23 +55,26 @@ rule prep_ann_temp:
     input:
          config['obs_temp'],
          config['sntemp_file'],
+         "{outdir}/prepped.npz",
     output:
-        "{outdir}/GW.npz"
+        "{outdir}/GW.npz",
+        "{outdir}/prepped_withGW.npz",
     run:
-        prep_annual_signal_data(input[0], input[1],
+        prep_annual_signal_data(input[0], input[1], input[2],
                   train_start_date=config['train_start_date'],
                   train_end_date=config['train_end_date'],
                   val_start_date=config['val_start_date'],
                   val_end_date=config['val_end_date'],
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'], 
-                  out_file=output[0])
-                  
+                  gwVarList = config['gw_vars'],
+                  out_file=output[0],
+                  out_file2 = output[1])
 
 # use "train" if wanting to use GPU on HPC
 # rule train:
 #    input:
-#        "{outdir}/prepped.npz"
+#        "{outdir}/prepped_withGW.npz"
 #    output:
 #        directory("{outdir}/trained_model/"),
 #        directory("{outdir}/pretrained_model/"),
@@ -92,7 +95,7 @@ rule prep_ann_temp:
 # use "train_model" if wanting to use CPU or local GPU
 rule train_model_local_or_cpu:
     input:
-        "{outdir}/prepped.npz"
+        "{outdir}/prepped_withGW.npz"
     output:
         directory("{outdir}/trained_weights/"),
         directory("{outdir}/pretrained_weights/"),

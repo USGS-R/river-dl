@@ -81,7 +81,7 @@ def nnse_one_var_samplewise(data, y_pred, var_idx):
 
 def y_data_components(data, y_pred, var_idx):
     weights = data[:, :, -2:]
-    y_true = data[:, :, :-2]
+    y_true = data[:, :, :2]
 
     # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)
@@ -112,6 +112,8 @@ def weighted_masked_rmse(lamb=0.5):
     """
 
     def rmse_masked_combined(data, y_pred):
+        print(data.shape)
+        print(y_pred.shape)
         rmse_main = rmse_masked_one_var(data, y_pred, 0)
         rmse_aux = rmse_masked_one_var(data, y_pred, 1)
         rmse_loss = rmse_main + lamb * rmse_aux
@@ -188,3 +190,23 @@ def kge_loss_one_var(data, y_pred, var_idx):
 
 def kge_loss(y_true, y_pred):
     return -1 * kge(y_true, y_pred)
+
+def weighted_masked_rmse_gw(lamb=0.5,lamb2=1.0):
+    """
+    calculate a weighted, masked rmse.
+    :param lamb: [float] (short for lambda). The factor that the auxiliary loss
+    will be multiplied by before added to the main loss.
+    """
+
+    def rmse_masked_combined(data, y_pred):
+        print(data.shape)
+        print(y_pred.shape)
+        rmse_main = rmse_masked_one_var(data, y_pred, 0)
+        rmse_aux = rmse_masked_one_var(data, y_pred, 1)
+        
+        y_data_components(data, y_pred, var_idx)
+        
+        rmse_loss = rmse_main + lamb * rmse_aux
+        return rmse_loss
+
+    return rmse_masked_combined

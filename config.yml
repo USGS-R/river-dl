@@ -9,25 +9,22 @@ out_dir: "DRB_output_subset"
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
+gw_vars: ['air_phi','air_amp','Ar_obs','delPhi_obs','sin_wt','cos_wt']
 primary_variable: "temp"
 lamb: 0
 
-pt_epochs: 200
-ft_epochs: 100
+pt_epochs: 3
+ft_epochs: 1
 
 train_start_date:
   - '1985-10-01'
-  - '2016-10-01'
 train_end_date:
   - '2006-09-30'
-  - '2020-09-30'
 val_start_date: '2006-10-01'
 val_end_date: '2016-09-30'
 test_start_date:
   - '1980-10-01'
-  - '2020-10-01'
 test_end_date:
   - '1985-09-30'
-  - '2021-09-30'
 
 hidden_size: 20

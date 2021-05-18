@@ -14,18 +14,23 @@ from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.train import get_data_if_file
 
 
-def unscale_output(y_scl, y_std, y_mean, logged_q=False):
+def unscale_output(y_scl, y_std, y_mean, y_vars, logged_q=False):
     """
     unscale output data given a standard deviation and a mean value for the
     outputs
     :param y_scl: [pd dataframe] scaled output data (predicted or observed)
     :param y_std:[numpy array] array of standard deviation of variables [n_out]
     :param y_mean:[numpy array] array of variable means [n_out]
+    :param y_vars: [list-like] y variable names
     :param logged_q: [bool] whether the model predicted log of discharge. if
     true, the exponent of the discharge will be executed
     :return:
     """
-    y_unscaled = (y_scl * y_std) + y_mean
+    y_unscaled = y_scl.copy()
+    # I'm replacing just the variable columns. I have to specify because, at
+    # least in some cases, there are other columns (e.g., "seg_id_nat" and
+    # date")
+    y_unscaled[y_vars] = (y_scl[y_vars] * y_std) + y_mean
     if logged_q:
         y_unscaled["seg_outflow"] = np.exp(y_unscaled["seg_outflow"])
     return y_unscaled
@@ -87,7 +92,6 @@ def predict_from_io_data(
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
-
     model = load_model_from_weights(
         model_type,
         model_weights_dir,
@@ -157,7 +161,7 @@ def predict(
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars,)
 
-    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, logged_q=logged_q)
+    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, logged_q,)
 
     if outfile:
         y_pred_pp.to_feather(outfile)
@@ -392,3 +396,4 @@ def predict_from_arbitrary_data(
         [predictions_beginning_trim, middle_predictions, predictions_end_trim]
     )
     return predictions_combined
+

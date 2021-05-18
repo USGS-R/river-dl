@@ -14,24 +14,21 @@ from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.train import get_data_if_file
 
 
-def unscale_output(y_scl, y_std, y_mean, data_cols, logged_q=False):
+def unscale_output(y_scl, y_std, y_mean, logged_q=False):
     """
     unscale output data given a standard deviation and a mean value for the
     outputs
     :param y_scl: [pd dataframe] scaled output data (predicted or observed)
     :param y_std:[numpy array] array of standard deviation of variables [n_out]
     :param y_mean:[numpy array] array of variable means [n_out]
-    :param data_cols:
     :param logged_q: [bool] whether the model predicted log of discharge. if
     true, the exponent of the discharge will be executed
     :return:
     """
-    yscl_data = y_scl[data_cols]
-    y_unscaled_data = (yscl_data * y_std) + y_mean
-    y_scl[data_cols] = y_unscaled_data
+    y_unscaled = (y_scl * y_std) + y_mean
     if logged_q:
-        y_scl["seg_outflow"] = np.exp(y_scl["seg_outflow"])
-    return y_scl
+        y_unscaled["seg_outflow"] = np.exp(y_unscaled["seg_outflow"])
+    return y_unscaled
 
 
 def load_model_from_weights(
@@ -42,8 +39,7 @@ def load_model_from_weights(
     flow_in_temp=False,
 ):
     """
-
-    :param flow_in_temp:
+    load a TF model from the model weights directory
     :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
     :param model_weights_dir: [str] directory to saved model weights
     :param hidden_size: [int] the number of hidden units in model
@@ -101,9 +97,9 @@ def predict_from_io_data(
     )
 
     if partition != "trn":
-        keep_only_second_half = True
+        keep_frac = 1
     else:
-        keep_only_second_half = False
+        keep_frac = 0.5
 
     preds = predict(
         model,
@@ -113,7 +109,7 @@ def predict_from_io_data(
         io_data[f"y_std"],
         io_data[f"y_mean"],
         io_data[f"y_vars"],
-        keep_only_second_half=keep_only_second_half,
+        keep_last_frac=keep_frac,
         outfile=outfile,
         logged_q=logged_q,
     )
@@ -128,7 +124,7 @@ def predict(
     y_stds,
     y_means,
     y_vars,
-    keep_only_second_half=True,
+    keep_last_frac=1.0,
     outfile=None,
     logged_q=False,
 ):
@@ -139,8 +135,9 @@ def predict(
     :param pred_ids: [np array] the ids of the segments (same shape as x_data)
     :param pred_dates: [np array] the dates of the segments (same shape as
     x_data)
-    :param keep_only_second_half: [bool] whether or not to remove the first half
-    of the sequence predictions. This allows states to "warm up"
+    :param keep_last_frac: [float] fraction of the predictions to keep starting
+    from the *end* of the predictions (0-1). (1 means you keep all of the
+    predictions, .75 means you keep the final three quarters of the predictions)
     :param y_stds:[np array] the standard deviation of the y data
     :param y_means:[np array] the means of the y data
     :param y_vars:[np array] the variable names of the y data
@@ -151,15 +148,16 @@ def predict(
     """
     num_segs = len(np.unique(pred_ids))
     y_pred = model.predict(x_data, batch_size=num_segs)
-    if keep_only_second_half:
-        half_seq_len = round(y_pred.shape[1] / 2)
-        y_pred = y_pred[:, half_seq_len:, :]
-        pred_ids = pred_ids[:, half_seq_len:, :]
-        pred_dates = pred_dates[:, half_seq_len:, :]
+
+    # keep only specified part of predictions
+    frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_frac))
+    y_pred = y_pred[:, frac_seq_len:, :]
+    pred_ids = pred_ids[:, frac_seq_len:, :]
+    pred_dates = pred_dates[:, frac_seq_len:, :]
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars,)
 
-    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, logged_q,)
+    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, logged_q=logged_q)
 
     if outfile:
         y_pred_pp.to_feather(outfile)
@@ -168,13 +166,13 @@ def predict(
 
 def mean_or_std_dataset_from_np(data, data_label, var_names_label):
     """
-    turn a numpy data array into a xarry dataset
+    turn a numpy data array of means or standard deviations into a xarry dataset
     :param data: the numpy NpzFile
     :param data_label: [str] the label for the values you want to turn into the
     xarray dataset (i.e., "x_mean" or "x_std")
     :param var_names_label: [str] the label of the data you want to become the
     variable names of the xarray dataset (i.e., "x_cols")
-    :return:xarray dataset
+    :return:xarray dataset of the means or standard deviations
     """
     df = pd.DataFrame([data[data_label]], columns=data[var_names_label])
     # take the "mean" to drop index level. it's only one value per variable
@@ -191,7 +189,7 @@ def predict_one_date_range(
     start_date,
     end_date,
     logged_q=False,
-    keep_only_second_half=True,
+    keep_last_frac=1.0,
     offset=0.5,
 ):
     """
@@ -206,8 +204,9 @@ def predict_one_date_range(
     :param end_date: [str or date] the end date of the predictions
     :param logged_q: [bool] whether the model predicted log of discharge. if
     true, the exponent of the discharge will be executed
-    :param keep_only_second_half: [bool] whether or not to remove the first half
-    of the sequence predictions. This allows states to "warm up"
+    :param keep_last_frac: [float] fraction of the predictions to keep starting
+    from the *end* of the predictions (0-1). (1 means you keep all of the
+    predictions, .75 means you keep the final three quarters of the predictions)
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
     the first batch will be 0-365 and the second will be 182-547)
     :return: [pd dataframe] the predictions
@@ -229,7 +228,7 @@ def predict_one_date_range(
         train_io_data["y_std"],
         train_io_data["y_mean"],
         train_io_data["y_vars"],
-        keep_only_second_half=keep_only_second_half,
+        keep_last_frac=keep_last_frac,
         logged_q=logged_q,
     )
     return predictions
@@ -243,6 +242,7 @@ def predict_from_arbitrary_data(
     model_weights_dir,
     model_type,
     hidden_size,
+    seq_len=365,
     dist_matrix=None,
     flow_in_temp=False,
     logged_q=False,
@@ -263,6 +263,7 @@ def predict_from_arbitrary_data(
     weights are stored
     :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
     :param hidden_size: [int] the number of hidden units in model
+    :param seq_len: [int] length of input sequences given to model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'. if not
     provided, will look for it in the "train_io_data" file.
     :param flow_in_temp: [bool] whether the flow should be an input into temp
@@ -293,10 +294,11 @@ def predict_from_arbitrary_data(
     x_means = mean_or_std_dataset_from_np(train_io_data, "x_mean", "x_cols")
 
     ds_x_scaled, _, _ = scale(ds_x, std=x_stds, mean=x_means)
-    seq_len = 365
 
     pred_start_date = datetime.datetime.strptime(pred_start_date, "%Y-%m-%d")
-    inputs_start_date = pred_start_date - datetime.timedelta(183)
+    # look back half of the sequence length before the prediction start date.
+    # if present, this serves as a half-sequence warm-up period
+    inputs_start_date = pred_start_date - datetime.timedelta(round(seq_len/2))
 
     # get the "middle" predictions
     middle_predictions = predict_one_date_range(
@@ -307,12 +309,12 @@ def predict_from_arbitrary_data(
         inputs_start_date,
         pred_end_date,
         logged_q,
-        keep_only_second_half=True,
+        keep_last_frac=0.5,
         offset=0.5,
     )
 
     # get the "beginning" predictions
-    start_dates_end = pred_start_date + datetime.timedelta(365)
+    start_dates_end = pred_start_date + datetime.timedelta(seq_len)
 
     beginning_predictions = predict_one_date_range(
         model,
@@ -322,7 +324,7 @@ def predict_from_arbitrary_data(
         pred_start_date,
         start_dates_end,
         logged_q,
-        keep_only_second_half=False,
+        keep_last_frac=1,
         offset=1,
     )
 
@@ -330,7 +332,7 @@ def predict_from_arbitrary_data(
     end_date_end = datetime.datetime.strptime(
         pred_end_date, "%Y-%m-%d"
     ) + datetime.timedelta(1)
-    end_dates_start = end_date_end - datetime.timedelta(365)
+    end_dates_start = end_date_end - datetime.timedelta(seq_len)
 
     end_predictions = predict_one_date_range(
         model,
@@ -340,7 +342,7 @@ def predict_from_arbitrary_data(
         end_dates_start,
         end_date_end,
         logged_q,
-        keep_only_second_half=False,
+        keep_last_frac=1,
         offset=1,
     )
 

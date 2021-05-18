@@ -6,6 +6,12 @@ from river_dl.loss_functions import rmse, nse, kge
 
 
 def filter_negative_preds(y_true, y_pred):
+    """
+    filters out negative predictions and prints a warning if there are >5% of predictions as negative
+    :param y_true: [array-like] observed y values
+    :param y_pred: [array-like] predicted y values
+    :return: [array-like] filtered data
+    """
     # print a warning if there are a lot of negatives
     n_negative = len(y_pred[y_pred < 0])
     perc_negative = n_negative / len(y_pred)
@@ -36,7 +42,7 @@ def nse_logged(y_true, y_pred):
     compute the rmse of the logged data
     :param y_true: [array-like] observed y values
     :param y_pred: [array-like] predicted y values
-    :return: [float] the rmse of the logged data
+    :return: [float] the nse of the logged data
     """
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
     return nse(np.log(y_true), np.log(y_pred))
@@ -44,8 +50,8 @@ def nse_logged(y_true, y_pred):
 
 def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
     """
-    filter an array by a percentile. The data less than (or greater than if
-    `less_than=False`) will be changed to NaN
+    filter an array by a percentile of the observations. The data less than
+    or greater than if `less_than=False`) will be changed to NaN
     :param y_true: [array-like] observed y values
     :param y_pred: [array-like] predicted y values
     :param percentile: [number] percentile number 0-100
@@ -63,9 +69,9 @@ def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
     return y_true_filt, y_pred_filt
 
 
-def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
+def percentile_metric(y_true, y_pred, metric, percentile, less_than=True):
     """
-    compute the rmse of the top 10 percent of data
+    compute an evaluation metric for a specified percentile of the observations
     :param y_true: [array-like] observed y values
     :param y_pred: [array-like] predicted y values
     :param metric: [function] metric function
@@ -81,10 +87,10 @@ def percentile_metric(y_true, y_pred, metric, percentile, less_than=False):
 
 def calc_metrics(df):
     """
-    calculate metrics (rmse and nse) on one reach
+    calculate metrics (e.g., rmse and nse)
     :param df:[pd dataframe] dataframe of observations and predictions for
-    one reach
-    :return: [pd Series] the rmse and nse for that one reach
+    one reach. dataframe must have columns "obs" and "pred"
+    :return: [pd Series] various evaluation metrics (e.g., rmse and nse)
     """
     obs = df["obs"].values
     pred = df["pred"].values
@@ -136,8 +142,8 @@ def overall_metrics(
     partition and variable
     :param pred_file: [str] path to predictions feather file
     :param obs_file: [str] path to observations zarr file
-    :param variable: [str] either 'flow' or 'temp'
-    :param partition: [str] either 'trn' or 'temp'
+    :param variable: [str] variable for which the metrics are being calculated
+    :param partition: [str] data partition for which metrics are calculated
     :param group: [str or list] which group the metrics should be computed for.
     Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
@@ -180,7 +186,7 @@ def combined_metrics(
     pred_trn=None,
     pred_val=None,
     pred_tst=None,
-    grp=None,
+    group=None,
     outfile=None,
 ):
     """
@@ -200,16 +206,16 @@ def combined_metrics(
     """
     df_all = []
     if pred_trn:
-        trn_temp = overall_metrics(pred_trn, obs_temp, "temp", "trn", grp)
-        trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", grp)
+        trn_temp = overall_metrics(pred_trn, obs_temp, "temp", "trn", group)
+        trn_flow = overall_metrics(pred_trn, obs_flow, "flow", "trn", group)
         df_all.extend([trn_temp, trn_flow])
     if pred_val:
-        val_temp = overall_metrics(pred_val, obs_temp, "temp", "val", grp)
-        val_flow = overall_metrics(pred_val, obs_flow, "flow", "val", grp)
+        val_temp = overall_metrics(pred_val, obs_temp, "temp", "val", group)
+        val_flow = overall_metrics(pred_val, obs_flow, "flow", "val", group)
         df_all.extend([val_temp, val_flow])
     if pred_tst:
-        tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", grp)
-        tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", grp)
+        tst_temp = overall_metrics(pred_tst, obs_temp, "temp", "tst", group)
+        tst_flow = overall_metrics(pred_tst, obs_flow, "flow", "tst", group)
         df_all.extend([tst_temp, tst_flow])
     df_all = pd.concat(df_all, axis=0)
     if outfile:

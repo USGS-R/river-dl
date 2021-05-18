@@ -179,9 +179,9 @@ def mean_or_std_dataset_from_np(data, data_label, var_names_label):
     :return:xarray dataset of the means or standard deviations
     """
     df = pd.DataFrame([data[data_label]], columns=data[var_names_label])
-    # take the "mean" to drop index level. it's only one value per variable
-    # so the mean is 'mean'ingless :)
-    ds = df.to_xarray().mean()
+    # take the "min" to drop index level. it's only one value per variable
+    # so the minis meaningless
+    ds = df.to_xarray().min()
     return ds
 
 
@@ -396,4 +396,3 @@ def predict_from_arbitrary_data(
         [predictions_beginning_trim, middle_predictions, predictions_end_trim]
     )
     return predictions_combined
-

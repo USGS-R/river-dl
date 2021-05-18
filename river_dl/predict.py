@@ -181,6 +181,26 @@ def mean_or_std_dataset_from_np(data, data_label, var_names_label):
     return ds
 
 
+def swap_first_seq_halves(x_data, batch_size):
+    """
+    make an additional batch from the first batch. the additional batch will
+    have the first and second halves of the original first batch switched
+
+    :param x_data: [np array] x data with shape [nseg * nbatch, seq_len, nfeat]
+    :param batch_size: [int] the size of the batch (number of segments)
+    :return: [np array] original data with an additional batch
+    """
+    first_batch = x_data[:batch_size, :, :]
+    seq_len = x_data.shape[1]
+    half_size = round(seq_len/2)
+    first_half_first_batch = first_batch[:, :half_size, :]
+    second_half_first_batch = first_batch[:, half_size:, :]
+    swapped = np.concatenate([second_half_first_batch, first_half_first_batch],
+                             axis=1)
+    new_x_data = np.concatenate([swapped, x_data], axis=0)
+    return new_x_data
+
+
 def predict_one_date_range(
     model,
     ds_x_scaled,
@@ -191,6 +211,7 @@ def predict_one_date_range(
     logged_q=False,
     keep_last_frac=1.0,
     offset=0.5,
+    swap_halves_of_first_seq=False,
 ):
     """
     make predictions for one date range. This was broken out to be able to do
@@ -209,6 +230,11 @@ def predict_one_date_range(
     predictions, .75 means you keep the final three quarters of the predictions)
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
     the first batch will be 0-365 and the second will be 182-547)
+    :param swap_halves_of_first_seq: [bool] whether or not to make an
+    *additional* sequence from the first sequence. The additional sequence will
+    be the first sequence with the first and last halves swapped. The last half
+    of the the first sequence serves as a stand-in spin-up period for ths first
+    half predictions. This option makes most sense only when keep_last_frac=0.5.
     :return: [pd dataframe] the predictions
     """
     ds_x_scaled = ds_x_scaled[train_io_data["x_cols"]]
@@ -220,6 +246,13 @@ def predict_one_date_range(
     x_batch_dates = coord_as_reshaped_array(
         x_data, "date", seq_len=seq_len, offset=offset
     )
+    num_segs = len(np.unique(x_batch_ids))
+
+    if swap_halves_of_first_seq:
+        x_batches = swap_first_seq_halves(x_batches, num_segs)
+        x_batch_ids = swap_first_seq_halves(x_batch_ids, num_segs)
+        x_batch_dates = swap_first_seq_halves(x_batch_dates, num_segs)
+
     predictions = predict(
         model,
         x_batches,
@@ -325,7 +358,8 @@ def predict_from_arbitrary_data(
         start_dates_end,
         logged_q,
         keep_last_frac=1,
-        offset=1,
+        offset=.5,
+        swap_halves_of_first_seq=True,
     )
 
     # get the "end" predictions

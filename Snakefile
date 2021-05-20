@@ -1,9 +1,9 @@
 import os
 
-# add scripts dir to path
-
 from river_dl.preproc_utils import prep_data
-from river_dl.postproc_utils import predict_from_weights, combined_metrics, plot_obs
+from river_dl.evaluate import combined_metrics
+from river_dl.postproc_utils import plot_obs
+from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 
 out_dir = config['out_dir']
@@ -90,7 +90,7 @@ rule make_predictions:
     group: 'train_predict_evaluate'
     run:
         model_dir = input[0] + '/'
-        predict_from_weights(model_type='rgcn', model_weights_dir=model_dir,
+        predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
                              logged_q=False)
@@ -123,7 +123,7 @@ rule combine_metrics:
                          obs_flow=input[1],
                          pred_trn=input[2],
                          pred_val=input[3],
-                         grp=params.grp_arg,
+                         group=params.grp_arg,
                          outfile=output[0])
 
 

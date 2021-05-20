@@ -1,4 +1,5 @@
 import numpy as np
+import math as m
 import tensorflow as tf
 
 
@@ -112,8 +113,6 @@ def weighted_masked_rmse(lamb=0.5):
     """
 
     def rmse_masked_combined(data, y_pred):
-        print(data.shape)
-        print(y_pred.shape)
         rmse_main = rmse_masked_one_var(data, y_pred, 0)
         rmse_aux = rmse_masked_one_var(data, y_pred, 1)
         rmse_loss = rmse_main + lamb * rmse_aux
@@ -191,22 +190,96 @@ def kge_loss_one_var(data, y_pred, var_idx):
 def kge_loss(y_true, y_pred):
     return -1 * kge(y_true, y_pred)
 
-def weighted_masked_rmse_gw(lamb=0.5,lamb2=1.0):
+def weighted_masked_rmse_gw(lamb=0.5,lamb2=0, lamb3=0):
     """
     calculate a weighted, masked rmse.
     :param lamb: [float] (short for lambda). The factor that the auxiliary loss
     will be multiplied by before added to the main loss.
     """
 
-    def rmse_masked_combined(data, y_pred):
-        print(data.shape)
-        print(y_pred.shape)
+    def rmse_masked_combined_gw(data, y_pred):
         rmse_main = rmse_masked_one_var(data, y_pred, 0)
         rmse_aux = rmse_masked_one_var(data, y_pred, 1)
         
-        y_data_components(data, y_pred, var_idx)
+        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_data_components(data, y_pred)
+        rmse_Ar = rmse(Ar_obs,Ar_pred)
+        rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
         
-        rmse_loss = rmse_main + lamb * rmse_aux
+      
+        rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
+        #return rmse_loss
         return rmse_loss
+    return rmse_masked_combined_gw
 
-    return rmse_masked_combined
+def GW_data_components(data, y_pred):
+    y_true = data[:, :, 2:-2]
+    y_pred_temp = y_pred[:,:,0:1] #extract just the predicted temperature (assumes temp is the primary variable)
+    #unscale the predicted temps
+    y_pred_temp = y_pred_temp*6.70826388+14.85555534
+    x_lm = y_true[:,:,-2:] #extract the sin(wt) and cos(wt)
+    x_lm_2 = tf.transpose(x_lm,perm=(0,2,1))
+    print("y_true shape")
+    print(y_true.shape)
+    print("x_lm shape")
+    print(x_lm.shape)
+    print("x_lm_2 shape")
+    print(x_lm_2.shape)
+    #X_mat=np.vstack((np.ones(x_lm.shape[1]), x_lm[0,:,0],x_lm[0,:,1])).T
+    X_mat=tf.stack((tf.constant(1., shape=x_lm[:,:,0].shape), x_lm[:,:,0],x_lm[:,:,1]),axis=1)
+    #X2 = tf.matmul(tf.linalg.inv(tf.matmul(tf.transpose(X_mat),X_mat)),tf.transpose(X_mat))
+    #a_b = tf.stack([tf.matmul(X2,tf.transpose(tf.slice(y_pred_temp, [k, 0], [1, y_pred_temp.shape[1]]))) for k in range(y_pred_temp.get_shape().as_list()[0])])
+    print("X_mat shape")
+    print(X_mat.shape)
+    
+    #getting the coefficients using a 3-d version of the normal equation:
+    #https://cmdlinetips.com/2020/03/linear-regression-using-matrix-multiplication-in-python-using-numpy/
+    #http://mlwiki.org/index.php/Normal_Equation
+    X_mat_T = tf.transpose(X_mat,perm=(0,2,1))
+    X_mat_T_dot = tf.einsum('bij,bjk->bik',X_mat_T,X_mat)
+    X_mat_inv = tf.linalg.pinv(X_mat_T_dot)
+    X_mat_inv_dot = tf.einsum('bij,bjk->bik',X_mat_inv,X_mat_T)
+    a_b = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_pred_temp)
+    
+    
+    #a_b = X_mat_T_dot[:,0:3,0:1]
+    print("X_mat_T shape")
+    print(X_mat_T.shape)
+    print("X_mat_inv shape")
+    #print(X_mat_inv.shape)
+    print("X_mat_inv_dot shape")
+    #print(X_mat_inv_dot.shape)
+    print("a_b shape")
+    print(a_b.shape)
+    
+    
+    
+    
+    Aw = tf.math.sqrt(a_b[:,1,0]**2+a_b[:,2,0]**2)
+    Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
+    print(Phiw.shape)
+    print(y_true[:,0,0].shape)
+    delPhi_pred = (Phiw-y_true[:,0,2])*365/(2*m.pi)
+    Ar_pred = Aw/y_true[:,0,3]
+    
+    
+    #a_b = np.array([np.array(np.linalg.inv(X_mat.T.dot(X_mat)).dot(X_mat.T).dot(y_pred_temp[i,:])) for i in range(y_pred_temp.shape[0])])
+    
+    #print(a_b.shape)
+    #print(a_b)
+    
+    # ensure y_pred, weights, and y_true are all tensors the same data type
+    #y_true = tf.convert_to_tensor(y_true)
+    #weights = tf.convert_to_tensor(weights)
+    #y_true = tf.cast(y_true, y_pred.dtype)
+    #weights = tf.cast(weights, y_pred.dtype)
+
+    # make all zero-weighted observations 'nan' so they don't get counted
+    # at all in the loss calculation
+    #y_true = tf.where(weights == 0, np.nan, y_true)
+
+    #weights = weights[:, :, var_idx]
+    #y_true = y_true[:, :, var_idx]
+    #y_pred = y_pred[:, :, var_idx]
+    #return y_true, y_pred, weights
+    return y_true[:,0,0], Ar_pred, y_true[:,0,1], delPhi_pred
+    #return a_b[:,0,0],a_b[:,1,0],a_b[:,2,0],delPhi_pred

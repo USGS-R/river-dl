@@ -105,7 +105,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    params.run_dir, model_type='rgcn', lamb=config['lamb'])
+                    params.run_dir, model_type='rgcn', lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
 
 rule make_predictions:
     input:

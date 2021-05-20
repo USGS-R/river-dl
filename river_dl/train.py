@@ -5,7 +5,7 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel
-from river_dl.loss_functions import weighted_masked_rmse
+from river_dl.loss_functions import weighted_masked_rmse, weighted_masked_rmse_gw
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -32,6 +32,8 @@ def train_model(
     seed=None,
     dropout=0,
     lamb=1,
+    lamb2=0,
+    lamb3=0,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
 ):
@@ -141,7 +143,7 @@ def train_model(
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
         if model_type == "rgcn":
-            model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
+            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(lamb=lamb,lamb2=lamb2,lamb3=lamb3))
         else:
             model.compile(optimizer_ft)
 

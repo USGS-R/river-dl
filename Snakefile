@@ -72,31 +72,7 @@ rule prep_ann_temp:
                   out_file2 = output[1])
 
 # use "train" if wanting to use GPU on HPC
-# rule train:
-#    input:
-#        "{outdir}/prepped_withGW.npz"
-#    output:
-#        directory("{outdir}/trained_model/"),
-#        directory("{outdir}/pretrained_model/"),
-#    params:
-#        # getting the base path to put the training outputs in
-#        # I omit the last slash (hence '[:-1]' so the split works properly
-#        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#        pt_epochs=config['pt_epochs'],
-#        ft_epochs=config['ft_epochs'],
-#        lamb=config['lamb'],
-#        lamb2=config['lamb2'],
-#        lamb3=config['lamb3'],
-#        loss = config['loss_type'],
-#    shell:
-#        """
-#        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
-#        """
-
-
-# use "train_model" if wanting to use CPU or local GPU
-rule train_model_local_or_cpu:
+rule train:
     input:
         "{outdir}/prepped_withGW.npz"
     output:
@@ -106,9 +82,33 @@ rule train_model_local_or_cpu:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-    run:
-        train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    params.run_dir, model_type='rgcn', loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+        pt_epochs=config['pt_epochs'],
+        ft_epochs=config['ft_epochs'],
+        lamb=config['lamb'],
+        lamb2=config['lamb2'],
+        lamb3=config['lamb3'],
+        loss = config['loss_type'],
+    shell:
+        """
+        module load analytics cuda10.1/toolkit/10.1.105 
+        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
+        """
+
+
+# use "train_model" if wanting to use CPU or local GPU
+#rule train_model_local_or_cpu:
+#    input:
+#        "{outdir}/prepped_withGW.npz"
+#    output:
+#        directory("{outdir}/trained_weights/"),
+#        directory("{outdir}/pretrained_weights/"),
+#    params:
+#        # getting the base path to put the training outputs in
+#        # I omit the last slash (hence '[:-1]' so the split works properly
+#        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+#    run:
+#        train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
+#                    params.run_dir, model_type='rgcn', loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
 
 rule make_predictions:
     input:

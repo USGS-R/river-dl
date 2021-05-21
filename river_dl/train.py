@@ -29,12 +29,12 @@ def train_model(
     out_dir,
     flow_in_temp=False,
     model_type="rgcn",
-    loss_type="noGW",
+    loss_type="GW",
     seed=None,
     dropout=0,
     lamb=1,
-    lamb2=0,
-    lamb3=0,
+    lamb2=2,
+    lamb3=0.1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
 ):
@@ -145,7 +145,8 @@ def train_model(
         temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
         temp_mean = io_data['y_mean'][temp_index]
         temp_sd = io_data['y_std'][temp_index]
-        
+        print("temp index")
+        print(temp_index) 
         if model_type == "rgcn" and loss_type.lower()=="gw":
             model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=lamb,lamb2=lamb2,lamb3=lamb3))
         elif model_type == "rgcn":
@@ -162,7 +163,10 @@ def train_model(
             [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
         )
         y_means = io_data["y_pre_trn"]
-
+        print("x_trn_obs shape")
+        print(x_trn_obs.shape)
+        print("y_trn_obs shape")
+        print(y_trn_obs.shape)
         model.fit(
             x=x_trn_obs,
             y=y_trn_obs,

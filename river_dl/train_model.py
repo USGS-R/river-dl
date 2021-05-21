@@ -86,11 +86,8 @@ model = train_model(
     out_dir=out_dir,
     flow_in_temp=flow_in_temp,
     lamb=args.lamb,
-    lamb2 = args.lamb2,
-    lamb3 = args.lamb3,
     seed=args.random_seed,
     learning_rate_ft=args.ft_learn_rate,
     learning_rate_pre=args.pt_learn_rate,
     model_type=args.model,
-    loss_type=args.loss,
 )

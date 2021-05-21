@@ -49,7 +49,20 @@ parser.add_argument(
     default="rgcn",
 )
 parser.add_argument(
+    "--loss",
+    help="type of loss function",
+    choices=["noGW", "GW"],
+    default="GW",
+)
+parser.add_argument(
     "--lamb", help="lambda for weighting aux gradient", default=1.0, type=float
+)
+
+parser.add_argument(
+    "--lamb2", help="lambda for weighting Ar gradient", default=2, type=float
+)
+parser.add_argument(
+    "--lamb3", help="lambda for weighting deltaPhi gradient", default=0.1, type=float
 )
 
 
@@ -70,8 +83,11 @@ model = train_model(
     out_dir=out_dir,
     flow_in_temp=flow_in_temp,
     lamb=args.lamb,
+    lamb2 = args.lamb2,
+    lamb3 = args.lamb3,
     seed=args.random_seed,
     learning_rate_ft=args.ft_learn_rate,
     learning_rate_pre=args.pt_learn_rate,
     model_type=args.model,
+    loss_type = args.loss,
 )

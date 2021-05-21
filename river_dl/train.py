@@ -29,6 +29,7 @@ def train_model(
     out_dir,
     flow_in_temp=False,
     model_type="rgcn",
+    loss_type="noGW",
     seed=None,
     dropout=0,
     lamb=1,
@@ -141,9 +142,14 @@ def train_model(
     # finetune
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-
-        if model_type == "rgcn":
-            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(lamb=lamb,lamb2=lamb2,lamb3=lamb3))
+        temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
+        temp_mean = io_data['y_mean'][temp_index]
+        temp_sd = io_data['y_std'][temp_index]
+        
+        if model_type == "rgcn" and loss_type.lower()=="gw":
+            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=lamb,lamb2=lamb2,lamb3=lamb3))
+        elif model_type == "rgcn":
+            model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
         else:
             model.compile(optimizer_ft)
 
@@ -155,6 +161,7 @@ def train_model(
         y_trn_obs = np.concatenate(
             [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
         )
+        y_means = io_data["y_pre_trn"]
 
         model.fit(
             x=x_trn_obs,

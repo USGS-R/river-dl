@@ -5,18 +5,20 @@ sntemp_file: "DRB_data/uncal_sntemp_input_output_subset"
 catchment_attr: "DRB_data/seg_attr_drb.feather"
 dist_matrix: "DRB_data/distance_matrix_subset.npz"
 
-out_dir: "DRB_output_subset_noGW"
+out_dir: "DRB_output_subset_test"
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
 primary_variable: "temp"
 lamb: 0.5
-lamb2: 0
-lamb3: 0
+lamb2: 2
+lamb3: 0.1
 
-pt_epochs: 200
-ft_epochs: 100
+loss_type: "GW"
+
+pt_epochs: 2
+ft_epochs: 2
 
 train_start_date:
   - '1985-10-01'

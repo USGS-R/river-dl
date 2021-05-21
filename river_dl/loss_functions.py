@@ -198,10 +198,10 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=0.5,lamb2=0, lamb
     """
 
     def rmse_masked_combined_gw(data, y_pred):
-	print("data shape")
-	print(data.shape)
-	print("y_pred shape")
-	print(y_pred.shape)
+        print("data shape")
+        print(data.shape)
+        print("y_pred shape")
+        print(y_pred.shape)
         rmse_main = rmse_masked_one_var(data, y_pred, 0)
         rmse_aux = rmse_masked_one_var(data, y_pred, 1)
         
@@ -222,7 +222,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd):
     print("y_true shape")
     print(y_true.shape)
     print("y_pred_temp shape")
-	print(y_pred_temp.shape)
+    print(y_pred_temp.shape)
     #unscale the predicted temps
     y_pred_temp = y_pred_temp*temp_sd+temp_mean
     

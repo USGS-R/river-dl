@@ -83,6 +83,10 @@ def nnse_one_var_samplewise(data, y_pred, var_idx):
 def y_data_components(data, y_pred, var_idx):
     weights = data[:, :, -2:]
     y_true = data[:, :, :2]
+    print("weights shape")
+    print(weights.shape)
+    print("y_true shape")
+    print(y_true.shape)
 
     # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)

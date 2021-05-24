@@ -102,7 +102,7 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
     split training data into batches with size of batch_size
     :param data_array: [numpy array] array of training data with dims [nseg,
     ndates, nfeat]
-    :param seq_len: [int] length of sequences (i.e., 365)
+    :param seq_len: [int] length of sequences (e.g., 365)
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
     the first batch will be 0-365 and the second will be 182-547)
     :return: [numpy array] batched data with dims [nbatches, nseg, seq_len
@@ -395,7 +395,7 @@ def convert_batch_reshape(
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
-    :param seq_len: [int] length of sequences (i.e., 365)
+    :param seq_len: [int] length of sequences (e.g., 365)
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
     the first batch will be 0-365 and the second will be 182-547)
     :return: [numpy array] batched and reshaped dataset
@@ -406,7 +406,7 @@ def convert_batch_reshape(
     arr = dataset.to_array().values
 
     # if the dataset is empty, just return it as is
-    if dataset.date.size == 0:
+    if dataset[time_idx_name].size == 0:
         return arr
 
     # before [nfeat, nseg, ndates]; after [nseg, ndates, nfeat]
@@ -439,7 +439,7 @@ def coord_as_reshaped_array(
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
-    :param seq_len: [int] length of sequences (i.e., 365)
+    :param seq_len: [int] length of sequences (e.g., 365)
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
     the first batch will be 0-365 and the second will be 182-547)
     :return:
@@ -490,6 +490,7 @@ def prep_y_data(
     val_end_date,
     test_start_date,
     test_end_date,
+    seq_len,
     log_vars,
     exclude_file,
     normalize_y,
@@ -520,6 +521,7 @@ def prep_y_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
+    :param seq_len: [int] length of sequences (e.g., 365)
     :param log_vars: [list-like] which variables (if any) to take log of
     :param exclude_file: [str] path to exclude file
     :param normalize_y: [bool] whether or not to normalize the y values
@@ -556,26 +558,29 @@ def prep_y_data(
 
     if normalize_y:
         # scale y training data and get the mean and std
-        if not y_std and not y_mean:
+        if not isinstance(y_std, xr.Dataset) or not isinstance(
+            y_mean, xr.Dataset
+        ):
             y_trn, y_std, y_mean = scale(y_trn)
         else:
             y_trn, _, _ = scale(y_trn)
 
     data = {
         f"y_{y_type}_trn": convert_batch_reshape(
-            y_trn, spatial_idx_name, time_idx_name
+            y_trn, spatial_idx_name, time_idx_name, seq_len=seq_len
         ),
         f"y_{y_type}_wgts": convert_batch_reshape(
-            y_wgts, spatial_idx_name, time_idx_name
+            y_wgts, spatial_idx_name, time_idx_name, seq_len=seq_len
         ),
         f"y_{y_type}_val": convert_batch_reshape(
-            y_val, spatial_idx_name, time_idx_name, offset=0.5
+            y_val, spatial_idx_name, time_idx_name, offset=0.5, seq_len=seq_len
         ),
         f"y_{y_type}_tst": convert_batch_reshape(
-            y_tst, spatial_idx_name, time_idx_name, offset=0.5
+            y_tst, spatial_idx_name, time_idx_name, offset=0.5, seq_len=seq_len
         ),
-        f"y_std": y_std.to_array().values,
-        f"y_mean": y_mean.to_array().values,
+        "y_std": y_std.to_array().values,
+        "y_mean": y_mean.to_array().values,
+        "y_vars": y_vars,
     }
     return data
 
@@ -583,7 +588,6 @@ def prep_y_data(
 def prep_data(
     x_data_file,
     y_data_file,
-    pretrain_file,
     train_start_date,
     train_end_date,
     val_start_date,
@@ -594,6 +598,8 @@ def prep_data(
     time_idx_name,
     x_vars,
     y_vars,
+    seq_len=365,
+    pretrain_file=None,
     distfile=None,
     catch_prop_file=None,
     exclude_file=None,
@@ -606,21 +612,24 @@ def prep_data(
     prepare input and output data for DL model training read in and process
     data into training and testing datasets. the training and testing data are
     scaled to have a std of 1 and a mean of zero
-    :param x_data_file: [str] path to Zarr file with x data
-    :param y_data_file: [str] temperature observations file
-    :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
+    :param x_data_file: [str] path to Zarr file with x data. Data should have
+    a spatial coordinate and a time coordinate that are specified in the
+    `spatial_idx_name` and `time_idx_name` arguments
+    :param y_data_file: [str] observations Zarr file. Data should have a spatial
+    coordinate and a time coordinate that are specified in the
+    spatial_idx_name` and `time_idx_name` arguments
     :param train_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
-    train period (can have multiple discontinuos periods)
+    train period (can have multiple discontinuous periods)
     :param train_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end train
-    period (can have multiple discontinuos periods)
+    period (can have multiple discontinuous periods)
     :param val_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
-    validation period (can have multiple discontinuos periods)
+    validation period (can have multiple discontinuous periods)
     :param val_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end
-    validation period (can have multiple discontinuos periods)
+    validation period (can have multiple discontinuous periods)
     :param test_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
-    test period (can have multiple discontinuos periods)
+    test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
-    period (can have multiple discontinuos periods)
+    period (can have multiple discontinuous periods)
     :param spatial_idx_name: [str] name of column that is used for spatial
     index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -628,6 +637,10 @@ def prep_data(
     :param x_vars: [list] variables that should be used as input. If None, all
     of the variables will be used
     :param y_vars: [list of str] which variables to prepare data for
+    :param seq_len: [int] length of sequences (e.g., 365)
+    :param pretrain_file: [str] Zarr file with the pretraining data. Should have
+    a spatial coordinate and a time coordinate that are specified in the
+    `spatial_idx_name` and `time_idx_name` arguments
     :param distfile: [str] path to the distance matrix .npz file
     :param catch_prop_file: [str] the path to the catchment properties file. If
     left unfilled, the catchment properties will not be included as predictors
@@ -694,34 +707,70 @@ def prep_data(
 
     x_data_dict = {
         "x_trn": convert_batch_reshape(
-            x_trn_scl, spatial_idx_name, time_idx_name
+            x_trn_scl, spatial_idx_name, time_idx_name, seq_len=seq_len
         ),
         "x_val": convert_batch_reshape(
-            x_val_scl, spatial_idx_name, time_idx_name, offset=0.5
+            x_val_scl,
+            spatial_idx_name,
+            time_idx_name,
+            offset=0.5,
+            seq_len=seq_len,
         ),
         "x_tst": convert_batch_reshape(
-            x_tst_scl, spatial_idx_name, time_idx_name, offset=0.5
+            x_tst_scl,
+            spatial_idx_name,
+            time_idx_name,
+            offset=0.5,
+            seq_len=seq_len,
         ),
         "x_std": x_std.to_array().values,
         "x_mean": x_mean.to_array().values,
-        "x_cols": np.array(x_vars),
+        "x_vars": np.array(x_vars),
         "ids_trn": coord_as_reshaped_array(
-            x_trn, spatial_idx_name, spatial_idx_name, time_idx_name
+            x_trn,
+            spatial_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            seq_len=seq_len,
         ),
         "times_trn": coord_as_reshaped_array(
-            x_trn, time_idx_name, spatial_idx_name, time_idx_name
+            x_trn,
+            time_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            seq_len=seq_len,
         ),
         "ids_val": coord_as_reshaped_array(
-            x_val, spatial_idx_name, spatial_idx_name, time_idx_name, offset=0.5
+            x_val,
+            spatial_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=0.5,
+            seq_len=seq_len,
         ),
         "times_val": coord_as_reshaped_array(
-            x_val, time_idx_name, spatial_idx_name, time_idx_name, offset=0.5
+            x_val,
+            time_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=0.5,
+            seq_len=seq_len,
         ),
         "ids_tst": coord_as_reshaped_array(
-            x_tst, spatial_idx_name, spatial_idx_name, time_idx_name, offset=0.5
+            x_tst,
+            spatial_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=0.5,
+            seq_len=seq_len,
         ),
         "times_tst": coord_as_reshaped_array(
-            x_tst, time_idx_name, spatial_idx_name, time_idx_name, offset=0.5
+            x_tst,
+            time_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=0.5,
+            seq_len=seq_len,
         ),
     }
     if distfile:
@@ -742,11 +791,14 @@ def prep_data(
             val_end_date,
             test_start_date,
             test_end_date,
+            seq_len,
             log_y_vars,
             exclude_file,
             normalize_y,
             "obs",
         )
+        # if there is a y_data_file and a pretrain file, use the observation
+        # mean and standard deviation to do the scaling/centering
         if pretrain_file:
             y_pre_data = prep_y_data(
                 pretrain_file,
@@ -760,6 +812,7 @@ def prep_data(
                 val_end_date,
                 test_start_date,
                 test_end_date,
+                seq_len,
                 log_y_vars,
                 exclude_file,
                 normalize_y,
@@ -767,8 +820,9 @@ def prep_data(
                 y_std=y_obs_data["y_std"],
                 y_mean=y_obs_data["y_mean"],
             )
-
-    if pretrain_file and not y_obs_data:
+    # if there is no observation file, use the pretrain mean and standard dev
+    # to do the scaling/centering
+    elif pretrain_file and not y_obs_data:
         y_pre_data = prep_y_data(
             pretrain_file,
             y_vars,
@@ -781,11 +835,14 @@ def prep_data(
             val_end_date,
             test_start_date,
             test_end_date,
+            seq_len,
             log_y_vars,
             exclude_file,
             normalize_y,
             "pre",
         )
+    else:
+        raise Warning("No y data was provided")
 
     all_data = {**x_data_dict, **y_obs_data, **y_pre_data}
     if out_file:

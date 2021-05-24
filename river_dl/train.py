@@ -5,7 +5,6 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel
-from river_dl.loss_functions import weighted_masked_rmse
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -27,6 +26,7 @@ def train_model(
     finetune_epochs,
     hidden_units,
     out_dir,
+    loss_func,
     flow_in_temp=False,
     model_type="rgcn",
     seed=None,
@@ -42,11 +42,14 @@ def train_model(
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
     :param out_dir: [str] directory where the output files should be written
+    :param loss_func: [function] loss function. only supported for rgcn
+    currently
     :param flow_in_temp: [bool] whether the flow predictions should feed
     into the temp predictions
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
     'lstm_grad_correction')
     :param seed: [int] random seed
+    :param dropout: [float] dropout rate for "lstm" model (0-1.0)
     :param lamb: [float] (short for 'lambda') weight between 0 and 1. How much
     to weight the auxiliary rmse is weighted compared to the main rmse. The
     difference between one and lambda becomes the main rmse weight.
@@ -61,7 +64,6 @@ def train_model(
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data["dist_matrix"]
 
     n_seg = len(np.unique(io_data["ids_trn"]))
     if n_seg > 1:
@@ -73,6 +75,7 @@ def train_model(
     if model_type == "lstm":
         model = LSTMModel(hidden_units, lamb=lamb)
     elif model_type == "rgcn":
+        dist_matrix = io_data["dist_matrix"]
         model = RGCNModel(
             hidden_units,
             flow_in_temp=flow_in_temp,
@@ -90,6 +93,8 @@ def train_model(
         )
     elif model_type == "gru":
         model = GRUModel(hidden_units, lamb=lamb)
+    else:
+        raise ValueError(f"{model_type} is not a supported model type")
 
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
@@ -105,12 +110,16 @@ def train_model(
         # use built in 'fit' method unless model is grad correction
         x_trn_pre = io_data["x_trn"]
         # combine with weights to pass to loss function
-        y_trn_pre = np.concatenate(
-            [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
-        )
+        try:
+            y_trn_pre = np.concatenate(
+                [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
+            )
+        except KeyError:
+            raise KeyError("trying to pretrain, but no y pretrain ('y_pre_trn')"
+                           "data found")
 
         if model_type == "rgcn":
-            model.compile(optimizer_pre, loss=weighted_masked_rmse(lamb=lamb))
+            model.compile(optimizer_pre, loss=loss_func)
         else:
             model.compile(optimizer_pre)
 
@@ -141,7 +150,7 @@ def train_model(
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
         if model_type == "rgcn":
-            model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
+            model.compile(optimizer_ft, loss=loss_func)
         else:
             model.compile(optimizer_ft)
 

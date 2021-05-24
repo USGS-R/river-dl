@@ -119,7 +119,7 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
     return combined
 
 
-def read_obs(obs_file, y_vars, x_data, spatial_idx_name, time_idx_name):
+def read_obs(obs_file, y_vars, x_data):
     """
     read and format multiple observation files. we read in the pretrain data to
     make sure we have the same indexing.
@@ -127,16 +127,10 @@ def read_obs(obs_file, y_vars, x_data, spatial_idx_name, time_idx_name):
     temporal domain
     :param y_vars: [list of str] which variables to prepare data for
     :param obs_file: [list] filenames of observation file
-    :param spatial_idx_name: [str] name of column that is used for spatial
-        index (e.g., 'seg_id_nat')
-    :param time_idx_name: [str] name of column that is used for temporal index
-        (usually 'time')
     :return: [xr dataset] the observations in the same time
     """
-    obs = [x_data.sortby([spatial_idx_name, time_idx_name])]
     ds = xr.open_zarr(obs_file)
-    obs.append(ds)
-    obs = xr.merge(obs, join="left")
+    obs = xr.merge([x_data, ds], join="left")
     obs = obs[y_vars]
     return obs
 
@@ -531,9 +525,7 @@ def prep_y_data(
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
-    y_data = read_obs(
-        y_data_file, y_vars, x_data, spatial_idx_name, time_idx_name
-    )
+    y_data = read_obs(y_data_file, y_vars, x_data)
 
     y_trn, y_val, y_tst = separate_trn_tst(
         y_data,
@@ -601,6 +593,8 @@ def prep_data(
     seq_len=365,
     pretrain_file=None,
     distfile=None,
+    dist_idx_name="rowcolnames",
+    dist_type="updown",
     catch_prop_file=None,
     exclude_file=None,
     log_y_vars=False,
@@ -642,6 +636,10 @@ def prep_data(
     a spatial coordinate and a time coordinate that are specified in the
     `spatial_idx_name` and `time_idx_name` arguments
     :param distfile: [str] path to the distance matrix .npz file
+    :param dist_idx_name: [str] name of index to sort dist_matrix by. This is
+    the name of an array in the distance matrix .npz file
+    :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
+    "updown")
     :param catch_prop_file: [str] the path to the catchment properties file. If
     left unfilled, the catchment properties will not be included as predictors
     :param exclude_file: [str] path to exclude file
@@ -676,9 +674,10 @@ def prep_data(
             "dist_matrix": prepared adjacency matrix
     """
     x_data = xr.open_zarr(x_data_file)
+    x_data = x_data.sortby([spatial_idx_name, time_idx_name])
 
     if segs:
-        x_data = x_data.sel[{spatial_idx_name: segs}]
+        x_data = x_data.sel({spatial_idx_name: segs})
 
     x_data = x_data[x_vars]
 
@@ -774,7 +773,12 @@ def prep_data(
         ),
     }
     if distfile:
-        x_data_dict["dist_matrix"] = (prep_adj_matrix(distfile, "updown"),)
+        x_data_dict["dist_matrix"] = prep_adj_matrix(
+            infile=distfile,
+            dist_type=dist_type,
+            dist_idx_name=dist_idx_name,
+            segs=segs,
+        )
 
     y_obs_data = {}
     y_pre_data = {}
@@ -850,30 +854,37 @@ def prep_data(
     return all_data
 
 
-def sort_dist_matrix(mat, row_col_names):
+def sort_dist_matrix(mat, row_col_names, segs=None):
     """
     sort the distance matrix by id
     :return:
     """
+    row_col_names = row_col_names.astype(type(segs[0]))
     df = pd.DataFrame(mat, columns=row_col_names, index=row_col_names)
+    if segs:
+        df = df[segs]
+        df = df.loc[segs]
     df = df.sort_index(axis=0)
     df = df.sort_index(axis=1)
     return df
 
 
-def prep_adj_matrix(infile, dist_type, out_file=None):
+def prep_adj_matrix(infile, dist_type, dist_idx_name, segs=None, out_file=None):
     """
     process adj matrix.
     **The resulting matrix is sorted by id **
-    :param infile:
+    :param infile: [str] path to the distance matrix .npz file
     :param dist_type: [str] type of distance matrix ("upstream", "downstream" or
     "updown")
-    :param out_file:
+    :param dist_idx_name: [str] name of index to sort dist_matrix by. This is
+    the name of an array in the distance matrix .npz file
+    :param segs: [list-like] which segments to prepare the data for
+    :param out_file: [str] path to save the .npz file to
     :return: [numpy array] processed adjacency matrix
     """
     adj_matrices = np.load(infile)
     adj = adj_matrices[dist_type]
-    adj = sort_dist_matrix(adj, adj_matrices["rowcolnames"])
+    adj = sort_dist_matrix(adj, adj_matrices[dist_idx_name], segs=segs)
     adj = np.where(np.isinf(adj), 0, adj)
     adj = -adj
     mean_adj = np.mean(adj[adj != 0])

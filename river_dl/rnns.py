@@ -4,26 +4,34 @@ import tensorflow as tf
 from tensorflow.keras import layers
 from river_dl.loss_functions import nnse_masked_one_var, nnse_one_var_samplewise
 
-
 class LSTMModel(tf.keras.Model):
     def __init__(
         self,
         hidden_size,
         gradient_correction=False,
         lamb=1,
-        dropout=0,
+        dropout=0, # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
         grad_log_file=None,
+        return_state=False,
     ):
         """
         :param hidden_size: [int] the number of hidden units
+        :param gradient_correction: [bool] 
+        :param lamb: [float] 
+        :param dropout: [float] value between 0 and 1 for the probability of an element to be zero  
+        :param grad_log_file: [str] location of gradient log file 
+        :param return_state: [bool] return the hidden (h) and cell (c) states of LSTM 
         """
         super().__init__()
         self.gradient_correction = gradient_correction
         self.grad_log_file = grad_log_file
         self.lamb = lamb
+        self.return_state = return_state 
         self.rnn_layer = layers.LSTM(
             hidden_size,
             return_sequences=True,
+            stateful=True,
+            return_state=return_state,
             name="rnn_shared",
             recurrent_dropout=dropout,
         )
@@ -32,7 +40,10 @@ class LSTMModel(tf.keras.Model):
 
     @tf.function
     def call(self, inputs, **kwargs):
-        x = self.rnn_layer(inputs)
+        if self.return_state: 
+            x, h, c = self.rnn_layer(inputs)
+        else:
+            x = self.rnn_layer(inputs)
         main_prediction = self.dense_main(x)
         aux_prediction = self.dense_aux(x)
         return tf.concat([main_prediction, aux_prediction], axis=2)
@@ -79,7 +90,11 @@ class LSTMModel(tf.keras.Model):
 
 
 class GRUModel(LSTMModel):
-    def __init__(self, hidden_size, lamb=1):
+    def __init__(
+        self,
+        hidden_size,
+        lamb=1
+    ):
         """
         :param hidden_size: [int] the number of hidden units
         """

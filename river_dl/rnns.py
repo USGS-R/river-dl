@@ -20,7 +20,7 @@ class LSTMModel(tf.keras.Model):
         :param gradient_correction: [bool] 
         :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
         :param lamb: [float] 
-        :param dropout: [float] value between 0 and 1 for the probability of an element to be zero  
+        :param dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
         :param grad_log_file: [str] location of gradient log file 
         :param return_state: [bool] return the hidden (h) and cell (c) states of LSTM 
         """

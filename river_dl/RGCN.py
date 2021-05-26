@@ -16,7 +16,7 @@ class RGCN(layers.Layer):
         hidden_size, 
         A, 
         tasks=1, 
-        dropout=0, 
+        dropout=0,  # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
         flow_in_temp=False, 
         rand_seed=None,
         return_state=False
@@ -25,9 +25,12 @@ class RGCN(layers.Layer):
 
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
+        :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
+        :param dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
+        :param return_state: [bool] whether the hidden (h) and cell (c) states of LSTM should be returned 
         """
         super().__init__()
         self.hidden_size = hidden_size
@@ -239,10 +242,12 @@ class RGCNModel(tf.keras.Model):
         """
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
+        :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
+        :param dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
-        :param return_state: [bool] whether the h and c states should be returned (for DA)
+        :param return_state: [bool] whether the hidden (h) and cell (c) states of LSTM should be returned 
         """
         super().__init__()
         self.return_state = return_state

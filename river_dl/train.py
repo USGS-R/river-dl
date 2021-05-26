@@ -145,9 +145,10 @@ def train_model(
         temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
         temp_mean = io_data['y_mean'][temp_index]
         temp_sd = io_data['y_std'][temp_index]
-        print("temp index")
-        print(temp_index) 
+        print("loss type")
+        print(loss_type.lower())
         if model_type == "rgcn" and loss_type.lower()=="gw":
+#        if model_type == "rgcn":
             model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=lamb,lamb2=lamb2,lamb3=lamb3))
         elif model_type == "rgcn":
             model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))

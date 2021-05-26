@@ -69,19 +69,23 @@ def samplewise_nnse_loss(y_true, y_pred):
     return 1 - nnse_val
 
 
-def nnse_masked_one_var(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+def nnse_masked_one_var(data, y_pred, var_idx, tasks):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx, tasks)
     return nnse_loss(y_true, y_pred)
 
 
-def nnse_one_var_samplewise(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+def nnse_one_var_samplewise(data, y_pred, var_idx, tasks):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx, tasks)
     return samplewise_nnse_loss(y_true, y_pred)
 
 
-def y_data_components(data, y_pred, var_idx):
-    weights = data[:, :, -2:]
-    y_true = data[:, :, :-2]
+def y_data_components(data, y_pred, var_idx, tasks):
+    if tasks == 2: 
+        weights = data[:, :, -2:]
+        y_true = data[:, :, :-2]
+    else: 
+        weights = data[:, :, -1:]
+        y_true = data[:, :, :-1]
 
     # ensure y_pred, weights, and y_true are all tensors the same data type
     y_true = tf.convert_to_tensor(y_true)
@@ -99,8 +103,8 @@ def y_data_components(data, y_pred, var_idx):
     return y_true, y_pred, weights
 
 
-def rmse_masked_one_var(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+def rmse_masked_one_var(data, y_pred, var_idx, tasks):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx, tasks)
     return rmse(y_true, y_pred)
 
 
@@ -181,8 +185,8 @@ def kge_norm_loss(y_true, y_pred):
     return 1 - norm_kge(y_true, y_pred)
 
 
-def kge_loss_one_var(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
+def kge_loss_one_var(data, y_pred, var_idx, tasks):
+    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx, tasks)
     return kge_loss(y_true, y_pred)
 
 

@@ -11,7 +11,16 @@ from tensorflow.keras import layers
 
 
 class RGCN(layers.Layer):
-    def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
+    def __init__(
+        self, 
+        hidden_size, 
+        A, 
+        tasks=1, 
+        dropout=0, 
+        flow_in_temp=False, 
+        rand_seed=None,
+        return_state=False
+    ):
         """
 
         :param hidden_size: [int] the number of hidden units
@@ -23,10 +32,12 @@ class RGCN(layers.Layer):
         super().__init__()
         self.hidden_size = hidden_size
         self.A = A.astype("float32")
+        self.tasks = tasks 
         self.flow_in_temp = flow_in_temp
+        self.return_state = return_state
 
         # set up the layer
-        self.lstm = tf.keras.layers.LSTMCell(hidden_size)
+        self.lstm = tf.keras.layers.LSTMCell(hidden_size, recurrent_dropout=dropout)
 
         ### set up the weights ###
         w_initializer = tf.random_normal_initializer(
@@ -88,6 +99,7 @@ class RGCN(layers.Layer):
             shape=[hidden_size], initializer="zeros", name="b_c"
         )
 
+        # will be doing two task predictions if flow_in_temp == True 
         if self.flow_in_temp:
             # was W2
             self.W_out_flow = self.add_weight(
@@ -108,17 +120,29 @@ class RGCN(layers.Layer):
                 shape=[1], initializer="zeros", name="b_out"
             )
         else:
-            # was W2
-            self.W_out = self.add_weight(
-                shape=[hidden_size, 2], initializer=w_initializer, name="W_out"
-            )
-            # was b2
-            self.b_out = self.add_weight(
-                shape=[2], initializer="zeros", name="b_out"
-            )
+            if self.tasks == 2: 
+                # was W2
+                self.W_out = self.add_weight(
+                    shape=[hidden_size, 2], initializer=w_initializer, name="W_out"
+                )
+                # was b2
+                self.b_out = self.add_weight(
+                    shape=[2], initializer="zeros", name="b_out"
+                )
+            else: 
+                # was W2
+                self.W_out = self.add_weight(
+                    shape=[hidden_size, 1], initializer=w_initializer, name="W_out"
+                )
+                # was b2
+                self.b_out = self.add_weight(
+                    shape=[1], initializer="zeros", name="b_out"
+                )
 
     @tf.function
     def call(self, inputs, **kwargs):
+        h_list = []
+        c_list = []
         graph_size = self.A.shape[0]
         hidden_state_prev, cell_state_prev = (
             tf.zeros([graph_size, self.hidden_size]),
@@ -126,7 +150,15 @@ class RGCN(layers.Layer):
         )
         out = []
         n_steps = inputs.shape[1]
+        h_update = tf.cast(kwargs['h_init'], tf.float32)
+        c_update = tf.cast(kwargs['c_init'], tf.float32)
+        if self.return_state:
+            # set the initial h & c states to the supplied h and c states if using DA 
+            hidden_state_prev = h_update 
+            cell_state_prev = c_update 
         for t in range(n_steps):
+            seq, state = self.lstm(inputs[:, t, :], states=[h_update, c_update])
+            h, c = state # are these used anywhere? 
             h_graph = tf.nn.tanh(
                 tf.matmul(
                     self.A,
@@ -176,23 +208,75 @@ class RGCN(layers.Layer):
 
             hidden_state_prev = h_update
             cell_state_prev = c_update
+            
+            h_list.append(h_update)
+            c_list.append(c_update)
+            
+        h_list = tf.stack(h_list)
+        c_list = tf.stack(c_list)
+        h_list = tf.transpose(h_list, [1, 0, 2])
+        c_list = tf.transpose(c_list, [1, 0, 2])
         out = tf.stack(out)
         out = tf.transpose(out, [1, 0, 2])
-        return out
+        
+        if self.return_state: 
+            return out, h_list, c_list 
+        else:
+            return out
 
 
 class RGCNModel(tf.keras.Model):
-    def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
+    def __init__(
+        self, 
+        hidden_size, 
+        A, 
+        tasks=1, 
+        dropout=0, # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
+        flow_in_temp=False, 
+        rand_seed=None,
+        return_state=False
+    ):
         """
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
+        :param return_state: [bool] whether the h and c states should be returned (for DA)
         """
         super().__init__()
-        self.rgcn_layer = RGCN(hidden_size, A, flow_in_temp, rand_seed)
+        self.return_state = return_state
+        self.hidden_size = hidden_size 
+        self.tasks = tasks 
+        self.dropout = dropout 
+        self.rnn_layer = tf.keras.layers.LSTM(
+            hidden_size, 
+            return_sequences=True, 
+            stateful=True,
+            return_state=return_state,
+            recurrent_dropout=dropout)
+            
+        self.rgcn_layer = RGCN(
+            hidden_size, 
+            A,
+            tasks,
+            dropout,
+            flow_in_temp, 
+            rand_seed,
+            return_state)
+            
+        self.h_gr = None
+        self.c_gr = None
 
     def call(self, inputs, **kwargs):
-        output = self.rgcn_layer(inputs)
+        batch_size = inputs.shape[0]
+        h_init = kwargs.get('h_init', tf.zeros([batch_size, self.hidden_size]))
+        c_init = kwargs.get('c_init', tf.zeros([batch_size, self.hidden_size]))
+        if self.return_state: 
+            output, h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
+            self.h_gr = h_gr
+            self.c_gr = c_gr
+        else:
+            output = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
+
         return output

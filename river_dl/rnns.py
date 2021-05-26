@@ -9,6 +9,7 @@ class LSTMModel(tf.keras.Model):
         self,
         hidden_size,
         gradient_correction=False,
+        tasks=1, 
         lamb=1,
         dropout=0, # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
         grad_log_file=None,
@@ -17,6 +18,7 @@ class LSTMModel(tf.keras.Model):
         """
         :param hidden_size: [int] the number of hidden units
         :param gradient_correction: [bool] 
+        :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
         :param lamb: [float] 
         :param dropout: [float] value between 0 and 1 for the probability of an element to be zero  
         :param grad_log_file: [str] location of gradient log file 
@@ -25,6 +27,7 @@ class LSTMModel(tf.keras.Model):
         super().__init__()
         self.gradient_correction = gradient_correction
         self.grad_log_file = grad_log_file
+        self.tasks = tasks 
         self.lamb = lamb
         self.return_state = return_state 
         self.rnn_layer = layers.LSTM(
@@ -35,8 +38,11 @@ class LSTMModel(tf.keras.Model):
             name="rnn_shared",
             recurrent_dropout=dropout,
         )
-        self.dense_main = layers.Dense(1, name="dense_main")
-        self.dense_aux = layers.Dense(1, name="dense_aux")
+        if self.tasks == 1: 
+            self.dense_main = layers.Dense(1, name="dense_main")
+        else: 
+            self.dense_main = layers.Dense(1, name="dense_main")
+            self.dense_aux = layers.Dense(1, name="dense_aux")
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -44,9 +50,14 @@ class LSTMModel(tf.keras.Model):
             x, h, c = self.rnn_layer(inputs)
         else:
             x = self.rnn_layer(inputs)
-        main_prediction = self.dense_main(x)
-        aux_prediction = self.dense_aux(x)
-        return tf.concat([main_prediction, aux_prediction], axis=2)
+            
+        if self.tasks == 1: 
+            main_prediction = self.dense_main(x) 
+            return main_prediction
+        else: 
+            main_prediction = self.dense_main(x)
+            aux_prediction = self.dense_aux(x)
+            return tf.concat([main_prediction, aux_prediction], axis=2)
 
     @tf.function
     def train_step(self, data):
@@ -58,35 +69,44 @@ class LSTMModel(tf.keras.Model):
         with tf.GradientTape(persistent=True) as tape:
             y_pred = self(x, training=True)  # forward pass
 
-            loss_main = nnse_one_var_samplewise(y, y_pred, 0)
-            loss_aux = nnse_one_var_samplewise(y, y_pred, 1)
+            loss_main = nnse_one_var_samplewise(y, y_pred, 0, self.tasks)
+            if self.tasks == 2: 
+                loss_aux = nnse_one_var_samplewise(y, y_pred, 1, 2)
 
         trainable_vars = self.trainable_variables
 
         main_out_vars = get_variables(trainable_vars, "dense_main")
-        aux_out_vars = get_variables(trainable_vars, "dense_aux")
-        shared_vars = get_variables(trainable_vars, "rnn_shared")
+        if self.tasks == 2: 
+            aux_out_vars = get_variables(trainable_vars, "dense_aux")
+            shared_vars = get_variables(trainable_vars, "rnn_shared")
 
         # get gradients
         gradient_main_out = tape.gradient(loss_main, main_out_vars)
-        gradient_aux_out = tape.gradient(loss_aux, aux_out_vars)
-        gradient_shared_main = tape.gradient(loss_main, shared_vars)
-        gradient_shared_aux = tape.gradient(loss_aux, shared_vars)
+        if self.tasks == 2: 
+            gradient_aux_out = tape.gradient(loss_aux, aux_out_vars)
+            gradient_shared_main = tape.gradient(loss_main, shared_vars)
+            gradient_shared_aux = tape.gradient(loss_aux, shared_vars)
 
-        if self.gradient_correction:
-            # adjust auxiliary gradient
-            gradient_shared_aux = adjust_gradient_list(
-                gradient_shared_main, gradient_shared_aux, self.grad_log_file
+        if self.tasks == 2: 
+            if self.gradient_correction:
+                # adjust auxiliary gradient
+                gradient_shared_aux = adjust_gradient_list(
+                    gradient_shared_main, gradient_shared_aux, self.grad_log_file
+                )
+        if self.tasks == 2: 
+            combined_gradient = combine_gradients_list(
+                gradient_shared_main, gradient_shared_aux, lamb=self.lamb
             )
-        combined_gradient = combine_gradients_list(
-            gradient_shared_main, gradient_shared_aux, lamb=self.lamb
-        )
 
         # apply gradients
         self.optimizer.apply_gradients(zip(gradient_main_out, main_out_vars))
-        self.optimizer.apply_gradients(zip(gradient_aux_out, aux_out_vars))
-        self.optimizer.apply_gradients(zip(combined_gradient, shared_vars))
-        return {"loss_main": loss_main, "loss_aux": loss_aux}
+        if self.tasks == 2: 
+            self.optimizer.apply_gradients(zip(gradient_aux_out, aux_out_vars))
+            self.optimizer.apply_gradients(zip(combined_gradient, shared_vars))
+            return {"loss_main": loss_main, "loss_aux": loss_aux}
+        else: 
+            return {"loss_main": loss_main} 
+        
 
 
 class GRUModel(LSTMModel):
@@ -140,3 +160,4 @@ def adjust_gradient_list(main_grads, aux_grads, logfile=None):
         adjust_gradient(main_grads[i], aux_grads[i], logfile)
         for i in range(len(main_grads))
     ]
+

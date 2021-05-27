@@ -29,12 +29,12 @@ def train_model(
     out_dir,
     flow_in_temp=False,
     model_type="rgcn",
-    loss_type="GW",
+    loss_type="noGW",
     seed=None,
     dropout=0,
     lamb=1,
-    lamb2=2,
-    lamb3=0.1,
+    lamb2=0,
+    lamb3=0,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
 ):
@@ -118,6 +118,7 @@ def train_model(
             model.compile(optimizer_pre)
 
         csv_log_pre = tf.keras.callbacks.CSVLogger(
+            
             os.path.join(out_dir, f"pretrain_log.csv")
         )
         model.fit(
@@ -145,10 +146,8 @@ def train_model(
         temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
         temp_mean = io_data['y_mean'][temp_index]
         temp_sd = io_data['y_std'][temp_index]
-        print("loss type")
-        print(loss_type.lower())
+        
         if model_type == "rgcn" and loss_type.lower()=="gw":
-#        if model_type == "rgcn":
             model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=lamb,lamb2=lamb2,lamb3=lamb3))
         elif model_type == "rgcn":
             model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
@@ -160,14 +159,16 @@ def train_model(
         )
 
         x_trn_obs = io_data["x_trn"]
-        y_trn_obs = np.concatenate(
-            [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
-        )
-        y_means = io_data["y_pre_trn"]
-        print("x_trn_obs shape")
-        print(x_trn_obs.shape)
-        print("y_trn_obs shape")
-        print(y_trn_obs.shape)
+        if loss_type.lower()!="gw":
+            y_trn_obs = np.concatenate(
+                [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
+            )
+        else:
+            y_trn_obs = np.concatenate(
+                [io_data["y_obs_trn"], io_data["GW_trn"],io_data["y_obs_wgts"]], axis=2
+            )
+        #y_means = io_data["y_pre_trn"]
+
         model.fit(
             x=x_trn_obs,
             y=y_trn_obs,

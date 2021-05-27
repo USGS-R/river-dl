@@ -239,11 +239,11 @@ def prep_annual_signal_data(
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
 
-    data['y_obs_trn'] = np.concatenate([preppedData['y_obs_trn'],make_GW_dataset(GW_trn,obs_trn,gwVarList)], axis=2)
-    data['y_obs_tst'] = np.concatenate([preppedData['y_obs_tst'],make_GW_dataset(GW_tst,obs_tst,gwVarList)], axis=2)
-    data['y_obs_val'] = np.concatenate([preppedData['y_obs_val'],make_GW_dataset(GW_val,obs_val,gwVarList)], axis=2)
-    data['y_vars'] = np.append(data['y_vars'],gwVarList)
-    np.savez_compressed(out_file2, **data)
+    #data['y_obs_trn'] = np.concatenate([preppedData['y_obs_trn'],make_GW_dataset(GW_trn,obs_trn,gwVarList)], axis=2)
+    #data['y_obs_tst'] = np.concatenate([preppedData['y_obs_tst'],make_GW_dataset(GW_tst,obs_tst,gwVarList)], axis=2)
+    #data['y_obs_val'] = np.concatenate([preppedData['y_obs_val'],make_GW_dataset(GW_val,obs_val,gwVarList)], axis=2)
+    #data['y_vars'] = np.append(data['y_vars'],gwVarList)
+    
     
     #save the GW data
     data2 = {}
@@ -251,7 +251,12 @@ def prep_annual_signal_data(
     data2['GW_trn']=GW_trn
     data2['GW_val']=GW_val
     data2['GW_cols']=GW_trn.columns.values.astype('str')
-    np.savez_compressed(out_file, **data2)
+    data['GW_trn']=make_GW_dataset(GW_trn,obs_trn,gwVarList)
+    data['GW_tst']=make_GW_dataset(GW_tst,obs_tst,gwVarList)
+    data['GW_val']=make_GW_dataset(GW_val,obs_val,gwVarList)
+    data['GW_cols']=GW_trn.columns.values.astype('str')
+    np.savez_compressed(out_file, **data)
+    np.savez_compressed(out_file2, **data2)
 
 def calc_amp_phi(thisData):
     segList = np.unique(thisData['seg_id_nat'])

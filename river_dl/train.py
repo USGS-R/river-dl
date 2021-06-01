@@ -29,7 +29,7 @@ def train_model(
     out_dir,
     flow_in_temp=False,
     model_type="rgcn",
-    loss_type="noGW",
+    loss_type="GW",
     seed=None,
     dropout=0,
     lamb=1,
@@ -167,7 +167,7 @@ def train_model(
             y_trn_obs = np.concatenate(
                 [io_data["y_obs_trn"], io_data["GW_trn"],io_data["y_obs_wgts"]], axis=2
             )
-        #y_means = io_data["y_pre_trn"]
+
 
         model.fit(
             x=x_trn_obs,
@@ -184,7 +184,7 @@ def train_model(
     with open(out_time_file, "a") as f:
         f.write(
             f"elapsed time finetune:\
-                 {finetune_time_elapsed} \n"
+                 {finetune_time_elapsed} \nloss type: {loss_type}\n"
         )
 
     return model

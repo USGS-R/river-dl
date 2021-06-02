@@ -72,7 +72,7 @@ class LSTMModel(tf.keras.Model):
 
             loss_main = nnse_one_var_samplewise(y, y_pred, 0, self.tasks)
             if self.tasks == 2: 
-                loss_aux = nnse_one_var_samplewise(y, y_pred, 1, 2)
+                loss_aux = nnse_one_var_samplewise(y, y_pred, 1, self.tasks)
 
         trainable_vars = self.trainable_variables
 

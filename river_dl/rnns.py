@@ -41,10 +41,8 @@ class LSTMModel(tf.keras.Model):
             recurrent_dropout=recurrent_dropout,
             dropout=dropout
         )
-        if self.tasks == 1: 
-            self.dense_main = layers.Dense(1, name="dense_main")
-        else: 
-            self.dense_main = layers.Dense(1, name="dense_main")
+        self.dense_main = layers.Dense(1, name="dense_main")
+        if self.tasks == 2: 
             self.dense_aux = layers.Dense(1, name="dense_aux")
 
     @tf.function
@@ -163,4 +161,3 @@ def adjust_gradient_list(main_grads, aux_grads, logfile=None):
         adjust_gradient(main_grads[i], aux_grads[i], logfile)
         for i in range(len(main_grads))
     ]
-

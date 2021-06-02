@@ -19,8 +19,8 @@ lamb3: 0.1
 #anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
 loss_type: "GW"
 
-pt_epochs: 20
-ft_epochs: 10
+pt_epochs: 200
+ft_epochs: 100
 
 train_start_date:
   - '1985-10-01'

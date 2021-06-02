@@ -139,18 +139,15 @@ class RGCN(layers.Layer):
         h_list = []
         c_list = []
         graph_size = self.A.shape[0]
-        hidden_state_prev, cell_state_prev = (
-            tf.zeros([graph_size, self.hidden_size]),
-            tf.zeros([graph_size, self.hidden_size]),
-        )
         out = []
         n_steps = inputs.shape[1]
-        h_update = tf.cast(kwargs['h_init'], tf.float32)
-        c_update = tf.cast(kwargs['c_init'], tf.float32)
+        # set the initial h & c states to the supplied h and c states if using DA, or 0's otherwise
         if self.return_state:
-            # set the initial h & c states to the supplied h and c states if using DA 
-            hidden_state_prev = h_update 
-            cell_state_prev = c_update 
+            hidden_state_prev = tf.cast(kwargs['h_init'], tf.float32)
+            cell_state_prev = tf.cast(kwargs['c_init'], tf.float32)
+        else:
+            hidden_state_prev = tf.zeros([graph_size, self.hidden_size])
+            cell_state_prev = tf.zeros([graph_size, self.hidden_size])
         for t in range(n_steps):
             h_graph = tf.nn.tanh(
                 tf.matmul(

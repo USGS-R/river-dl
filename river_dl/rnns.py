@@ -10,7 +10,7 @@ class LSTMModel(tf.keras.Model):
         hidden_size,
         gradient_correction=False,
         tasks=1, 
-        lamb=1,
+        lambda_aux=1,
         recurrent_dropout=0,
         dropout=0,  
         grad_log_file=None,
@@ -20,7 +20,7 @@ class LSTMModel(tf.keras.Model):
         :param hidden_size: [int] the number of hidden units
         :param gradient_correction: [bool] 
         :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
-        :param lamb: [float] 
+        :param lambda_aux: [float] 
         :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
         :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
         :param grad_log_file: [str] location of gradient log file 
@@ -30,7 +30,7 @@ class LSTMModel(tf.keras.Model):
         self.gradient_correction = gradient_correction
         self.grad_log_file = grad_log_file
         self.tasks = tasks 
-        self.lamb = lamb
+        self.lambda_aux = lambda_aux
         self.return_state = return_state 
         self.rnn_layer = layers.LSTM(
             hidden_size,
@@ -96,7 +96,7 @@ class LSTMModel(tf.keras.Model):
                 )
         if self.tasks == 2: 
             combined_gradient = combine_gradients_list(
-                gradient_shared_main, gradient_shared_aux, lamb=self.lamb
+                gradient_shared_main, gradient_shared_aux, lambda_aux=self.lambda_aux
             )
 
         # apply gradients
@@ -114,12 +114,12 @@ class GRUModel(LSTMModel):
     def __init__(
         self,
         hidden_size,
-        lamb=1
+        lambda_aux=1
     ):
         """
         :param hidden_size: [int] the number of hidden units
         """
-        super().__init__(hidden_size, lamb=lamb)
+        super().__init__(hidden_size, lambda_aux=lambda_aux)
         self.rnn_layer = layers.GRU(
             hidden_size, return_sequences=True, name="rnn_shared"
         )
@@ -152,8 +152,8 @@ def get_variables(trainable_variables, name):
     return [v for v in trainable_variables if name in v.name]
 
 
-def combine_gradients_list(main_grads, aux_grads, lamb=1):
-    return [main_grads[i] + lamb * aux_grads[i] for i in range(len(main_grads))]
+def combine_gradients_list(main_grads, aux_grads, lambda_aux=1):
+    return [main_grads[i] + lambda_aux * aux_grads[i] for i in range(len(main_grads))]
 
 
 def adjust_gradient_list(main_grads, aux_grads, logfile=None):

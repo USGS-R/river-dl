@@ -31,7 +31,7 @@ def train_model(
     model_type="rgcn",
     seed=None,
     dropout=0,
-    lamb=1,
+    lambda_aux=1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
 ):
@@ -47,7 +47,7 @@ def train_model(
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
     'lstm_grad_correction')
     :param seed: [int] random seed
-    :param lamb: [float] (short for 'lambda') weight between 0 and 1. How much
+    :param lambda_aux: [float] weight between 0 and 1. How much
     to weight the auxiliary rmse is weighted compared to the main rmse. The
     difference between one and lambda becomes the main rmse weight.
     :param learning_rate_pre: [float] the pretrain learning rate
@@ -71,7 +71,7 @@ def train_model(
         batch_size = num_years
 
     if model_type == "lstm":
-        model = LSTMModel(hidden_units, lamb=lamb)
+        model = LSTMModel(hidden_units, lambda_aux=lambda_aux)
     elif model_type == "rgcn":
         model = RGCNModel(
             hidden_units,
@@ -84,12 +84,12 @@ def train_model(
         model = LSTMModel(
             hidden_units,
             gradient_correction=True,
-            lamb=lamb,
+            lambda_aux=lambda_aux,
             dropout=dropout,
             grad_log_file=grad_log_file,
         )
     elif model_type == "gru":
-        model = GRUModel(hidden_units, lamb=lamb)
+        model = GRUModel(hidden_units, lambda_aux=lambda_aux)
 
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
@@ -110,7 +110,7 @@ def train_model(
         )
 
         if model_type == "rgcn":
-            model.compile(optimizer_pre, loss=weighted_masked_rmse(lamb=lamb))
+            model.compile(optimizer_pre, loss=weighted_masked_rmse(lambda_aux=lambda_aux))
         else:
             model.compile(optimizer_pre)
 
@@ -141,7 +141,7 @@ def train_model(
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
         if model_type == "rgcn":
-            model.compile(optimizer_ft, loss=weighted_masked_rmse(lamb=lamb))
+            model.compile(optimizer_ft, loss=weighted_masked_rmse(lambda_aux=lambda_aux))
         else:
             model.compile(optimizer_ft)
 

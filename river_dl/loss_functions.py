@@ -108,10 +108,10 @@ def rmse_masked_one_var(data, y_pred, var_idx, tasks):
     return rmse(y_true, y_pred)
 
 
-def weighted_masked_rmse(lamb=0.5, tasks=1):
+def weighted_masked_rmse(lambda_aux=0.5, tasks=1):
     """
     calculate a weighted, masked rmse.
-    :param lamb: [float] (short for lambda). The factor that the auxiliary loss
+    :param lambda_aux: [float] The factor that the auxiliary loss
     will be multiplied by before added to the main loss.
     :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
     """
@@ -120,7 +120,7 @@ def weighted_masked_rmse(lamb=0.5, tasks=1):
         rmse_main = rmse_masked_one_var(data, y_pred, 0, tasks)
         if tasks == 2: 
             rmse_aux = rmse_masked_one_var(data, y_pred, 1, tasks)
-            rmse_loss = rmse_main + lamb * rmse_aux
+            rmse_loss = rmse_main + lambda_aux * rmse_aux
             return rmse_loss
         else: 
             return rmse_main 

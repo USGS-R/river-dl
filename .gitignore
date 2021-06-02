@@ -7,3 +7,4 @@ DRB_output*/
 *.ipynb_checkpoints/*
 .snakemake/
 *__pycache__*
+.ipynb_checkpoints*

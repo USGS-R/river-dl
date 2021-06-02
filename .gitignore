@@ -8,3 +8,5 @@ DRB_output*/
 .snakemake/
 *__pycache__*
 .ipynb_checkpoints*
+*.slurm
+*.out

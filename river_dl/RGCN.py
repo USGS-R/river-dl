@@ -15,31 +15,21 @@ class RGCN(layers.Layer):
         self, 
         hidden_size, 
         A, 
-        tasks=1, 
-        recurrent_dropout=0,   
+        recurrent_dropout=0,
         dropout=0,
-        flow_in_temp=False, 
         rand_seed=None,
-        return_state=False
     ):
         """
 
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
-        :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
-        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
-        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
-        :param flow_in_temp: [bool] whether the flow predictions should feed
-        into the temp predictions
+        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero
+        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero
         :param rand_seed: [int] the random seed for initialization
-        :param return_state: [bool] whether the hidden (h) and cell (c) states of LSTM should be returned 
         """
         super().__init__()
         self.hidden_size = hidden_size
         self.A = A.astype("float32")
-        self.tasks = tasks 
-        self.flow_in_temp = flow_in_temp
-        self.return_state = return_state
 
         # set up the layer
         self.lstm = tf.keras.layers.LSTMCell(hidden_size, recurrent_dropout=recurrent_dropout, dropout=dropout)
@@ -104,45 +94,14 @@ class RGCN(layers.Layer):
             shape=[hidden_size], initializer="zeros", name="b_c"
         )
 
-        # will be doing two task predictions if flow_in_temp == True 
-        if self.flow_in_temp:
-            # was W2
-            self.W_out_flow = self.add_weight(
-                shape=[hidden_size, 1], initializer=w_initializer, name="W_out"
-            )
-            # was b2
-            self.b_out_flow = self.add_weight(
-                shape=[1], initializer="zeros", name="b_out"
-            )
-
-            self.W_out_temp = self.add_weight(
-                shape=[hidden_size + 1, 1],
-                initializer=w_initializer,
-                name="W_out",
-            )
-
-            self.b_out_temp = self.add_weight(
-                shape=[1], initializer="zeros", name="b_out"
-            )
-        else:
-            # was W2
-            self.W_out = self.add_weight(
-                shape=[hidden_size, self.tasks], initializer=w_initializer, name="W_out"
-            )
-            # was b2
-            self.b_out = self.add_weight(
-                shape=[self.tasks], initializer="zeros", name="b_out"
-            )
-
     @tf.function
     def call(self, inputs, **kwargs):
         h_list = []
         c_list = []
         graph_size = self.A.shape[0]
-        out = []
         n_steps = inputs.shape[1]
         # set the initial h & c states to the supplied h and c states if using DA, or 0's otherwise
-        if self.return_state:
+        if kwargs.get('h_init'):
             hidden_state_prev = tf.cast(kwargs['h_init'], tf.float32)
             cell_state_prev = tf.cast(kwargs['c_init'], tf.float32)
         else:
@@ -179,23 +138,6 @@ class RGCN(layers.Layer):
                 + self.b_c
             )
 
-            if self.flow_in_temp:
-                out_pred_q = (
-                    tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
-                )
-                out_pred_t = (
-                    tf.matmul(
-                        tf.concat([h_update, out_pred_q], axis=1),
-                        self.W_out_temp,
-                    )
-                    + self.b_out_temp
-                )
-                out_pred = tf.concat([out_pred_t, out_pred_q], axis=1)
-            else:
-                out_pred = tf.matmul(h_update, self.W_out) + self.b_out
-
-            out.append(out_pred)
-
             hidden_state_prev = h_update
             cell_state_prev = c_update
             
@@ -206,13 +148,7 @@ class RGCN(layers.Layer):
         c_list = tf.stack(c_list)
         h_list = tf.transpose(h_list, [1, 0, 2])
         c_list = tf.transpose(c_list, [1, 0, 2])
-        out = tf.stack(out)
-        out = tf.transpose(out, [1, 0, 2])
-        
-        if self.return_state: 
-            return out, h_list, c_list 
-        else:
-            return out
+        return h_list, c_list
 
 
 class RGCNModel(tf.keras.Model):
@@ -220,60 +156,54 @@ class RGCNModel(tf.keras.Model):
         self, 
         hidden_size, 
         A, 
-        tasks=1, 
+        num_tasks=1,
         recurrent_dropout=0,  
         dropout=0,
-        flow_in_temp=False, 
         rand_seed=None,
-        return_state=False
     ):
         """
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
-        :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
-        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param num_tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks
+        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a recurrent element to be zero
         :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
-        :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
-        :param return_state: [bool] whether the hidden (h) and cell (c) states of LSTM should be returned 
         """
         super().__init__()
-        self.return_state = return_state
-        self.hidden_size = hidden_size 
-        self.tasks = tasks 
+        self.hidden_size = hidden_size
+        self.num_tasks = num_tasks
         self.recurrent_dropout = recurrent_dropout
-        self.dropout = dropout 
-        self.rnn_layer = tf.keras.layers.LSTM(
-            hidden_size, 
-            return_sequences=True, 
-            stateful=return_state,
-            return_state=return_state,
-            recurrent_dropout=recurrent_dropout,
-            dropout=dropout)
-            
+        self.dropout = dropout
+
         self.rgcn_layer = RGCN(
             hidden_size, 
             A,
-            tasks,
-            recurrent_dropout
+            recurrent_dropout,
             dropout,
-            flow_in_temp, 
-            rand_seed,
-            return_state)
+            rand_seed)
             
         self.h_gr = None
         self.c_gr = None
+
+        self.dense_main = layers.Dense(1, name="dense_main")
+        if self.num_tasks == 2:
+            self.dense_aux = layers.Dense(1, name="dense_aux")
 
     def call(self, inputs, **kwargs):
         batch_size = inputs.shape[0]
         h_init = kwargs.get('h_init', tf.zeros([batch_size, self.hidden_size]))
         c_init = kwargs.get('c_init', tf.zeros([batch_size, self.hidden_size]))
-        if self.return_state: 
-            output, h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
-            self.h_gr = h_gr
-            self.c_gr = c_gr
-        else:
-            output = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
+        h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
+        self.h_gr = h_gr
+        self.c_gr = c_gr
 
-        return output
+        if self.num_tasks == 1:
+            main_prediction = self.dense_main(h_gr)
+            return main_prediction
+        elif self.num_tasks == 2:
+            main_prediction = self.dense_main(h_gr)
+            aux_prediction = self.dense_aux(h_gr)
+            return tf.concat([main_prediction, aux_prediction], axis=2)
+        else:
+            raise ValueError(f'This model only supports 1 or 2 tasks (not {self.num_tasks})')

@@ -35,7 +35,7 @@ class LSTMModel(tf.keras.Model):
         self.rnn_layer = layers.LSTM(
             hidden_size,
             return_sequences=True,
-            stateful=True,
+            stateful=return_state,
             return_state=return_state,
             name="rnn_shared",
             recurrent_dropout=recurrent_dropout,

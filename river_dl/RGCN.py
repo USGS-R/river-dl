@@ -247,7 +247,7 @@ class RGCNModel(tf.keras.Model):
         self.rnn_layer = tf.keras.layers.LSTM(
             hidden_size, 
             return_sequences=True, 
-            stateful=True,
+            stateful=return_state,
             return_state=return_state,
             recurrent_dropout=recurrent_dropout,
             dropout=dropout)

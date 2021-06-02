@@ -125,24 +125,14 @@ class RGCN(layers.Layer):
                 shape=[1], initializer="zeros", name="b_out"
             )
         else:
-            if self.tasks == 2: 
-                # was W2
-                self.W_out = self.add_weight(
-                    shape=[hidden_size, 2], initializer=w_initializer, name="W_out"
-                )
-                # was b2
-                self.b_out = self.add_weight(
-                    shape=[2], initializer="zeros", name="b_out"
-                )
-            else: 
-                # was W2
-                self.W_out = self.add_weight(
-                    shape=[hidden_size, 1], initializer=w_initializer, name="W_out"
-                )
-                # was b2
-                self.b_out = self.add_weight(
-                    shape=[1], initializer="zeros", name="b_out"
-                )
+            # was W2
+            self.W_out = self.add_weight(
+                shape=[hidden_size, self.tasks], initializer=w_initializer, name="W_out"
+            )
+            # was b2
+            self.b_out = self.add_weight(
+                shape=[self.tasks], initializer="zeros", name="b_out"
+            )
 
     @tf.function
     def call(self, inputs, **kwargs):
@@ -162,8 +152,6 @@ class RGCN(layers.Layer):
             hidden_state_prev = h_update 
             cell_state_prev = c_update 
         for t in range(n_steps):
-            seq, state = self.lstm(inputs[:, t, :], states=[h_update, c_update])
-            h, c = state # are these used anywhere? 
             h_graph = tf.nn.tanh(
                 tf.matmul(
                     self.A,

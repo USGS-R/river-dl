@@ -11,7 +11,8 @@ class LSTMModel(tf.keras.Model):
         gradient_correction=False,
         tasks=1, 
         lamb=1,
-        dropout=0, # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
+        recurrent_dropout=0,
+        dropout=0,  
         grad_log_file=None,
         return_state=False,
     ):
@@ -20,7 +21,8 @@ class LSTMModel(tf.keras.Model):
         :param gradient_correction: [bool] 
         :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
         :param lamb: [float] 
-        :param dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
         :param grad_log_file: [str] location of gradient log file 
         :param return_state: [bool] return the hidden (h) and cell (c) states of LSTM 
         """
@@ -36,7 +38,8 @@ class LSTMModel(tf.keras.Model):
             stateful=True,
             return_state=return_state,
             name="rnn_shared",
-            recurrent_dropout=dropout,
+            recurrent_dropout=recurrent_dropout,
+            dropout=dropout
         )
         if self.tasks == 1: 
             self.dense_main = layers.Dense(1, name="dense_main")

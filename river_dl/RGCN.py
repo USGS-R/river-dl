@@ -16,7 +16,8 @@ class RGCN(layers.Layer):
         hidden_size, 
         A, 
         tasks=1, 
-        dropout=0,  # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
+        recurrent_dropout=0,   
+        dropout=0,
         flow_in_temp=False, 
         rand_seed=None,
         return_state=False
@@ -26,7 +27,8 @@ class RGCN(layers.Layer):
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
         :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
-        :param dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
@@ -40,7 +42,7 @@ class RGCN(layers.Layer):
         self.return_state = return_state
 
         # set up the layer
-        self.lstm = tf.keras.layers.LSTMCell(hidden_size, recurrent_dropout=dropout)
+        self.lstm = tf.keras.layers.LSTMCell(hidden_size, recurrent_dropout=recurrent_dropout, dropout=dropout)
 
         ### set up the weights ###
         w_initializer = tf.random_normal_initializer(
@@ -234,7 +236,8 @@ class RGCNModel(tf.keras.Model):
         hidden_size, 
         A, 
         tasks=1, 
-        dropout=0, # I propose changing this to 'recurrent_dropout' and adding another option for 'dropout' since these will map to the options for the tf LSTM layers https://www.tensorflow.org/api_docs/python/tf/keras/layers/LSTMCell ; and also https://arxiv.org/pdf/1512.05287.pdf 
+        recurrent_dropout=0,  
+        dropout=0,
         flow_in_temp=False, 
         rand_seed=None,
         return_state=False
@@ -243,7 +246,8 @@ class RGCNModel(tf.keras.Model):
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
         :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
-        :param dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
         :param flow_in_temp: [bool] whether the flow predictions should feed
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
@@ -253,18 +257,21 @@ class RGCNModel(tf.keras.Model):
         self.return_state = return_state
         self.hidden_size = hidden_size 
         self.tasks = tasks 
+        self.recurrent_dropout = recurrent_dropout
         self.dropout = dropout 
         self.rnn_layer = tf.keras.layers.LSTM(
             hidden_size, 
             return_sequences=True, 
             stateful=True,
             return_state=return_state,
-            recurrent_dropout=dropout)
+            recurrent_dropout=recurrent_dropout,
+            dropout=dropout)
             
         self.rgcn_layer = RGCN(
             hidden_size, 
             A,
             tasks,
+            recurrent_dropout
             dropout,
             flow_in_temp, 
             rand_seed,

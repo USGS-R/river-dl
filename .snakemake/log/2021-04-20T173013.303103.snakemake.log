@@ -1,7 +1,0 @@
-Building DAG of jobs...
-MissingInputException in line 29 of /home/jovyan/river-dl/Snakefile:
-Missing input files for rule prep_io_data:
-DRB_data/obs_temp_subset
-DRB_data/uncal_sntemp_input_output_subset
-DRB_data/distance_matrix_subset.npz
-DRB_data/obs_flow_subset

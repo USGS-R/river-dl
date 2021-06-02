@@ -1,5 +1,0 @@
-Building DAG of jobs...
-MissingInputException in line 18 of /home/jovyan/river-dl/Snakefile:
-Missing input files for rule all:
-DRB_output/GW_summary.csv
-DRB_output/GW.png

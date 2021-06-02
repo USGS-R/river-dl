@@ -1,4 +1,0 @@
-ModuleNotFoundError in line 13 of /home/jovyan/river-dl/Snakefile:
-No module named 'river_dl.postproc_util'
-  File "/home/jovyan/river-dl/Snakefile", line 13, in <module>
-  File "/home/jovyan/river-dl/river_dl/gw_utils.py", line 11, in <module>

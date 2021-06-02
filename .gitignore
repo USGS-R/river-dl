@@ -2,7 +2,8 @@
 data/
 *.npz
 DRB_data/
-config.yml
-DRB_output/
-DRB_outputs/
-
+DRB_output*/
+*.ipynb
+*.ipynb_checkpoints/*
+.snakemake/
+*__pycache__*

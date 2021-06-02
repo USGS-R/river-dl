@@ -103,29 +103,25 @@ def y_data_components(data, y_pred, var_idx, tasks):
     return y_true, y_pred, weights
 
 
-def rmse_masked_one_var(data, y_pred, var_idx, tasks):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx, tasks)
-    return rmse(y_true, y_pred)
-
-
-def weighted_masked_rmse(lambda_aux=0.5, tasks=1):
+def multitask_loss(lambdas, loss_func):
     """
-    calculate a weighted, masked rmse.
-    :param lambda_aux: [float] The factor that the auxiliary loss
-    will be multiplied by before added to the main loss.
-    :param tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks 
+    calculate a weighted multi-task loss for a given number of variables with a
+    given loss function
+    :param lambdas: [array-like float] The factor that losses will be
+    multiplied by before being added together.
+    :param loss_func: [function] Loss function that will be used to calculate
+    the loss of each variable. Must take as input parameters [y_true, y_pred]
     """
-
-    def rmse_masked_combined(data, y_pred):
-        rmse_main = rmse_masked_one_var(data, y_pred, 0, tasks)
-        if tasks == 2: 
-            rmse_aux = rmse_masked_one_var(data, y_pred, 1, tasks)
-            rmse_loss = rmse_main + lambda_aux * rmse_aux
-            return rmse_loss
-        else: 
-            return rmse_main 
-
-    return rmse_masked_combined
+    def combine_loss(y_true, y_pred):
+        losses = []
+        n_vars = y_pred.shape[-1]
+        for var_id in range(n_vars):
+            ind_var_loss = loss_func(y_true[:, :, var_id], y_pred[:, :, var_id])
+            weighted_ind_var_loss = lambdas[var_id] * ind_var_loss
+            losses.append(weighted_ind_var_loss)
+        total_loss = sum(losses)
+        return total_loss
+    return combine_loss
 
 
 def mean_masked(y):

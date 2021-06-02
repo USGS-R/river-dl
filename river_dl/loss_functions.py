@@ -196,9 +196,12 @@ def kge_loss(y_true, y_pred):
 
 def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=0.5,lamb2=0, lamb3=0):
     """
-    calculate a weighted, masked rmse.
-    :param lamb: [float] (short for lambda). The factor that the auxiliary loss
+    calculate a weighted, masked rmse that includes the groundwater terms
+    :param lamb, lamb2, lamb3: [float] (short for lambda). The factor that the auxiliary loss, Ar loss, and deltaPhi loss
     will be multiplied by before added to the main loss.
+    :param temp_index: [int]. Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param temp_mean: [float]. Mean temperature for unscaling the predicted temperatures.
+    :param temp_sd: [float]. Standard deviation of temperature for unscalind the predicted temperatures.
     """
 
     def rmse_masked_combined_gw(data, y_pred):
@@ -209,21 +212,27 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=0.5,lamb2=0, lamb
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
         
-      
         rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
-        #return rmse_loss
+        
         return rmse_loss
     return rmse_masked_combined_gw
 
 def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd):
     #assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
+    #assumes the first two columns of data are the observed flow and temperature, the last two are the weights, and the remaining 
+    #ones (extracted here) are the data for gw analysis
     y_true = data[:, :, 2:-2]
     y_pred_temp = y_pred[:,:,int(temp_index):(int(temp_index)+1)] #extract just the predicted temperature
-    #unscale the predicted temps
+    #unscale the predicted temps prior to calculating the amplitude and phase
     y_pred_temp = y_pred_temp*temp_sd+temp_mean
     
     x_lm = y_true[:,:,-2:] #extract the sin(wt) and cos(wt)
     #a tensor of the sin(wt) and cos(wt) for each reach x day, the 1's are for the intercept of the linear regression
+    # T(t) = T_mean + a*sin(wt) + b*cos(wt)
+    # Johnson, Z.C., Johnson, B.G., Briggs, M.A., Snyder, C.D., Hitt, N.P., and Devine, W.D., 2021, Heed the data gap: Guidelines for 
+    #using incomplete datasets in annual stream temperature analyses: Ecological Indicators, v. 122, p. 107229, 
+    #http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
+
     X_mat=tf.stack((tf.constant(1., shape=y_pred_temp[:,:,0].shape), x_lm[:,:,0],x_lm[:,:,1]),axis=1)
     
     #getting the coefficients using a 3-d version of the normal equation:
@@ -237,13 +246,15 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd):
     
     #the tensor a_b has the coefficients from the regression (reach x [[intercept],[a],[b]])
     #Aw = amplitude of the water temp sinusoid (deg C)
+    #A = sqrt (a^2 + b^2)
     Aw = tf.math.sqrt(a_b[:,1,0]**2+a_b[:,2,0]**2)
     #Phiw = phase of the water temp sinusoid (radians)
+    #Phi = (3/2)* pi - atan (b/a) - in radians
     Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
     
-    #delPhi_pred = the difference in phase between the air and water temp sinusoids, in days
+    #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
     delPhi_pred = (Phiw-y_true[:,0,2])*365/(2*m.pi)
-    #Ar_pred = the ratio of the air temp and water temp amplitudes
+    #Ar_pred = the ratio of the water temp and air temp amplitudes
     Ar_pred = Aw/y_true[:,0,3]
     
     return y_true[:,0,0], Ar_pred, y_true[:,0,1], delPhi_pred

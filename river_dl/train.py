@@ -143,6 +143,8 @@ def train_model(
     # finetune
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
+        
+        #extract these for use in the GW loss function
         temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
         temp_mean = io_data['y_mean'][temp_index]
         temp_sd = io_data['y_std'][temp_index]

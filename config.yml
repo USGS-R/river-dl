@@ -12,9 +12,11 @@ x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet
 gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
 primary_variable: "temp"
 lamb: 0.5
+#lamb2 and lamb3 are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
 lamb2: 2
 lamb3: 0.1
 
+#anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
 loss_type: "GW"
 
 pt_epochs: 20

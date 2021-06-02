@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import xarray as xr
-from sklearn.linear_model import LinearRegression
 import statsmodels.api as sm
 from datetime import datetime
 import math
@@ -20,18 +19,32 @@ def amp_phi (Date, temp, isWater=False):
     :param isWater: boolean indicator if the temp data is water temps (versus air)
     :returns: amplitude and phase
     """
+    
+    # Johnson, Z.C., Johnson, B.G., Briggs, M.A., Snyder, C.D., Hitt, N.P., and Devine, W.D., 2021, Heed the data gap: Guidelines for 
+    #using incomplete datasets in annual stream temperature analyses: Ecological Indicators, v. 122, p. 107229, 
+    #http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
+    # T(t) = T_mean + a*sin(wt) + b*cos(wt)
+    
+    #A = amplitude of the temp sinusoid (deg C)
+    #A = sqrt (a^2 + b^2)
+    
+    #Phi = phase of the temp sinusoid (radians)
+    #Phi = (3/2)* pi - atan (b/a) - in radians
+    
     #convert the date to decimal data
     date_decimal = [float(x)/365 for x in ((Date-np.datetime64('1980-10-01'))/np.timedelta64(1, 'D'))]
     
-    #remove water temps below 1C or above 60C
-    #if isWater:
-    #    print(temp)
-    #    temp = [x if x >=1 and x<=60 else np.nan for x in temp]
+    #remove water temps below 1C or above 60C to avoid complex freeze-thaw dynamics near 0 C and because >60C is likely erroneous  
+    if isWater:
+        temp = [x if x >=1 and x<=60 else np.nan for x in temp]
     
     x = [[math.sin(2*math.pi*j),math.cos(2*math.pi*j)] for j in date_decimal]
+# this solves the regression using scikit-learn (not on the current import list), which doesn't give confidence intervals
 #     model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
 #     amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
 #     phi = math.asin(model.coef_[1]/amp)
+
+#this solves the regression using stats models, which provides confidence intervals on the coefficients
     X = sm.add_constant(x)
     model = sm.OLS(temp,X)
     results = model.fit()
@@ -41,6 +54,7 @@ def amp_phi (Date, temp, isWater=False):
     amp = math.sqrt(results.params[1]**2+results.params[2]**2)
     amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
     amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
+    
     phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
     phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
     phi_low = np.min(phiRange)
@@ -55,7 +69,8 @@ def annTempStats(thisData):
     calculate the annual signal properties (phase and amplitude) for temperature times series
     :param thisData: [xr dataset] with time series data of air and water temp for each segment
     :returns: data frame with phase and amplitude of air and observed water temp, along with the
-    phase shift and amplitude ratio for each segment
+    phase shift and amplitude ratio for each segment, "low" and "high" values are the minimum and maximum 
+    property values calculated with coefficient values within the 95th percent confidence interval
     """
 
     
@@ -101,7 +116,7 @@ def annTempStats(thisData):
         
         #get the water temp properties
         #ensure sufficient data
-        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365): #this requires at least 2 years of data, other requirements added below
+        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365): #this requires at least 1 yr of data
             waterDF = pd.DataFrame({'date':thisData['date'].values,'seg_tave_water':thisData['seg_tave_water'][:,i].values})
             #require temps > 1 and <60 C for signal analysis
             waterDF.loc[(waterDF.seg_tave_water<1)|(waterDF.seg_tave_water>60),"seg_tave_water"]=np.nan
@@ -115,7 +130,7 @@ def annTempStats(thisData):
                 phi_low = np.nan
                 phi_high = np.nan
             else:
-            
+                ### old code that may be used again for adding additional data requirements for the temp signal analysis
                 #get the longest set of temp records with no gaps >49 days
                 #dateDiff = [0]
                 #dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
@@ -196,15 +211,15 @@ def prep_annual_signal_data(
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
-    the prepped dataset
+    the prepped dataset and save a separate GW only dataset
     :param obs_temper_file: [str] temperature observations file (csv)
     :param pretrain_file: [str] the file with the pretraining data (SNTemp data)
-    :param catch_prop_file: [str] the path to the catchment properties file. If
-    left unfilled, the catchment properties will not be included as predictors
-    :param test_start_date: [str] the date to start for the test period
-    :param n_test_yr: [int] number of years to take for the test period
-    :param exclude_file: [str] path to exclude file
+    :param io_data_file: [str] the prepped data file
+    :param train_start_date, train_end_date, val_start_date,val_end_date,test_start_date,test_end_date: [str]
+    the start and end dates of the training, validation, and testing periods
+    :param gwVarList: [str] list of groundwater-relevant variables
     :param out_file: [str] file to where the values will be written
+    :param out_file1: [str] file to where the GW only values will be written
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -230,7 +245,7 @@ def prep_annual_signal_data(
         test_end_date)
     
     
-    #get the annual signal properties for the training and testing data
+    #get the annual signal properties for the training, validation, and testing data
     GW_trn = annTempStats(obs_trn)
     GW_tst = annTempStats(obs_tst)
     GW_val = annTempStats(obs_val)
@@ -238,27 +253,27 @@ def prep_annual_signal_data(
     #add the GW data to the y dataset
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
-
-    #data['y_obs_trn'] = np.concatenate([preppedData['y_obs_trn'],make_GW_dataset(GW_trn,obs_trn,gwVarList)], axis=2)
-    #data['y_obs_tst'] = np.concatenate([preppedData['y_obs_tst'],make_GW_dataset(GW_tst,obs_tst,gwVarList)], axis=2)
-    #data['y_obs_val'] = np.concatenate([preppedData['y_obs_val'],make_GW_dataset(GW_val,obs_val,gwVarList)], axis=2)
-    #data['y_vars'] = np.append(data['y_vars'],gwVarList)
-    
-    
-    #save the GW data
-    data2 = {}
-    data2['GW_tst']=GW_tst
-    data2['GW_trn']=GW_trn
-    data2['GW_val']=GW_val
-    data2['GW_cols']=GW_trn.columns.values.astype('str')
     data['GW_trn']=make_GW_dataset(GW_trn,obs_trn,gwVarList)
     data['GW_tst']=make_GW_dataset(GW_tst,obs_tst,gwVarList)
     data['GW_val']=make_GW_dataset(GW_val,obs_val,gwVarList)
     data['GW_cols']=GW_trn.columns.values.astype('str')
     np.savez_compressed(out_file, **data)
+    
+    
+    #save the GW-only dataset
+    data2 = {}
+    data2['GW_tst']=GW_tst
+    data2['GW_trn']=GW_trn
+    data2['GW_val']=GW_val
+    data2['GW_cols']=GW_trn.columns.values.astype('str')
     np.savez_compressed(out_file2, **data2)
 
 def calc_amp_phi(thisData):
+    """
+    compiles temperature signal properties for predicted temperatures
+    :param thisData: [dataset] dataset of predicted temperatures
+    :returns: dataframe with signal properties by segment
+    """
     segList = np.unique(thisData['seg_id_nat'])
     water_amp_preds = []
     water_phi_preds = []
@@ -269,6 +284,13 @@ def calc_amp_phi(thisData):
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
     
 def merge_pred_obs(gw_obs,obs_col,pred):
+    """
+    merges predicted and observed temperature signal properties into one dataframe
+    :param gw_obs: [dataframe] dataframe of observed annual temperature signal properties by segment
+    :param obs_col: [str] relevant column in the gw_obs dataframe
+    :param pred: [dataframe] predicted values by segment
+    :returns: dataframe with predictions and observations
+    """
     obsDF = pd.DataFrame(gw_obs[obs_col],columns=gw_obs['GW_cols'])
     obsDF = obsDF.merge(pred)
     obsDF['Ar_pred']=obsDF['water_amp_pred']/obsDF['air_amp']
@@ -276,11 +298,25 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     return obsDF
 
 def make_GW_dataset (GW_data,x_data,varList):
+     """
+    prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
+    :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
+    :param x_data: [str] observation dataset
+    :param varList: [str] variables to keep in the final dataset
+    :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
+    """
+    #make a dataframe with all combinations of segment and date and then join the annual temperature signal properties dataframe to it
     prod = pd.DataFrame(product(np.unique(GW_data.seg_id_nat),x_data['date'].values),columns=['seg_id_nat','date'])
     prod = prod.merge(GW_data)
+    
+    #convert the date to decimal years starting at 1980-10-01
     prod['dec_date']=[float(x)/365 for x in ((prod.date-np.datetime64('1980-10-01'))/np.timedelta64(1, 'D'))]
+    
+    #precalculate sin(wt) and cos(wt) for the regression
     prod['sin_wt']=[math.sin(2*math.pi*x) for x in prod['dec_date']]
     prod['cos_wt']=[math.cos(2*math.pi*x) for x in prod['dec_date']]
+    
+    #reshape the resulting dataset
     obs2 = [x_data.sortby(["seg_id_nat", "date"])]
     obs2.append(prod.set_index(['date','seg_id_nat']).to_xarray())
     GW_ds = xr.merge(obs2, join="left")
@@ -290,6 +326,12 @@ def make_GW_dataset (GW_data,x_data,varList):
     return GW_Arr
     
 def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output):
+    """
+    calculates annual temperature signal properties using predicted temperatures
+    :param GW_data: file of prepped GW only data
+    :param trn_data, tst_data, val_data: [str] files with predicted temperatures from the training, testing, and validation partitions (feather)
+    :param trn_output, tst_output, val_output: [str] output files for the calculated metrics for the training, testing, and validation partitions(csv)
+    """
     gw_obs = np.load(GW_data)
     
     trn_preds = pd.read_feather(trn_data)
@@ -309,6 +351,12 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     gw_stats_val.to_csv(val_output)
     
 def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
+    """
+    summarizeds GW metrics across all data partitions and creates summary figures
+    :param trnFile,tstFile,valFile: [str] input files for the calculated metrics for the training, testing, and validation partitions(csv)
+    :param outFile: output file for the summarized metrics (csv)
+    :param figFile1, figFile2: output files for the summary scatterplot and boxplot figures
+    """
     trnDF = pd.read_csv(trnFile)
     tstDF = pd.read_csv(tstFile)
     valDF = pd.read_csv(valFile)

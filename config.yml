@@ -24,13 +24,15 @@ ft_epochs: 100
 
 train_start_date:
   - '1985-10-01'
+  - '2016-10-01'
 train_end_date:
   - '2006-09-30'
+  - '2020-09-30'
 val_start_date: '2006-10-01'
 val_end_date: '2016-09-30'
 test_start_date:
   - '1980-10-01'
+  - '2020-10-01'
 test_end_date:
   - '1985-09-30'
-
-hidden_size: 20
+  - '2021-09-30'

@@ -1,9 +1,9 @@
 import os
 
-# add scripts dir to path
-
 from river_dl.preproc_utils import prep_data
-from river_dl.postproc_utils import predict_from_weights, combined_metrics, plot_obs
+from river_dl.evaluate import combined_metrics
+from river_dl.postproc_utils import plot_obs
+from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
 
@@ -27,6 +27,7 @@ rule all:
         ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
+        
 
 rule prep_io_data:
     input:
@@ -51,6 +52,10 @@ rule prep_io_data:
                   log_q=False, segs=None,
                   out_file=output[0])
                   
+                   
+                  
+                  
+                  
 rule prep_ann_temp:
     input:
          config['obs_temp'],
@@ -72,31 +77,7 @@ rule prep_ann_temp:
                   out_file2=output[1])
 
 # use "train" if wanting to use GPU on HPC
-rule train:
-    input:
-        "{outdir}/prepped_withGW.npz"
-    output:
-        directory("{outdir}/trained_weights/"),
-        directory("{outdir}/pretrained_weights/"),
-    params:
-        # getting the base path to put the training outputs in
-        # I omit the last slash (hence '[:-1]' so the split works properly
-        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-        pt_epochs=config['pt_epochs'],
-        ft_epochs=config['ft_epochs'],
-        lamb=config['lamb'],
-        lamb2=config['lamb2'],
-        lamb3=config['lamb3'],
-        loss = config['loss_type'],
-    shell:
-        """
-        module load analytics cuda10.1/toolkit/10.1.105 
-        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
-        """
-
-
-# use "train_model" if wanting to use CPU or local GPU
-#rule train_model_local_or_cpu:
+#rule train:
 #    input:
 #        "{outdir}/prepped_withGW.npz"
 #    output:
@@ -106,9 +87,34 @@ rule train:
 #        # getting the base path to put the training outputs in
 #        # I omit the last slash (hence '[:-1]' so the split works properly
 #        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#    run:
-#        train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-#                    params.run_dir, model_type='rgcn', loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+#        pt_epochs=config['pt_epochs'],
+#        ft_epochs=config['ft_epochs'],
+#        lamb=config['lamb'],
+#        lamb2=config['lamb2'],
+#        lamb3=config['lamb3'],
+#        loss = config['loss_type'],
+#    shell:
+#        """
+#        module load analytics cuda10.1/toolkit/10.1.105 
+#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
+#        """
+ 
+# use "train_model" if wanting to use CPU or local GPU
+rule train_model_local_or_cpu:
+    input:
+        "{outdir}/prepped_withGW.npz"
+    output:
+        directory("{outdir}/trained_weights/"),
+        directory("{outdir}/pretrained_weights/"),
+    params:
+        # getting the base path to put the training outputs in
+        # I omit the last slash (hence '[:-1]' so the split works properly
+        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+    run:
+        train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
+                    params.run_dir, model_type='rgcn', loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+
+
 rule make_predictions:
     input:
         "{outdir}/trained_weights/",
@@ -118,11 +124,10 @@ rule make_predictions:
     group: 'train_predict_evaluate'
     run:
         model_dir = input[0] + '/'
-        predict_from_weights(model_type='rgcn', model_weights_dir=model_dir,
+        predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
                              logged_q=False)
-
 
 def get_grp_arg(wildcards):
     if wildcards.metric_type == 'overall':
@@ -133,7 +138,7 @@ def get_grp_arg(wildcards):
         return 'seg_id_nat'
     elif wildcards.metric_type == 'month_reach':
         return ['seg_id_nat', 'month']
-
+        
 
 rule combine_metrics:
     input:
@@ -154,7 +159,7 @@ rule combine_metrics:
                          grp=params.grp_arg,
                          outfile=output[0])
 
-
+                         
 rule plot_prepped_data:
     input:
         "{outdir}/prepped.npz",
@@ -164,7 +169,7 @@ rule plot_prepped_data:
         plot_obs(input[0], wildcards.variable, output[0],
                  partition=wildcards.partition)
 
-
+                 
 rule compile_pred_GW_stats:
     input:
         "{outdir}/GW.npz",

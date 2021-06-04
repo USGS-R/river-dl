@@ -178,8 +178,7 @@ class RGCNModel(tf.keras.Model):
             dropout,
             rand_seed)
             
-        self.h_gr = None
-        self.c_gr = None
+        self.states = None
 
         self.dense_main = layers.Dense(1, name="dense_main")
         if self.num_tasks == 2:
@@ -190,8 +189,7 @@ class RGCNModel(tf.keras.Model):
         h_init = kwargs.get('h_init', tf.zeros([batch_size, self.hidden_size]))
         c_init = kwargs.get('c_init', tf.zeros([batch_size, self.hidden_size]))
         h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
-        self.h_gr = h_gr
-        self.c_gr = c_gr
+        self.states = h_gr[:, -1, :], c_gr[:, -1, :]
 
         if self.num_tasks == 1:
             main_prediction = self.dense_main(h_gr)

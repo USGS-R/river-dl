@@ -42,23 +42,24 @@ class MultitaskLSTMModel(tf.keras.Model):
         self,
         hidden_size,
         gradient_correction=False,
-        lambda_aux=1,
+        lambdas=(1, 1),
         recurrent_dropout=0,
         dropout=0,  
         grad_log_file=None,
     ):
         """
         :param hidden_size: [int] the number of hidden units
-        :param gradient_correction: [bool] 
-        :param lambda_aux: [float]
-        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero  
+        :param gradient_correction: [bool]
+        :param lambdas: [array-like] weights to multiply the loss from each target
+        variable by
+        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero
         :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
         :param grad_log_file: [str] location of gradient log file 
         """
         super().__init__()
         self.gradient_correction = gradient_correction
         self.grad_log_file = grad_log_file
-        self.lambda_aux = lambda_aux
+        self.lambdas = lambdas
         self.rnn_layer = layers.LSTM(
             hidden_size,
             return_sequences=True,
@@ -111,7 +112,7 @@ class MultitaskLSTMModel(tf.keras.Model):
                 gradient_shared_main, gradient_shared_aux, self.grad_log_file
             )
         combined_gradient = combine_gradients_list(
-            gradient_shared_main, gradient_shared_aux, lambda_aux=self.lambda_aux
+            gradient_shared_main, gradient_shared_aux, lambdas=self.lambdas
         )
 
         # apply gradients
@@ -139,12 +140,12 @@ class MultitaskGRUModel(MultitaskLSTMModel):
     def __init__(
         self,
         hidden_size,
-        lambda_aux=1
+        lambdas=(1, 1)
     ):
         """
         :param hidden_size: [int] the number of hidden units
         """
-        super().__init__(hidden_size, lambda_aux=lambda_aux)
+        super().__init__(hidden_size, lambdas=lambdas)
         self.rnn_layer = layers.GRU(
             hidden_size, return_sequences=True, name="rnn_shared"
         )
@@ -177,8 +178,8 @@ def get_variables(trainable_variables, name):
     return [v for v in trainable_variables if name in v.name]
 
 
-def combine_gradients_list(main_grads, aux_grads, lambda_aux=1):
-    return [main_grads[i] + lambda_aux * aux_grads[i] for i in range(len(main_grads))]
+def combine_gradients_list(main_grads, aux_grads, lambdas=(1, 1)):
+    return [lambdas[0] * main_grads[i] + lambdas[1] * aux_grads[i] for i in range(len(main_grads))]
 
 
 def adjust_gradient_list(main_grads, aux_grads, logfile=None):

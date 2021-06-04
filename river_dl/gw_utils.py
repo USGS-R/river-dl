@@ -7,9 +7,10 @@ import math
 from itertools import compress, product
 import matplotlib.pyplot as plt
 import seaborn as sns
+from copy import deepcopy
 
 from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs, convert_batch_reshape
-from river_dl.postproc_utils import calc_metrics
+from river_dl.evaluate import calc_metrics
 
 def amp_phi (Date, temp, isWater=False):
     """
@@ -46,7 +47,7 @@ def amp_phi (Date, temp, isWater=False):
 
 #this solves the regression using stats models, which provides confidence intervals on the coefficients
     X = sm.add_constant(x)
-    model = sm.OLS(temp,X)
+    model = sm.OLS(temp,X, missing='drop')
     results = model.fit()
     
     confInt = np.array(results.conf_int())
@@ -250,13 +251,20 @@ def prep_annual_signal_data(
     GW_tst = annTempStats(obs_tst)
     GW_val = annTempStats(obs_val)
     
+    #scale the Ar_obs & delPhi_obs
+    GW_trn_scale = deepcopy(GW_trn)
+    GW_trn_scale['Ar_obs'] = (GW_trn['Ar_obs']-np.nanmean(GW_trn['Ar_obs']))/np.nanstd(GW_trn['Ar_obs'])
+    GW_trn_scale['delPhi_obs'] = (GW_trn['delPhi_obs']-np.nanmean(GW_trn['delPhi_obs']))/np.nanstd(GW_trn['delPhi_obs'])
+    
     #add the GW data to the y dataset
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
-    data['GW_trn']=make_GW_dataset(GW_trn,obs_trn,gwVarList)
+    data['GW_trn']=make_GW_dataset(GW_trn_scale,obs_trn,gwVarList)
     data['GW_tst']=make_GW_dataset(GW_tst,obs_tst,gwVarList)
     data['GW_val']=make_GW_dataset(GW_val,obs_val,gwVarList)
     data['GW_cols']=GW_trn.columns.values.astype('str')
+    data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
+    data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
     np.savez_compressed(out_file, **data)
     
     
@@ -298,7 +306,7 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     return obsDF
 
 def make_GW_dataset (GW_data,x_data,varList):
-     """
+    """
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
     :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
     :param x_data: [str] observation dataset

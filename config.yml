@@ -5,7 +5,7 @@ sntemp_file: "DRB_data/uncal_sntemp_input_output_subset"
 catchment_attr: "DRB_data/seg_attr_drb.feather"
 dist_matrix: "DRB_data/distance_matrix_subset.npz"
 
-out_dir: "DRB_output_subset_test"
+out_dir: "DRB_output_subset_test_scale"
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
@@ -19,8 +19,6 @@ lamb3: 0.1
 #anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
 loss_type: "GW"
 
-pt_epochs: 200
-ft_epochs: 100
 
 train_start_date:
   - '1985-10-01'
@@ -36,3 +34,7 @@ test_start_date:
 test_end_date:
   - '1985-09-30'
   - '2021-09-30'
+
+pt_epochs: 2
+ft_epochs: 1
+hidden_size: 20

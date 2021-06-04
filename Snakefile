@@ -19,7 +19,7 @@ rule all:
         expand( "{outdir}/{plt_variable}_{partition}.png",
                 outdir=out_dir,
                 plt_variable=['temp', 'flow'],
-                partition=['trn', 'val'],
+                partition=['trn','val'],
         ),
         expand("{outdir}/GW_stats_{partition}.csv",
                 outdir=out_dir,
@@ -156,7 +156,7 @@ rule combine_metrics:
                          obs_flow=input[1],
                          pred_trn=input[2],
                          pred_val=input[3],
-                         grp=params.grp_arg,
+                         group=params.grp_arg,
                          outfile=output[0])
 
                          

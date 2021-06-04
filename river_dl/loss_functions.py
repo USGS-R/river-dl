@@ -190,7 +190,7 @@ def kge_loss_one_var(data, y_pred, var_idx):
 def kge_loss(y_true, y_pred):
     return -1 * kge(y_true, y_pred)
 
-def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=0.5,lamb2=0, lamb3=0):
+def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=0.5,lamb2=0, lamb3=0):
     """
     calculate a weighted, masked rmse that includes the groundwater terms
     :param lamb, lamb2, lamb3: [float] (short for lambda). The factor that the auxiliary loss, Ar loss, and deltaPhi loss
@@ -204,7 +204,7 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=0.5,lamb2=0, lamb
         rmse_main = rmse_masked_one_var(data, y_pred, 0)
         rmse_aux = rmse_masked_one_var(data, y_pred, 1)
         
-        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd)
+        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std)
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
         
@@ -213,7 +213,7 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,lamb=0.5,lamb2=0, lamb
         return rmse_loss
     return rmse_masked_combined_gw
 
-def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd):
+def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd,gw_mean, gw_std):
     #assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
     #assumes the first two columns of data are the observed flow and temperature, the last two are the weights, and the remaining 
     #ones (extracted here) are the data for gw analysis
@@ -248,9 +248,10 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd):
     #Phi = (3/2)* pi - atan (b/a) - in radians
     Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
     
+    #calculate and scale predicted values
     #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-    delPhi_pred = (Phiw-y_true[:,0,2])*365/(2*m.pi)
+    delPhi_pred = ((Phiw-y_true[:,0,2])*365/(2*m.pi)-gw_mean[1])/gw_std[1]
     #Ar_pred = the ratio of the water temp and air temp amplitudes
-    Ar_pred = Aw/y_true[:,0,3]
+    Ar_pred = (Aw/y_true[:,0,3]-gw_mean[0])/gw_std[0]
     
     return y_true[:,0,0], Ar_pred, y_true[:,0,1], delPhi_pred

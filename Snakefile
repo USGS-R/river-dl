@@ -5,20 +5,17 @@ from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
+from river_dl import loss_functions as lf
 
 out_dir = config['out_dir']
 code_dir = config['code_dir']
+loss_function = lf.multitask_rmse(config['lambdas'])
 
 rule all:
     input:
         expand("{outdir}/{metric_type}_metrics.csv",
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
-        ),
-        expand( "{outdir}/{plt_variable}_{partition}.png",
-                outdir=out_dir,
-                plt_variable=['temp', 'flow'],
-                partition=['trn', 'val'],
         ),
 
 rule prep_io_data:
@@ -62,7 +59,7 @@ rule prep_io_data:
 #    shell:
 #        """
 #        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jsadler/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --model rgcn -s 135"
+#        run_training -e /home/jsadler/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lambdas {params.lamb} --loss_func multitask_rmse --model rgcn -s 135"
 #        """
 
 
@@ -79,7 +76,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    params.run_dir, model_type='rgcn', lamb=config['lamb'])
+                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
 
 rule make_predictions:
     input:
@@ -93,7 +90,7 @@ rule make_predictions:
         predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
-                             logged_q=False)
+                             logged_q=False, num_tasks=2)
 
 
 def get_grp_arg(wildcards):

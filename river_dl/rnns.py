@@ -29,12 +29,12 @@ class LSTMModel(tf.keras.Model):
         self.dense_main = layers.Dense(1, name="dense_main")
         if self.num_tasks == 2:
             self.dense_aux = layers.Dense(1, name="dense_aux")
-        self.h = None
-        self.c = None
+        self.states = None
 
     @tf.function
     def call(self, inputs, **kwargs):
-        x, self.h, self.c = self.rnn_layer(inputs)
+        x, h, c = self.rnn_layer(inputs)
+        self.states = h, c
         if self.num_tasks == 1:
             main_prediction = self.dense_main(x)
             return main_prediction

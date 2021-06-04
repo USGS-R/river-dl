@@ -99,9 +99,7 @@ def train_model(
         # use built in 'fit' method unless model is grad correction
         x_trn_pre = io_data["x_trn"]
         # combine with weights to pass to loss function
-        y_trn_pre = np.concatenate(
-            [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
-        )
+        y_trn_pre = io_data["y_pre_trn"]
 
         model.compile(optimizer_pre, loss=loss_func)
 
@@ -138,9 +136,7 @@ def train_model(
         )
 
         x_trn_obs = io_data["x_trn"]
-        y_trn_obs = np.concatenate(
-            [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
-        )
+        y_trn_obs = io_data["y_obs_trn"]
 
         model.fit(
             x=x_trn_obs,

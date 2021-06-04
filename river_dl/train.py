@@ -46,8 +46,10 @@ def train_model(
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
     'gru')
     :param seed: [int] random seed
-    :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero
-    :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero
+    :param recurrent_dropout: [float] value between 0 and 1 for the probability
+    of a reccurent element to be zero
+    :param dropout: [float] value between 0 and 1 for the probability of an
+    input element to be zero
     :param num_tasks: [int] number of tasks (outputs to be predicted)
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
@@ -70,7 +72,12 @@ def train_model(
         batch_size = num_years
 
     if model_type == "lstm":
-        model = LSTMModel(hidden_units, num_tasks=num_tasks, recurrent_dropout=recurrent_dropout, dropout=dropout)
+        model = LSTMModel(
+            hidden_units,
+            num_tasks=num_tasks,
+            recurrent_dropout=recurrent_dropout,
+            dropout=dropout,
+        )
     elif model_type == "rgcn":
         model = RGCNModel(
             hidden_units,
@@ -78,12 +85,19 @@ def train_model(
             A=dist_matrix,
             rand_seed=seed,
             dropout=dropout,
-            recurrent_dropout=recurrent_dropout
+            recurrent_dropout=recurrent_dropout,
         )
     elif model_type == "gru":
-        model = GRUModel(hidden_units, num_tasks=num_tasks, recurrent_dropout=recurrent_dropout, dropout=dropout)
+        model = GRUModel(
+            hidden_units,
+            num_tasks=num_tasks,
+            recurrent_dropout=recurrent_dropout,
+            dropout=dropout,
+        )
     else:
-        raise ValueError(f"The 'model_type' provided ({model_type}) is not supported")
+        raise ValueError(
+            f"The 'model_type' provided ({model_type}) is not supported"
+        )
 
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)

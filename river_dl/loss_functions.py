@@ -93,6 +93,7 @@ def multitask_loss(lambdas, loss_func):
     :param loss_func: [function] Loss function that will be used to calculate
     the loss of each variable. Must take as input parameters [y_true, y_pred]
     """
+
     def combine_loss(y_true, y_pred):
         losses = []
         n_vars = y_pred.shape[-1]
@@ -102,6 +103,7 @@ def multitask_loss(lambdas, loss_func):
             losses.append(weighted_ind_var_loss)
         total_loss = sum(losses)
         return total_loss
+
     return combine_loss
 
 

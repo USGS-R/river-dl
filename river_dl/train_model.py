@@ -4,20 +4,20 @@ import river_dl.loss_functions as lf
 
 
 def get_loss_func_from_str(loss_func_str, lambdas=None):
-    if loss_func_str == 'rmse':
+    if loss_func_str == "rmse":
         return lf.rmse
-    elif loss_func_str == 'nse':
+    elif loss_func_str == "nse":
         return lf.nse
-    elif loss_func_str == 'kge':
+    elif loss_func_str == "kge":
         return lf.kge
-    elif loss_func_str == 'multitask_rmse':
+    elif loss_func_str == "multitask_rmse":
         return lf.multitask_rmse(lambdas)
-    elif loss_func_str == 'multitask_nse':
+    elif loss_func_str == "multitask_nse":
         return lf.multitask_nse(lambdas)
-    elif loss_func_str == 'multitask_kge':
+    elif loss_func_str == "multitask_kge":
         return lf.multitask_kge(lambdas)
     else:
-        raise ValueError(f'loss function {loss_func_str} not supported')
+        raise ValueError(f"loss function {loss_func_str} not supported")
 
 
 parser = argparse.ArgumentParser()
@@ -59,20 +59,34 @@ parser.add_argument(
     default="rgcn",
 )
 parser.add_argument(
-    "--num_tasks", help="number of tasks (outputs to be predicted)", default=1, type=int
+    "--num_tasks",
+    help="number of tasks (outputs to be predicted)",
+    default=1,
+    type=int,
 )
 parser.add_argument(
-    "--loss_func", help="loss function", default='rmse', type=str,
-    choices=["rmse", "nse", "kge", "multitask_rmse", "multitask_kge", "multitask_nse"],
+    "--loss_func",
+    help="loss function",
+    default="rmse",
+    type=str,
+    choices=[
+        "rmse",
+        "nse",
+        "kge",
+        "multitask_rmse",
+        "multitask_kge",
+        "multitask_nse",
+    ],
 )
-parser.add_argument(
-    "--dropout", help="dropout rate", default=0, type=float
-)
+parser.add_argument("--dropout", help="dropout rate", default=0, type=float)
 parser.add_argument(
     "--recurrent_dropout", help="recurrent dropout", default=0, type=float
 )
 parser.add_argument(
-    "--lambdas", help="lambdas for weighting variable losses", default=[1, 1], type=list
+    "--lambdas",
+    help="lambdas for weighting variable losses",
+    default=[1, 1],
+    type=list,
 )
 
 args = parser.parse_args()

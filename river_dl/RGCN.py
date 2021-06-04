@@ -12,19 +12,16 @@ from tensorflow.keras import layers
 
 class RGCN(layers.Layer):
     def __init__(
-        self, 
-        hidden_size, 
-        A, 
-        recurrent_dropout=0,
-        dropout=0,
-        rand_seed=None,
+        self, hidden_size, A, recurrent_dropout=0, dropout=0, rand_seed=None,
     ):
         """
 
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
-        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a reccurent element to be zero
-        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero
+        :param recurrent_dropout: [float] value between 0 and 1 for the
+        probability of a recurrent element to be zero
+        :param dropout: [float] value between 0 and 1 for the probability of an
+        input element to be zero
         :param rand_seed: [int] the random seed for initialization
         """
         super().__init__()
@@ -32,7 +29,9 @@ class RGCN(layers.Layer):
         self.A = A.astype("float32")
 
         # set up the layer
-        self.lstm = tf.keras.layers.LSTMCell(hidden_size, recurrent_dropout=recurrent_dropout, dropout=dropout)
+        self.lstm = tf.keras.layers.LSTMCell(
+            hidden_size, recurrent_dropout=recurrent_dropout, dropout=dropout
+        )
 
         ### set up the weights ###
         w_initializer = tf.random_normal_initializer(
@@ -99,9 +98,10 @@ class RGCN(layers.Layer):
         h_list = []
         c_list = []
         n_steps = inputs.shape[1]
-        # set the initial h & c states to the supplied h and c states if using DA, or 0's otherwise
-        hidden_state_prev = tf.cast(kwargs['h_init'], tf.float32)
-        cell_state_prev = tf.cast(kwargs['c_init'], tf.float32)
+        # set the initial h & c states to the supplied h and c states if using
+        # DA, or 0's otherwise
+        hidden_state_prev = tf.cast(kwargs["h_init"], tf.float32)
+        cell_state_prev = tf.cast(kwargs["c_init"], tf.float32)
         for t in range(n_steps):
             h_graph = tf.nn.tanh(
                 tf.matmul(
@@ -135,10 +135,10 @@ class RGCN(layers.Layer):
 
             hidden_state_prev = h_update
             cell_state_prev = c_update
-            
+
             h_list.append(h_update)
             c_list.append(c_update)
-            
+
         h_list = tf.stack(h_list)
         c_list = tf.stack(c_list)
         h_list = tf.transpose(h_list, [1, 0, 2])
@@ -148,20 +148,23 @@ class RGCN(layers.Layer):
 
 class RGCNModel(tf.keras.Model):
     def __init__(
-        self, 
-        hidden_size, 
-        A, 
+        self,
+        hidden_size,
+        A,
         num_tasks=1,
-        recurrent_dropout=0,  
+        recurrent_dropout=0,
         dropout=0,
         rand_seed=None,
     ):
         """
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
-        :param num_tasks: [int] number of prediction tasks to perform - currently supports either 1 or 2 prediction tasks
-        :param recurrent_dropout: [float] value between 0 and 1 for the probability of a recurrent element to be zero
-        :param dropout: [float] value between 0 and 1 for the probability of an input element to be zero  
+        :param num_tasks: [int] number of prediction tasks to perform -
+        currently supports either 1 or 2 prediction tasks
+        :param recurrent_dropout: [float] value between 0 and 1 for the
+        probability of a recurrent element to be zero
+        :param dropout: [float] value between 0 and 1 for the probability of an
+        input element to be zero
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
         """
@@ -172,12 +175,9 @@ class RGCNModel(tf.keras.Model):
         self.dropout = dropout
 
         self.rgcn_layer = RGCN(
-            hidden_size, 
-            A,
-            recurrent_dropout,
-            dropout,
-            rand_seed)
-            
+            hidden_size, A, recurrent_dropout, dropout, rand_seed
+        )
+
         self.states = None
 
         self.dense_main = layers.Dense(1, name="dense_main")
@@ -186,8 +186,8 @@ class RGCNModel(tf.keras.Model):
 
     def call(self, inputs, **kwargs):
         batch_size = inputs.shape[0]
-        h_init = kwargs.get('h_init', tf.zeros([batch_size, self.hidden_size]))
-        c_init = kwargs.get('c_init', tf.zeros([batch_size, self.hidden_size]))
+        h_init = kwargs.get("h_init", tf.zeros([batch_size, self.hidden_size]))
+        c_init = kwargs.get("c_init", tf.zeros([batch_size, self.hidden_size]))
         h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
         self.states = h_gr[:, -1, :], c_gr[:, -1, :]
 
@@ -199,4 +199,6 @@ class RGCNModel(tf.keras.Model):
             aux_prediction = self.dense_aux(h_gr)
             return tf.concat([main_prediction, aux_prediction], axis=2)
         else:
-            raise ValueError(f'This model only supports 1 or 2 tasks (not {self.num_tasks})')
+            raise ValueError(
+                f"This model only supports 1 or 2 tasks (not {self.num_tasks})"
+            )

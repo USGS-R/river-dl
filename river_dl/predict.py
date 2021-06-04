@@ -317,7 +317,7 @@ def predict_from_arbitrary_data(
 
     model = load_model_from_weights(
         model_type, model_weights_dir, hidden_size, dist_matrix,
-        um_tasks=num_tasks
+        num_tasks=num_tasks
     )
 
     ds = xr.open_zarr(raw_data_file)

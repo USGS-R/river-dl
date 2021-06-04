@@ -103,6 +103,10 @@ def y_data_components(data, y_pred, var_idx, tasks):
     return y_true, y_pred, weights
 
 
+def weighted_masked_rmse(lambdas):
+    return multitask_loss(lambdas, rmse)
+
+
 def multitask_loss(lambdas, loss_func):
     """
     calculate a weighted multi-task loss for a given number of variables with a

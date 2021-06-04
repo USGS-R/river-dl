@@ -41,7 +41,7 @@ def load_model_from_weights(
     model_weights_dir,
     hidden_size,
     dist_matrix=None,
-    flow_in_temp=False,
+    num_tasks=1,
 ):
     """
     load a TF model from the model weights directory
@@ -49,15 +49,14 @@ def load_model_from_weights(
     :param model_weights_dir: [str] directory to saved model weights
     :param hidden_size: [int] the number of hidden units in model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'
-    :param flow_in_temp: [bool] whether the flow should be an input into temp
     :return:
     """
     if model_type == "rgcn":
-        model = RGCNModel(hidden_size, A=dist_matrix, flow_in_temp=flow_in_temp)
+        model = RGCNModel(hidden_size, A=dist_matrix, num_tasks=num_tasks)
     elif model_type.startswith("lstm"):
-        model = LSTMModel(hidden_size)
+        model = LSTMModel(hidden_size, num_tasks=num_tasks)
     elif model_type == "gru":
-        model = GRUModel(hidden_size)
+        model = GRUModel(hidden_size, num_tasks=num_tasks)
     else:
         raise ValueError(
             f'model_type must be "lstm", "gru" or "rgcn", (not {model_type})'
@@ -74,7 +73,7 @@ def predict_from_io_data(
     io_data,
     partition,
     outfile,
-    flow_in_temp=False,
+    num_tasks=1,
     logged_q=False,
 ):
     """
@@ -86,7 +85,6 @@ def predict_from_io_data(
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
-    :param flow_in_temp: [bool] whether the flow should be an input into temp
     :param logged_q: [bool] whether the discharge was logged in training. if
     True the exponent of the discharge will be taken in the model unscaling
     :return: [pd dataframe] predictions
@@ -97,7 +95,7 @@ def predict_from_io_data(
         model_weights_dir,
         hidden_size,
         io_data.get("dist_matrix"),
-        flow_in_temp,
+        num_tasks=num_tasks,
     )
 
     if partition != "trn":
@@ -279,9 +277,9 @@ def predict_from_arbitrary_data(
     model_weights_dir,
     model_type,
     hidden_size,
+    num_tasks=1,
     seq_len=365,
     dist_matrix=None,
-    flow_in_temp=False,
     logged_q=False,
 ):
     """
@@ -303,8 +301,6 @@ def predict_from_arbitrary_data(
     :param seq_len: [int] length of input sequences given to model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'. if not
     provided, will look for it in the "train_io_data" file.
-    :param flow_in_temp: [bool] whether the flow should be an input into temp
-    for the rgcn model
     :param logged_q: [bool] whether the model predicted log of discharge. if
     true, the exponent of the discharge will be executed
     :return: [pd dataframe] the predictions
@@ -320,7 +316,8 @@ def predict_from_arbitrary_data(
             )
 
     model = load_model_from_weights(
-        model_type, model_weights_dir, hidden_size, dist_matrix, flow_in_temp,
+        model_type, model_weights_dir, hidden_size, dist_matrix,
+        um_tasks=num_tasks
     )
 
     ds = xr.open_zarr(raw_data_file)

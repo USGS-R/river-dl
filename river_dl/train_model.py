@@ -1,6 +1,23 @@
-import os
 import argparse
 from river_dl.train import train_model
+import river_dl.loss_functions as lf
+
+
+def get_loss_func_from_str(loss_func_str, lambdas=None):
+    if loss_func_str == "rmse":
+        return lf.rmse
+    elif loss_func_str == "nse":
+        return lf.nse
+    elif loss_func_str == "kge":
+        return lf.kge
+    elif loss_func_str == "multitask_rmse":
+        return lf.multitask_rmse(lambdas)
+    elif loss_func_str == "multitask_nse":
+        return lf.multitask_nse(lambdas)
+    elif loss_func_str == "multitask_kge":
+        return lf.multitask_kge(lambdas)
+    else:
+        raise ValueError(f"loss function {loss_func_str} not supported")
 
 
 parser = argparse.ArgumentParser()
@@ -24,13 +41,6 @@ parser.add_argument(
     "-f", "--finetune_epochs", help="number of finetune" "epochs", type=int
 )
 parser.add_argument(
-    "-q",
-    "--flow-in-temp",
-    help="whether or not to do flow\
-                    in temp",
-    action="store_true",
-)
-parser.add_argument(
     "--pt_learn_rate",
     help="learning rate for pretraining",
     type=float,
@@ -45,31 +55,56 @@ parser.add_argument(
 parser.add_argument(
     "--model",
     help="type of model to train",
-    choices=["lstm", "rgcn"],
+    choices=["lstm", "rgcn", "gru"],
     default="rgcn",
 )
 parser.add_argument(
-    "--lamb", help="lambda for weighting aux gradient", default=1.0, type=float
+    "--num_tasks",
+    help="number of tasks (variables to be predicted)",
+    default=1,
+    type=int,
+)
+parser.add_argument(
+    "--loss_func",
+    help="loss function",
+    default="rmse",
+    type=str,
+    choices=[
+        "rmse",
+        "nse",
+        "kge",
+        "multitask_rmse",
+        "multitask_kge",
+        "multitask_nse",
+    ],
+)
+parser.add_argument("--dropout", help="dropout rate", default=0, type=float)
+parser.add_argument(
+    "--recurrent_dropout", help="recurrent dropout", default=0, type=float
+)
+parser.add_argument(
+    "--lambdas",
+    help="lambdas for weighting variable losses",
+    default=[1, 1],
+    type=list,
 )
 
-
 args = parser.parse_args()
-flow_in_temp = args.flow_in_temp
-in_data_file = args.in_data
-hidden_units = args.hidden_units
-out_dir = args.outdir
-pt_epochs = args.pretrain_epochs
-ft_epochs = args.finetune_epochs
+
+loss_func = get_loss_func_from_str(args.loss_func)
+
 
 # -------- train ------
 model = train_model(
-    in_data_file,
-    pt_epochs,
-    ft_epochs,
-    hidden_units,
-    out_dir=out_dir,
-    flow_in_temp=flow_in_temp,
-    lamb=args.lamb,
+    args.in_data_file,
+    args.pretrain_epochs,
+    args.finetune_epochs,
+    args.hidden_units,
+    out_dir=args.out_dir,
+    num_tasks=args.num_tasks,
+    loss_func=loss_func,
+    dropout=args.dropout,
+    recurrent_dropout=args.recurrent_dropout,
     seed=args.random_seed,
     learning_rate_ft=args.ft_learn_rate,
     learning_rate_pre=args.pt_learn_rate,

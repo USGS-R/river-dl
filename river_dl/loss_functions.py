@@ -1,4 +1,3 @@
-import numpy as np
 import tensorflow as tf
 
 
@@ -69,55 +68,43 @@ def samplewise_nnse_loss(y_true, y_pred):
     return 1 - nnse_val
 
 
-def nnse_masked_one_var(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
-    return nnse_loss(y_true, y_pred)
+def multitask_nse(lambdas):
+    return multitask_loss(lambdas, nnse_loss)
 
 
-def nnse_one_var_samplewise(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
-    return samplewise_nnse_loss(y_true, y_pred)
+def multitask_samplewise_nse(lambdas):
+    return multitask_loss(lambdas, samplewise_nnse_loss)
 
 
-def y_data_components(data, y_pred, var_idx):
-    weights = data[:, :, -2:]
-    y_true = data[:, :, :-2]
-
-    # ensure y_pred, weights, and y_true are all tensors the same data type
-    y_true = tf.convert_to_tensor(y_true)
-    weights = tf.convert_to_tensor(weights)
-    y_true = tf.cast(y_true, y_pred.dtype)
-    weights = tf.cast(weights, y_pred.dtype)
-
-    # make all zero-weighted observations 'nan' so they don't get counted
-    # at all in the loss calculation
-    y_true = tf.where(weights == 0, np.nan, y_true)
-
-    weights = weights[:, :, var_idx]
-    y_true = y_true[:, :, var_idx]
-    y_pred = y_pred[:, :, var_idx]
-    return y_true, y_pred, weights
+def multitask_rmse(lambdas):
+    return multitask_loss(lambdas, rmse)
 
 
-def rmse_masked_one_var(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
-    return rmse(y_true, y_pred)
+def multitask_kge(lambdas):
+    return multitask_loss(lambdas, kge_loss)
 
 
-def weighted_masked_rmse(lamb=0.5):
+def multitask_loss(lambdas, loss_func):
     """
-    calculate a weighted, masked rmse.
-    :param lamb: [float] (short for lambda). The factor that the auxiliary loss
-    will be multiplied by before added to the main loss.
+    calculate a weighted multi-task loss for a given number of variables with a
+    given loss function
+    :param lambdas: [array-like float] The factor that losses will be
+    multiplied by before being added together.
+    :param loss_func: [function] Loss function that will be used to calculate
+    the loss of each variable. Must take as input parameters [y_true, y_pred]
     """
 
-    def rmse_masked_combined(data, y_pred):
-        rmse_main = rmse_masked_one_var(data, y_pred, 0)
-        rmse_aux = rmse_masked_one_var(data, y_pred, 1)
-        rmse_loss = rmse_main + lamb * rmse_aux
-        return rmse_loss
+    def combine_loss(y_true, y_pred):
+        losses = []
+        n_vars = y_pred.shape[-1]
+        for var_id in range(n_vars):
+            ind_var_loss = loss_func(y_true[:, :, var_id], y_pred[:, :, var_id])
+            weighted_ind_var_loss = lambdas[var_id] * ind_var_loss
+            losses.append(weighted_ind_var_loss)
+        total_loss = sum(losses)
+        return total_loss
 
-    return rmse_masked_combined
+    return combine_loss
 
 
 def mean_masked(y):
@@ -179,11 +166,6 @@ def kge_norm_loss(y_true, y_pred):
     making it a loss, so low is good, high is bad
     """
     return 1 - norm_kge(y_true, y_pred)
-
-
-def kge_loss_one_var(data, y_pred, var_idx):
-    y_true, y_pred, weights = y_data_components(data, y_pred, var_idx)
-    return kge_loss(y_true, y_pred)
 
 
 def kge_loss(y_true, y_pred):

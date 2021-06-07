@@ -17,6 +17,7 @@ class LSTMModel(tf.keras.Model):
         input element to be zero
         """
         super().__init__()
+        self.hidden_size = hidden_size
         self.num_tasks = num_tasks
         self.rnn_layer = layers.LSTM(
             hidden_size,
@@ -33,6 +34,10 @@ class LSTMModel(tf.keras.Model):
 
     @tf.function
     def call(self, inputs, **kwargs):
+        batch_size = inputs.shape[0]
+        h_init = kwargs.get("h_init", tf.zeros([batch_size, self.hidden_size]))
+        c_init = kwargs.get("c_init", tf.zeros([batch_size, self.hidden_size]))
+        self.rnn_layer.reset_states(states=[h_init, c_init])
         x, h, c = self.rnn_layer(inputs)
         self.states = h, c
         if self.num_tasks == 1:

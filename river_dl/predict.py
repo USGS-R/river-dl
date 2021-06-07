@@ -14,7 +14,7 @@ from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.train import get_data_if_file
 
 
-def unscale_output(y_scl, y_std, y_mean, y_vars, logged_q=False):
+def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
     """
     unscale output data given a standard deviation and a mean value for the
     outputs
@@ -22,17 +22,17 @@ def unscale_output(y_scl, y_std, y_mean, y_vars, logged_q=False):
     :param y_std:[numpy array] array of standard deviation of variables [n_out]
     :param y_mean:[numpy array] array of variable means [n_out]
     :param y_vars: [list-like] y variable names
-    :param logged_q: [bool] whether the model predicted log of discharge. if
-    true, the exponent of the discharge will be executed
-    :return:
+    :param log_vars: [list-like] which variables (if any) were logged in data
+    prep
+    :return: unscaled data
     """
     y_unscaled = y_scl.copy()
     # I'm replacing just the variable columns. I have to specify because, at
     # least in some cases, there are other columns (e.g., "seg_id_nat" and
     # date")
     y_unscaled[y_vars] = (y_scl[y_vars] * y_std) + y_mean
-    if logged_q:
-        y_unscaled["seg_outflow"] = np.exp(y_unscaled["seg_outflow"])
+    if log_vars:
+        y_unscaled[log_vars] = np.exp(y_unscaled[log_vars])
     return y_unscaled
 
 
@@ -75,7 +75,7 @@ def predict_from_io_data(
     partition,
     outfile,
     flow_in_temp=False,
-    logged_q=False,
+    log_vars=False,
 ):
     """
     make predictions from trained model
@@ -87,8 +87,8 @@ def predict_from_io_data(
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
     :param flow_in_temp: [bool] whether the flow should be an input into temp
-    :param logged_q: [bool] whether the discharge was logged in training. if
-    True the exponent of the discharge will be taken in the model unscaling
+    :param log_vars: [list-like] which variables (if any) were logged in data
+    prep
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -115,7 +115,7 @@ def predict_from_io_data(
         io_data[f"y_vars"],
         keep_last_frac=keep_frac,
         outfile=outfile,
-        logged_q=logged_q,
+        log_vars=log_vars,
     )
     return preds
 
@@ -130,7 +130,7 @@ def predict(
     y_vars,
     keep_last_frac=1.0,
     outfile=None,
-    logged_q=False,
+    log_vars=False,
 ):
     """
     use trained model to make predictions
@@ -146,8 +146,8 @@ def predict(
     :param y_means:[np array] the means of the y data
     :param y_vars:[np array] the variable names of the y data
     :param outfile: [str] the file where the output data should be stored
-    :param logged_q: [str] whether the discharge was logged in training. if True
-    the exponent of the discharge will be taken in the model unscaling
+    :param log_vars: [list-like] which variables (if any) were logged in data
+    prep
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
@@ -161,7 +161,7 @@ def predict(
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars,)
 
-    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, logged_q,)
+    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, log_vars,)
 
     if outfile:
         y_pred_pp.to_feather(outfile)
@@ -196,11 +196,12 @@ def swap_first_seq_halves(x_data, batch_size):
     """
     first_batch = x_data[:batch_size, :, :]
     seq_len = x_data.shape[1]
-    half_size = round(seq_len/2)
+    half_size = round(seq_len / 2)
     first_half_first_batch = first_batch[:, :half_size, :]
     second_half_first_batch = first_batch[:, half_size:, :]
-    swapped = np.concatenate([second_half_first_batch, first_half_first_batch],
-                             axis=1)
+    swapped = np.concatenate(
+        [second_half_first_batch, first_half_first_batch], axis=1
+    )
     new_x_data = np.concatenate([swapped, x_data], axis=0)
     return new_x_data
 
@@ -212,7 +213,9 @@ def predict_one_date_range(
     seq_len,
     start_date,
     end_date,
-    logged_q=False,
+    spatial_idx_name,
+    time_idx_name,
+    log_vars=None,
     keep_last_frac=1.0,
     offset=0.5,
     swap_halves_of_first_seq=False,
@@ -227,8 +230,12 @@ def predict_one_date_range(
     :param seq_len: [int] length of the prediction sequences (usu. 365)
     :param start_date: [str or date] the start date of the predictions
     :param end_date: [str or date] the end date of the predictions
-    :param logged_q: [bool] whether the model predicted log of discharge. if
-    true, the exponent of the discharge will be executed
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
+    :param log_vars: [list-like] which variables (if any) were logged in data
+    prep
     :param keep_last_frac: [float] fraction of the predictions to keep starting
     from the *end* of the predictions (0-1). (1 means you keep all of the
     predictions, .75 means you keep the final three quarters of the predictions)
@@ -243,12 +250,28 @@ def predict_one_date_range(
     """
     ds_x_scaled = ds_x_scaled[train_io_data["x_cols"]]
     x_data = ds_x_scaled.sel(date=slice(start_date, end_date))
-    x_batches = convert_batch_reshape(x_data, seq_len=seq_len, offset=offset)
+    x_batches = convert_batch_reshape(
+        x_data,
+        seq_len=seq_len,
+        offset=offset,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
+    )
     x_batch_ids = coord_as_reshaped_array(
-        x_data, "seg_id_nat", seq_len=seq_len, offset=offset
+        x_data,
+        "seg_id_nat",
+        seq_len=seq_len,
+        offset=offset,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
     )
     x_batch_dates = coord_as_reshaped_array(
-        x_data, "date", seq_len=seq_len, offset=offset
+        x_data,
+        "date",
+        seq_len=seq_len,
+        offset=offset,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
     )
     num_segs = len(np.unique(x_batch_ids))
 
@@ -266,7 +289,7 @@ def predict_one_date_range(
         train_io_data["y_mean"],
         train_io_data["y_vars"],
         keep_last_frac=keep_last_frac,
-        logged_q=logged_q,
+        log_vars=log_vars,
     )
     return predictions
 
@@ -279,10 +302,12 @@ def predict_from_arbitrary_data(
     model_weights_dir,
     model_type,
     hidden_size,
+    spatial_idx_name,
+    time_idx_name,
     seq_len=365,
     dist_matrix=None,
     flow_in_temp=False,
-    logged_q=False,
+    log_vars=None,
 ):
     """
     make predictions given raw data that is potentially independent from the
@@ -300,13 +325,17 @@ def predict_from_arbitrary_data(
     weights are stored
     :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
     :param hidden_size: [int] the number of hidden units in model
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
     :param seq_len: [int] length of input sequences given to model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'. if not
     provided, will look for it in the "train_io_data" file.
     :param flow_in_temp: [bool] whether the flow should be an input into temp
     for the rgcn model
-    :param logged_q: [bool] whether the model predicted log of discharge. if
-    true, the exponent of the discharge will be executed
+    :param log_vars: [list-like] which variables (if any) were logged in data
+    prep
     :return: [pd dataframe] the predictions
     """
     train_io_data = get_data_if_file(train_io_data)
@@ -335,7 +364,7 @@ def predict_from_arbitrary_data(
     pred_start_date = datetime.datetime.strptime(pred_start_date, "%Y-%m-%d")
     # look back half of the sequence length before the prediction start date.
     # if present, this serves as a half-sequence warm-up period
-    inputs_start_date = pred_start_date - datetime.timedelta(round(seq_len/2))
+    inputs_start_date = pred_start_date - datetime.timedelta(round(seq_len / 2))
 
     # get the "middle" predictions
     middle_predictions = predict_one_date_range(
@@ -345,7 +374,9 @@ def predict_from_arbitrary_data(
         seq_len,
         inputs_start_date,
         pred_end_date,
-        logged_q,
+        log_vars=log_vars,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
         keep_last_frac=0.5,
         offset=0.5,
     )
@@ -360,9 +391,11 @@ def predict_from_arbitrary_data(
         seq_len,
         pred_start_date,
         start_dates_end,
-        logged_q,
+        log_vars=log_vars,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
         keep_last_frac=1,
-        offset=.5,
+        offset=0.5,
         swap_halves_of_first_seq=True,
     )
 
@@ -379,7 +412,9 @@ def predict_from_arbitrary_data(
         seq_len,
         end_dates_start,
         end_date_end,
-        logged_q,
+        log_vars=log_vars,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
         keep_last_frac=1,
         offset=1,
     )

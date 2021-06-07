@@ -45,7 +45,7 @@ def load_model_from_weights(
     :param model_weights_dir: [str] directory to saved model weights
     :param hidden_size: [int] the number of hidden units in model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'
-    :param num_tasks: [int] number of tasks (outputs to be predicted)
+    :param num_tasks: [int] number of tasks (variables to be predicted)
     :return: TF model
     """
     if model_type == "rgcn":
@@ -84,7 +84,7 @@ def predict_from_io_data(
     :param outfile: [str] the file where the output data should be stored
     :param logged_q: [bool] whether the discharge was logged in training. if
     True the exponent of the discharge will be taken in the model unscaling
-    :param num_tasks: [int] number of tasks (outputs to be predicted)
+    :param num_tasks: [int] number of tasks (variables to be predicted)
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -297,7 +297,7 @@ def predict_from_arbitrary_data(
     weights are stored
     :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
     :param hidden_size: [int] the number of hidden units in model
-    :param num_tasks: [int] number of tasks (outputs to be predicted)
+    :param num_tasks: [int] number of tasks (variables to be predicted)
     :param seq_len: [int] length of input sequences given to model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'. if not
     provided, will look for it in the "train_io_data" file.

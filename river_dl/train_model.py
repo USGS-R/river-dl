@@ -60,7 +60,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--num_tasks",
-    help="number of tasks (outputs to be predicted)",
+    help="number of tasks (variables to be predicted)",
     default=1,
     type=int,
 )

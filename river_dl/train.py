@@ -50,7 +50,7 @@ def train_model(
     of a reccurent element to be zero
     :param dropout: [float] value between 0 and 1 for the probability of an
     input element to be zero
-    :param num_tasks: [int] number of tasks (outputs to be predicted)
+    :param num_tasks: [int] number of tasks (variables to be predicted)
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model

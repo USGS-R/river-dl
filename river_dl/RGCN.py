@@ -185,7 +185,7 @@ class RGCNModel(tf.keras.Model):
             self.dense_aux = layers.Dense(1, name="dense_aux")
 
     def call(self, inputs, **kwargs):
-        batch_size = inputs.shape[0]
+        batch_size = tf.shape(inputs)[0]
         h_init = kwargs.get("h_init", tf.zeros([batch_size, self.hidden_size]))
         c_init = kwargs.get("c_init", tf.zeros([batch_size, self.hidden_size]))
         h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)

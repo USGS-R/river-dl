@@ -34,7 +34,7 @@ class LSTMModel(tf.keras.Model):
 
     @tf.function
     def call(self, inputs, **kwargs):
-        batch_size = inputs.shape[0]
+        batch_size = tf.shape(inputs)[0]
         h_init = kwargs.get("h_init", tf.zeros([batch_size, self.hidden_size]))
         c_init = kwargs.get("c_init", tf.zeros([batch_size, self.hidden_size]))
         self.rnn_layer.reset_states(states=[h_init, c_init])

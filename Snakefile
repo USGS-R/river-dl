@@ -5,10 +5,15 @@ from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
+from river_dl import loss_functions as lf
 from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
+
+
 
 out_dir = config['out_dir']
 code_dir = config['code_dir']
+
+loss_function = lf.multitask_rmse(config['lambdas'])
 
 rule all:
     input:
@@ -16,18 +21,14 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
-        expand( "{outdir}/{plt_variable}_{partition}.png",
-                outdir=out_dir,
-                plt_variable=['temp', 'flow'],
-                partition=['trn','val'],
-        ),
-        expand("{outdir}/GW_stats_{partition}.csv",
-                outdir=out_dir,
-                partition=['trn', 'tst','val']
-        ),
+#        expand("{outdir}/GW_stats_{partition}.csv",
+#                outdir=out_dir,
+#                partition=['trn', 'tst','val']
+#        ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
         
+
 
 rule prep_io_data:
     input:
@@ -51,8 +52,7 @@ rule prep_io_data:
                   primary_variable=config['primary_variable'],
                   log_q=False, segs=None,
                   out_file=output[0])
-                  
-                   
+                 
                   
                   
                   
@@ -99,6 +99,7 @@ rule prep_ann_temp:
 #        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
 #        """
  
+ 
 # use "train_model" if wanting to use CPU or local GPU
 rule train_model_local_or_cpu:
     input:
@@ -112,7 +113,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    params.run_dir, model_type='rgcn', loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
 
 
 rule make_predictions:
@@ -127,7 +128,10 @@ rule make_predictions:
         predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
-                             logged_q=False)
+                             logged_q=False, num_tasks=2)
+                             
+        
+                             
 
 def get_grp_arg(wildcards):
     if wildcards.metric_type == 'overall':
@@ -138,7 +142,7 @@ def get_grp_arg(wildcards):
         return 'seg_id_nat'
     elif wildcards.metric_type == 'month_reach':
         return ['seg_id_nat', 'month']
-        
+
 
 rule combine_metrics:
     input:
@@ -194,4 +198,4 @@ rule calc_gw_summary_metrics:
         "{outdir}/GW_boxplot.png",
     run:
         calc_gw_metrics(input[0],input[1],input[2],output[0], output[1], output[2])
-        
+ 

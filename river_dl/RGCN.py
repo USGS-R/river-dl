@@ -11,22 +11,27 @@ from tensorflow.keras import layers
 
 
 class RGCN(layers.Layer):
-    def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
+    def __init__(
+        self, hidden_size, A, recurrent_dropout=0, dropout=0, rand_seed=None,
+    ):
         """
 
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
-        :param flow_in_temp: [bool] whether the flow predictions should feed
-        into the temp predictions
+        :param recurrent_dropout: [float] value between 0 and 1 for the
+        probability of a recurrent element to be zero
+        :param dropout: [float] value between 0 and 1 for the probability of an
+        input element to be zero
         :param rand_seed: [int] the random seed for initialization
         """
         super().__init__()
         self.hidden_size = hidden_size
         self.A = A.astype("float32")
-        self.flow_in_temp = flow_in_temp
 
         # set up the layer
-        self.lstm = tf.keras.layers.LSTMCell(hidden_size)
+        self.lstm = tf.keras.layers.LSTMCell(
+            hidden_size, recurrent_dropout=recurrent_dropout, dropout=dropout
+        )
 
         ### set up the weights ###
         w_initializer = tf.random_normal_initializer(
@@ -88,44 +93,15 @@ class RGCN(layers.Layer):
             shape=[hidden_size], initializer="zeros", name="b_c"
         )
 
-        if self.flow_in_temp:
-            # was W2
-            self.W_out_flow = self.add_weight(
-                shape=[hidden_size, 1], initializer=w_initializer, name="W_out"
-            )
-            # was b2
-            self.b_out_flow = self.add_weight(
-                shape=[1], initializer="zeros", name="b_out"
-            )
-
-            self.W_out_temp = self.add_weight(
-                shape=[hidden_size + 1, 1],
-                initializer=w_initializer,
-                name="W_out",
-            )
-
-            self.b_out_temp = self.add_weight(
-                shape=[1], initializer="zeros", name="b_out"
-            )
-        else:
-            # was W2
-            self.W_out = self.add_weight(
-                shape=[hidden_size, 2], initializer=w_initializer, name="W_out"
-            )
-            # was b2
-            self.b_out = self.add_weight(
-                shape=[2], initializer="zeros", name="b_out"
-            )
-
     @tf.function
     def call(self, inputs, **kwargs):
-        graph_size = self.A.shape[0]
-        hidden_state_prev, cell_state_prev = (
-            tf.zeros([graph_size, self.hidden_size]),
-            tf.zeros([graph_size, self.hidden_size]),
-        )
-        out = []
+        h_list = []
+        c_list = []
         n_steps = inputs.shape[1]
+        # set the initial h & c states to the supplied h and c states if using
+        # DA, or 0's otherwise
+        hidden_state_prev = tf.cast(kwargs["h_init"], tf.float32)
+        cell_state_prev = tf.cast(kwargs["c_init"], tf.float32)
         for t in range(n_steps):
             h_graph = tf.nn.tanh(
                 tf.matmul(
@@ -157,42 +133,72 @@ class RGCN(layers.Layer):
                 + self.b_c
             )
 
-            if self.flow_in_temp:
-                out_pred_q = (
-                    tf.matmul(h_update, self.W_out_flow) + self.b_out_flow
-                )
-                out_pred_t = (
-                    tf.matmul(
-                        tf.concat([h_update, out_pred_q], axis=1),
-                        self.W_out_temp,
-                    )
-                    + self.b_out_temp
-                )
-                out_pred = tf.concat([out_pred_t, out_pred_q], axis=1)
-            else:
-                out_pred = tf.matmul(h_update, self.W_out) + self.b_out
-
-            out.append(out_pred)
-
             hidden_state_prev = h_update
             cell_state_prev = c_update
-        out = tf.stack(out)
-        out = tf.transpose(out, [1, 0, 2])
-        return out
+
+            h_list.append(h_update)
+            c_list.append(c_update)
+
+        h_list = tf.stack(h_list)
+        c_list = tf.stack(c_list)
+        h_list = tf.transpose(h_list, [1, 0, 2])
+        c_list = tf.transpose(c_list, [1, 0, 2])
+        return h_list, c_list
 
 
 class RGCNModel(tf.keras.Model):
-    def __init__(self, hidden_size, A, flow_in_temp=False, rand_seed=None):
+    def __init__(
+        self,
+        hidden_size,
+        A,
+        num_tasks=1,
+        recurrent_dropout=0,
+        dropout=0,
+        rand_seed=None,
+    ):
         """
         :param hidden_size: [int] the number of hidden units
         :param A: [numpy array] adjacency matrix
-        :param flow_in_temp: [bool] whether the flow predictions should feed
+        :param num_tasks: [int] number of prediction tasks to perform -
+        currently supports either 1 or 2 prediction tasks
+        :param recurrent_dropout: [float] value between 0 and 1 for the
+        probability of a recurrent element to be zero
+        :param dropout: [float] value between 0 and 1 for the probability of an
+        input element to be zero
         into the temp predictions
         :param rand_seed: [int] the random seed for initialization
         """
         super().__init__()
-        self.rgcn_layer = RGCN(hidden_size, A, flow_in_temp, rand_seed)
+        self.hidden_size = hidden_size
+        self.num_tasks = num_tasks
+        self.recurrent_dropout = recurrent_dropout
+        self.dropout = dropout
+
+        self.rgcn_layer = RGCN(
+            hidden_size, A, recurrent_dropout, dropout, rand_seed
+        )
+
+        self.states = None
+
+        self.dense_main = layers.Dense(1, name="dense_main")
+        if self.num_tasks == 2:
+            self.dense_aux = layers.Dense(1, name="dense_aux")
 
     def call(self, inputs, **kwargs):
-        output = self.rgcn_layer(inputs)
-        return output
+        batch_size = inputs.shape[0]
+        h_init = kwargs.get("h_init", tf.zeros([batch_size, self.hidden_size]))
+        c_init = kwargs.get("c_init", tf.zeros([batch_size, self.hidden_size]))
+        h_gr, c_gr = self.rgcn_layer(inputs, h_init=h_init, c_init=c_init)
+        self.states = h_gr[:, -1, :], c_gr[:, -1, :]
+
+        if self.num_tasks == 1:
+            main_prediction = self.dense_main(h_gr)
+            return main_prediction
+        elif self.num_tasks == 2:
+            main_prediction = self.dense_main(h_gr)
+            aux_prediction = self.dense_aux(h_gr)
+            return tf.concat([main_prediction, aux_prediction], axis=2)
+        else:
+            raise ValueError(
+                f"This model only supports 1 or 2 tasks (not {self.num_tasks})"
+            )

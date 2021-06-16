@@ -1,3 +1,9 @@
+"""
+This file provides a commandline interface (CLI) for the `train.train_model`
+function. The commandline interface was originally provided to allow a command
+to be sent to a slurm scheduler which was necessary to train the model using
+GPUs. This has been tested on USGS's Tallgrass supercomputer.
+"""
 import argparse
 from river_dl.train import train_model
 import river_dl.loss_functions as lf

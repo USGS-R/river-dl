@@ -422,13 +422,15 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
                 ax = fig.add_subplot(len(partDict), len(metricLst), thisFig, aspect='equal')
                 ax.set_title('{}, {}'.format(thisMetric, thisPart))
                 ax.axline((np.nanmean(thisData['{}_pred'.format(thisMetric)]),np.nanmean(thisData['{}_pred'.format(thisMetric)])), slope=1.0,linewidth=1, color='black', label="1 to 1 line")
+                colorDict = {"Atmosphere":"red","Shallow":"green","Deep":"blue"}
                 for x in range(len(thisData['{}_obs'.format(thisMetric)])):
-                    ax.plot([thisData['{}_obs'.format(thisMetric+"_low")][x],thisData['{}_obs'.format(thisMetric+"_high")][x]],[thisData['{}_pred'.format(thisMetric)][x],thisData['{}_pred'.format(thisMetric)][x]], color="blue")
+                    thisColor = colorDict[thisData.group[x]]
+                    ax.plot([thisData['{}_obs'.format(thisMetric+"_low")][x],thisData['{}_obs'.format(thisMetric+"_high")][x]],[thisData['{}_pred'.format(thisMetric)][x],thisData['{}_pred'.format(thisMetric)][x]], color=thisColor)
 #                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
-                ax.scatter(x=thisData.loc[thisData.group=="Atmosphere",'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group=="Atmosphere",'{}_pred'.format(thisMetric)],label="RGCN",color="red")
-                ax.scatter(x=thisData.loc[thisData.group=="Shallow",'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group=="Shallow",'{}_pred'.format(thisMetric)],label="RGCN",color="green")
-                ax.scatter(x=thisData.loc[thisData.group=="Deep",'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group=="Deep",'{}_pred'.format(thisMetric)],label="RGCN",color="blue")
-            
+                for thisGroup in np.unique(thisData['group']):
+                    thisColor = colorDict[thisGroup]
+                    ax.scatter(x=thisData.loc[thisData.group==thisGroup,'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group==thisGroup,'{}_pred'.format(thisMetric)],label="RGCN - %s"%thisGroup,color=thisColor)
+                
 #                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
                 for i, label in enumerate(thisData.seg_id_nat):
                     ax.annotate(int(label), (thisData['{}_obs'.format(thisMetric)][i],thisData['{}_pred'.format(thisMetric)][i]))

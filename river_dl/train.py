@@ -5,7 +5,7 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel
-from river_dl.loss_functions import weighted_masked_rmse, weighted_masked_rmse_gw
+from river_dl.loss_functions import weighted_masked_rmse_gw
 from river_dl.rnns import LSTMModel, GRUModel
 
 

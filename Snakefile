@@ -21,10 +21,10 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
-#        expand("{outdir}/GW_stats_{partition}.csv",
-#                outdir=out_dir,
-#                partition=['trn', 'tst','val']
-#        ),
+        expand("{outdir}/GW_stats_{partition}.csv",
+                outdir=out_dir,
+                partition=['trn', 'tst','val']
+        ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
         
@@ -113,7 +113,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'], lamb=config['lamb'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'], lamb2=config['lamb2'],lamb3=config['lamb3'])
 
 
 rule make_predictions:

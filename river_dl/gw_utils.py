@@ -47,20 +47,27 @@ def amp_phi (Date, temp, isWater=False):
 
 #this solves the regression using stats models, which provides confidence intervals on the coefficients
     X = sm.add_constant(x)
-    model = sm.OLS(temp,X, missing='drop')
-    results = model.fit()
+    try:
+        model = sm.OLS(temp,X, missing='drop')
+        results = model.fit()
     
-    confInt = np.array(results.conf_int())
+        confInt = np.array(results.conf_int())
       
-    amp = math.sqrt(results.params[1]**2+results.params[2]**2)
-    amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
-    amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
+        amp = math.sqrt(results.params[1]**2+results.params[2]**2)
+        amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
+        amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
     
-    phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
-    phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
-    phi_low = np.min(phiRange)
-    phi_high = np.max(phiRange)
-    
+        phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
+        phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
+        phi_low = np.min(phiRange)
+        phi_high = np.max(phiRange)
+    except:
+        amp=np.nan
+        phi=np.nan
+        amp_low=np.nan
+        amp_high=np.nan
+        phi_low=np.nan
+        phi_high = np.nan
     
     return amp, phi, amp_low, amp_high, phi_low, phi_high
 
@@ -406,15 +413,23 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
     thisFig = 0
     for thisPart in partDict.keys():
             thisData = partDict[thisPart]
+            thisData['group']="Atmosphere"
+            thisData.loc[thisData.delPhi_obs>=10,"group"]="Shallow"
+            thisData.loc[(thisData.delPhi_obs<=10) & (thisData.Ar_obs<0.65),"group"]="Deep"
+
             for thisMetric in metricLst:
                 thisFig = thisFig + 1
                 ax = fig.add_subplot(len(partDict), len(metricLst), thisFig, aspect='equal')
                 ax.set_title('{}, {}'.format(thisMetric, thisPart))
-                ax.axline((np.nanmean(thisData['{}_pred'.format(thisMetric)]),np.nanmean(thisData['{}_pred'.format(thisMetric)])), slope=1.0,linewidth=1, color='r', label="1 to 1 line")
+                ax.axline((np.nanmean(thisData['{}_pred'.format(thisMetric)]),np.nanmean(thisData['{}_pred'.format(thisMetric)])), slope=1.0,linewidth=1, color='black', label="1 to 1 line")
                 for x in range(len(thisData['{}_obs'.format(thisMetric)])):
                     ax.plot([thisData['{}_obs'.format(thisMetric+"_low")][x],thisData['{}_obs'.format(thisMetric+"_high")][x]],[thisData['{}_pred'.format(thisMetric)][x],thisData['{}_pred'.format(thisMetric)][x]], color="blue")
-                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
-                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
+#                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
+                ax.scatter(x=thisData.loc[thisData.group=="Atmosphere",'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group=="Atmosphere",'{}_pred'.format(thisMetric)],label="RGCN",color="red")
+                ax.scatter(x=thisData.loc[thisData.group=="Shallow",'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group=="Shallow",'{}_pred'.format(thisMetric)],label="RGCN",color="green")
+                ax.scatter(x=thisData.loc[thisData.group=="Deep",'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group=="Deep",'{}_pred'.format(thisMetric)],label="RGCN",color="blue")
+            
+#                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
                 for i, label in enumerate(thisData.seg_id_nat):
                     ax.annotate(int(label), (thisData['{}_obs'.format(thisMetric)][i],thisData['{}_pred'.format(thisMetric)][i]))
                 if thisFig==1:

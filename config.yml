@@ -1,10 +1,10 @@
 # Input files
-obs_flow: "DRB_data/obs_flow_subset"
-obs_temp: "DRB_data/obs_temp_subset"
-sntemp_file: "DRB_data/uncal_sntemp_input_output_subset"
-dist_matrix: "DRB_data/distance_matrix_subset.npz"
+obs_flow: "data_DRB/obs_flow_subset"
+obs_temp: "data_DRB/obs_temp_subset"
+sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
+dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
-out_dir: "DRB_output_subset_test"
+out_dir: "output_data_DRB_subset_test"
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]

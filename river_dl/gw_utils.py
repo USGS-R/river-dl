@@ -35,9 +35,9 @@ def amp_phi (Date, temp, isWater=False):
     #convert the date to decimal years
     date_decimal = make_decimal_date(Date)
     
-    #remove water temps below 1C or above 60C to avoid complex freeze-thaw dynamics near 0 C and because >60C is likely erroneous  
+    #remove water temps below 1C or above 45C to avoid complex freeze-thaw dynamics near 0 C and because >60C is likely erroneous  
     if isWater:
-        temp = [x if x >=1 and x<=60 else np.nan for x in temp]
+        temp = [x if x >=1 and x<=45 else np.nan for x in temp]
     
     x = [[math.sin(2*math.pi*j),math.cos(2*math.pi*j)] for j in date_decimal]
 # this solves the regression using scikit-learn (not on the current import list), which doesn't give confidence intervals

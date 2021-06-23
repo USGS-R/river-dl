@@ -198,9 +198,9 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
 
 def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd,gw_mean, gw_std):
     #assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
-    #assumes the first two columns of data are the observed flow and temperature, the last two are the weights, and the remaining 
+    #assumes the first two columns of data are the observed flow and temperature, and the remaining 
     #ones (extracted here) are the data for gw analysis
-    y_true = data[:, :, 2:-2]
+    y_true = data[:, :, 2:]
     y_pred_temp = y_pred[:,:,int(temp_index):(int(temp_index)+1)] #extract just the predicted temperature
     #unscale the predicted temps prior to calculating the amplitude and phase
     y_pred_temp = y_pred_temp*temp_sd+temp_mean

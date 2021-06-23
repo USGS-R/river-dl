@@ -32,8 +32,8 @@ def amp_phi (Date, temp, isWater=False):
     #Phi = phase of the temp sinusoid (radians)
     #Phi = (3/2)* pi - atan (b/a) - in radians
     
-    #convert the date to decimal data
-    date_decimal = [float(x)/365 for x in ((Date-np.datetime64('1980-10-01'))/np.timedelta64(1, 'D'))]
+    #convert the date to decimal years
+    date_decimal = make_decimal_date(Date)
     
     #remove water temps below 1C or above 60C to avoid complex freeze-thaw dynamics near 0 C and because >60C is likely erroneous  
     if isWater:
@@ -297,6 +297,24 @@ def calc_amp_phi(thisData):
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
+
+def make_decimal_date(date, ref_date = "1980-10-01"):
+    """
+    converts a list of dates to decimal years relative to a reference date
+    :param date: array or list of dates
+    :param ref_date: [str] reference date, see below for details before changing it
+    :returns: list of decimal dates
+    """
+    
+    #1980-10-01 is a reference date from which the decimal dates are calculated. Changing the time of year may require changing the calculation of phi. 
+    # For details of if /how the phi calculation may need to change, see Appendix A in 
+    # Johnson, Z.C., Johnson, B.G., Briggs, M.A., Snyder, C.D., Hitt, N.P., and Devine, W.D., 2021, 
+    # Heed the data gap: Guidelines for using incomplete datasets in annual stream temperature analyses: 
+    # Ecological Indicators, v. 122, p. 107229, http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
+    
+    decimal_date = [float(x)/365 for x in ((date-np.datetime64(ref_date))/np.timedelta64(1, 'D'))]
+    
+    return decimal_date
     
 def merge_pred_obs(gw_obs,obs_col,pred):
     """
@@ -324,8 +342,8 @@ def make_GW_dataset (GW_data,x_data,varList):
     prod = pd.DataFrame(product(np.unique(GW_data.seg_id_nat),x_data['date'].values),columns=['seg_id_nat','date'])
     prod = prod.merge(GW_data)
     
-    #convert the date to decimal years starting at 1980-10-01
-    prod['dec_date']=[float(x)/365 for x in ((prod.date-np.datetime64('1980-10-01'))/np.timedelta64(1, 'D'))]
+    #convert the date to decimal years 
+    prod['dec_date']=make_decimal_date(prod.date)
     
     #precalculate sin(wt) and cos(wt) for the regression
     prod['sin_wt']=[math.sin(2*math.pi*x) for x in prod['dec_date']]

@@ -72,7 +72,7 @@ def amp_phi (Date, temp, isWater=False):
     return amp, phi, amp_low, amp_high, phi_low, phi_high
 
 
-def annTempStats(thisData):
+def annual_temp_stats(thisData):
     """
     calculate the annual signal properties (phase and amplitude) for temperature times series
     :param thisData: [xr dataset] with time series data of air and water temp for each segment
@@ -254,9 +254,9 @@ def prep_annual_signal_data(
     
     
     #get the annual signal properties for the training, validation, and testing data
-    GW_trn = annTempStats(obs_trn)
-    GW_tst = annTempStats(obs_tst)
-    GW_val = annTempStats(obs_val)
+    GW_trn = annual_temp_stats(obs_trn)
+    GW_tst = annual_temp_stats(obs_tst)
+    GW_val = annual_temp_stats(obs_val)
     
     #scale the Ar_obs & delPhi_obs
     GW_trn_scale = deepcopy(GW_trn)

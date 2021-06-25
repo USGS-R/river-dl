@@ -183,10 +183,22 @@ def annual_temp_stats(thisData):
     delPhi_low_obs = [(water_phi_low_obs[x]-air_phi_high[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     delPhi_high_obs = [(water_phi_high_obs[x]-air_phi_low[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     
+    ########################################################
+    #these thresholds were set based on analysis in Hare, D.K., Helton, A.M., Johnson, Z.C., Lane, J.W., and Briggs, M.A.,
+    #2021, Continental-scale analysis of shallow and deep groundwater contributions to streams: Nature Communications, 
+    #v. 12, no. 1, p. 1450, https://doi.org/10.1038/s41467-021-21651-0.
+
+    #Ar is the ratio of the annual amplitude of the stream temp and the annual amplitude of the air temp. 
+    #Ar > 1 indicates that the water temperature varies more widely than the air temperature, which would not be expected and suggests a data anomaly. 
+    #Therefore Ar > 1.1 is set to NA (along with the corresponding delPhi)
     #remove Ar >1.1
     delPhi_obs=[delPhi_obs[i] if Ar_obs[i] <=1.1 else np.nan for i in range(len(delPhi_obs))]
     Ar_obs = [x if x <= 1.1 else np.nan for x in Ar_obs]
     
+    #delPhi is the phase difference between the air temp and the water temp.
+    #delPhi < 0 indicates the water warms / cools before the air, which is unexpected and suggests a data anomaly.
+    # Therefore delPhi is set to NA when it is less than -10 and to 0 when it is between -10 and 0 (allowing a buffer for imprecision in estimating
+    # the delPhi). Ar is also set to NA when delPhi is less than -10.
     #remove delPhi <-10
     Ar_obs = [Ar_obs[i] if delPhi_obs[i] >=-10 else np.nan for i in range(len(Ar_obs))]
     delPhi_obs = [x if x >=-10 else np.nan for x in delPhi_obs]

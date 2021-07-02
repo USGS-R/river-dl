@@ -72,10 +72,13 @@ def amp_phi (Date, temp, isWater=False):
     return amp, phi, amp_low, amp_high, phi_low, phi_high
 
 
-def annual_temp_stats(thisData):
+def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water_temp_obs_col="seg_tave_water",air_temp_col = 'seg_tave_air'):
     """
     calculate the annual signal properties (phase and amplitude) for temperature times series
     :param thisData: [xr dataset] with time series data of air and water temp for each segment
+    :param water_temp_pbm_col: str with the column name of the process-based model predicted water temperatures in degrees C
+    :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
+    :param air_temp_col: str with the column name of the air temperatures in degrees C
     :returns: data frame with phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio for each segment, "low" and "high" values are the minimum and maximum 
     property values calculated with coefficient values within the 95th percent confidence interval
@@ -94,18 +97,18 @@ def annual_temp_stats(thisData):
     water_phi_obs = []
     water_phi_low_obs = []
     water_phi_high_obs = []        
-    water_amp_sntemp = []
-    water_amp_low_sntemp = []
-    water_amp_high_sntemp = []
-    water_phi_sntemp = []
-    water_phi_low_sntemp = []
-    water_phi_high_sntemp = []
+    water_amp_pbm = []
+    water_amp_low_pbm = []
+    water_amp_high_pbm = []
+    water_phi_pbm = []
+    water_phi_low_pbm = []
+    water_phi_high_pbm = []
     
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
         #get the air temp properties
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData['seg_tave_air'][:,i].values,isWater=False)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
         air_amp.append(amp)
         air_amp_low.append(amp_low)
         air_amp_high.append(amp_high)
@@ -113,21 +116,21 @@ def annual_temp_stats(thisData):
         air_phi_low.append(phi_low)
         air_phi_high.append(phi_high)
 
-        #get the sntemp water temp properties
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData['seg_tave_water_sntemp'][:,i].values,isWater=True)
-        water_amp_sntemp.append(amp)
-        water_amp_low_sntemp.append(amp_low)
-        water_amp_high_sntemp.append(amp_high)
-        water_phi_sntemp.append(phi)
-        water_phi_low_sntemp.append(phi_low)
-        water_phi_high_sntemp.append(phi_high)
+        #get the process-based model (pbm) water temp properties
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[water_temp_pbm_col][:,i].values,isWater=True)
+        water_amp_pbm.append(amp)
+        water_amp_low_pbm.append(amp_low)
+        water_amp_high_pbm.append(amp_high)
+        water_phi_pbm.append(phi)
+        water_phi_low_pbm.append(phi_low)
+        water_phi_high_pbm.append(phi_high)
         
-        #get the water temp properties
+        #get the observed water temp properties
         #ensure sufficient data
-        if np.sum(np.isfinite(thisData['seg_tave_water'][:,i].values))>(365): #this requires at least 1 yr of data
-            waterDF = pd.DataFrame({'date':thisData['date'].values,'seg_tave_water':thisData['seg_tave_water'][:,i].values})
+        if np.sum(np.isfinite(thisData[water_temp_obs_col][:,i].values))>(365): #this requires at least 1 yr of data
+            waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
             #require temps > 1 and <60 C for signal analysis
-            waterDF.loc[(waterDF.seg_tave_water<1)|(waterDF.seg_tave_water>60),"seg_tave_water"]=np.nan
+            waterDF.loc[(waterDF.tave_water<1)|(waterDF.tave_water>60),"tave_water"]=np.nan
             waterDF.dropna(inplace=True)
             
             if waterDF.shape[0]<(365):
@@ -151,7 +154,7 @@ def annual_temp_stats(thisData):
                 #    waterDF = waterDF.loc[waterDF.bin==maxBin]
                 
                 if waterDF.shape[0]>=(365):
-                    amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.seg_tave_water.values,isWater=True)
+                    amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
                 else:
                     amp = np.nan
                     phi = np.nan
@@ -208,10 +211,10 @@ def annual_temp_stats(thisData):
     
     
     
-    Ar_sntemp = [water_amp_sntemp[x]/air_amp[x] for x in range(len(water_amp_sntemp))]
-    delPhi_sntemp = [(water_phi_sntemp[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_sntemp))]
+    Ar_pbm = [water_amp_pbm[x]/air_amp[x] for x in range(len(water_amp_pbm))]
+    delPhi_pbm = [(water_phi_pbm[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_pbm))]
     
-    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_sntemp':water_amp_sntemp,'water_phi_sntemp':water_phi_sntemp,'Ar_sntemp':Ar_sntemp,'delPhi_sntemp':delPhi_sntemp})
+    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_pbm':water_amp_pbm,'water_phi_pbm':water_phi_pbm,'Ar_pbm':Ar_pbm,'delPhi_pbm':delPhi_pbm})
     
     return tempDF
 
@@ -253,7 +256,7 @@ def prep_annual_signal_data(
     obs.append(xr.open_zarr(obs_temper_file).transpose())
     obs=xr.merge(obs,join="left")
     obs=obs[["seg_tave_air","seg_tave_water","temp_c"]]
-    obs = obs.rename({"seg_tave_water": "seg_tave_water_sntemp"})
+    obs = obs.rename({"seg_tave_water": "seg_tave_water_pbm"})
     obs = obs.rename({"temp_c": "seg_tave_water"})
     
     #split into testing and training
@@ -295,7 +298,7 @@ def prep_annual_signal_data(
     data2['GW_cols']=GW_trn.columns.values.astype('str')
     np.savez_compressed(out_file2, **data2)
 
-def calc_amp_phi(thisData):
+def calc_amp_phi(thisData, water_temp_pred_col = "seg_tave_water"):
     """
     compiles temperature signal properties for predicted temperatures
     :param thisData: [dataset] dataset of predicted temperatures
@@ -305,7 +308,7 @@ def calc_amp_phi(thisData):
     water_amp_preds = []
     water_phi_preds = []
     for thisSeg in segList:
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,"seg_tave_water"],isWater=True)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
@@ -395,7 +398,7 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     gw_stats_tst.to_csv(tst_output)
     gw_stats_val.to_csv(val_output)
     
-def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
+def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name = "SNTemp"):
     """
     summarizeds GW metrics across all data partitions and creates summary figures
     :param trnFile,tstFile,valFile: [str] input files for the calculated metrics for the training, testing, and validation partitions(csv)
@@ -429,10 +432,10 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
             else:
                 resultsDF = resultsDF.append(tempDF,ignore_index=True)
                 
-            tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_sntemp".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_sntemp".format(thisVar):"pred"}))).T
+            tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_pbm".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_pbm".format(thisVar):"pred"}))).T
             tempDF['variable']=thisVar
             tempDF['partition']=partition
-            tempDF['model']='SNTemp'
+            tempDF['model']=pbm_name
             resultsDF = resultsDF.append(tempDF,ignore_index=True)
                 
     resultsDF.to_csv(outFile,header=True, index=False)
@@ -479,7 +482,7 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2):
             thisData = partDict[thisPart]
             for thisMetric in metricLst:
                 thisFig = thisFig + 1
-                colsToPlot = ['{}_obs'.format(thisMetric),'{}_sntemp'.format(thisMetric),'{}_pred'.format(thisMetric)]
+                colsToPlot = ['{}_obs'.format(thisMetric),'{}_pbm'.format(thisMetric),'{}_pred'.format(thisMetric)]
                 nObs =["n: " + str(np.sum(np.isfinite(thisData[thisCol].values))) for thisCol in colsToPlot]
                 ax = fig.add_subplot(len(partDict), len(metricLst), thisFig)
                 ax.set_title('{}, {}'.format(thisMetric, thisPart))

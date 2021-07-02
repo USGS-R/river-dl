@@ -170,7 +170,7 @@ def train_model(
             y_trn_obs = io_data["y_obs_trn"]
         else:
             y_trn_obs = np.concatenate(
-                [io_data["y_obs_trn"], io_data["GW_trn"]], axis=2
+                [io_data["y_obs_trn"], io_data["GW_trn_reshape"]], axis=2
             )
 
 

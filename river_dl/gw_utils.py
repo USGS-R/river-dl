@@ -230,7 +230,9 @@ def prep_annual_signal_data(
     test_end_date,
     gwVarList,
     out_file=None,
-    out_file2=None,
+    air_temp_col = 'seg_tave_air',
+    water_temp_pbm_col = 'seg_tave_water',
+    water_temp_obs_col = 'temp_c',
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -242,7 +244,9 @@ def prep_annual_signal_data(
     the start and end dates of the training, validation, and testing periods
     :param gwVarList: [str] list of groundwater-relevant variables
     :param out_file: [str] file to where the values will be written
-    :param out_file1: [str] file to where the GW only values will be written
+    :param water_temp_pbm_col: str with the column name of the process-based model predicted water temperatures in degrees C
+    :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
+    :param air_temp_col: str with the column name of the air temperatures in degrees C
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -255,9 +259,9 @@ def prep_annual_signal_data(
     obs = [ds_pre.sortby(["seg_id_nat","date"])]
     obs.append(xr.open_zarr(obs_temper_file).transpose())
     obs=xr.merge(obs,join="left")
-    obs=obs[["seg_tave_air","seg_tave_water","temp_c"]]
-    obs = obs.rename({"seg_tave_water": "seg_tave_water_pbm"})
-    obs = obs.rename({"temp_c": "seg_tave_water"})
+    obs=obs[[air_temp_col,water_temp_pbm_col,water_temp_obs_col]]
+    obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
+    obs = obs.rename({water_temp_obs_col: "seg_tave_water"})
     
     #split into testing and training
     obs_trn, obs_val, obs_tst = separate_trn_tst(obs, train_start_date,
@@ -281,9 +285,12 @@ def prep_annual_signal_data(
     #add the GW data to the y dataset
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
-    data['GW_trn']=make_GW_dataset(GW_trn_scale,obs_trn,gwVarList)
-    data['GW_tst']=make_GW_dataset(GW_tst,obs_tst,gwVarList)
-    data['GW_val']=make_GW_dataset(GW_val,obs_val,gwVarList)
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn,gwVarList)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst,gwVarList)
+    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val,gwVarList)
+    data['GW_tst']=GW_tst
+    data['GW_trn']=GW_trn
+    data['GW_val']=GW_val
     data['GW_cols']=GW_trn.columns.values.astype('str')
     data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
     data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
@@ -291,12 +298,12 @@ def prep_annual_signal_data(
     
     
     #save the GW-only dataset
-    data2 = {}
-    data2['GW_tst']=GW_tst
-    data2['GW_trn']=GW_trn
-    data2['GW_val']=GW_val
-    data2['GW_cols']=GW_trn.columns.values.astype('str')
-    np.savez_compressed(out_file2, **data2)
+    #data2 = {}
+    #data2['GW_tst']=GW_tst
+    #data2['GW_trn']=GW_trn
+    #data2['GW_val']=GW_val
+    #data2['GW_cols']=GW_trn.columns.values.astype('str')
+    #np.savez_compressed(out_file2, **data2)
 
 def calc_amp_phi(thisData, water_temp_pred_col = "seg_tave_water"):
     """

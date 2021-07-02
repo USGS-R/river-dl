@@ -63,7 +63,6 @@ rule prep_ann_temp:
          "{outdir}/prepped.npz",
     output:
         "{outdir}/prepped_withGW.npz",
-        "{outdir}/GW.npz",
     run:
         prep_annual_signal_data(input[0], input[1], input[2],
                   train_start_date=config['train_start_date'],
@@ -73,8 +72,7 @@ rule prep_ann_temp:
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'], 
                   gwVarList = config['gw_vars'],
-                  out_file=output[0],
-                  out_file2=output[1])
+                  out_file=output[0])
 
 # use "train" if wanting to use GPU on HPC
 #rule train:
@@ -176,7 +174,7 @@ rule plot_prepped_data:
                  
 rule compile_pred_GW_stats:
     input:
-        "{outdir}/GW.npz",
+        "{outdir}/prepped_withGW.npz",
         "{outdir}/trn_preds.feather",
         "{outdir}/tst_preds.feather",
         "{outdir}/val_preds.feather"

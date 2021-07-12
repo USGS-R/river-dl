@@ -83,8 +83,9 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     phase shift and amplitude ratio for each segment, "low" and "high" values are the minimum and maximum 
     property values calculated with coefficient values within the 95th percent confidence interval
     """
-
-    
+    print("thisData")
+    print(thisData)
+    print(thisData['seg_id_nat']) 
     air_amp=[]
     air_amp_low=[]
     air_amp_high=[]
@@ -214,8 +215,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     Ar_pbm = [water_amp_pbm[x]/air_amp[x] for x in range(len(water_amp_pbm))]
     delPhi_pbm = [(water_phi_pbm[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_pbm))]
     
-    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'], 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_pbm':water_amp_pbm,'water_phi_pbm':water_phi_pbm,'Ar_pbm':Ar_pbm,'delPhi_pbm':delPhi_pbm})
-    
+    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'].values, 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_pbm':water_amp_pbm,'water_phi_pbm':water_phi_pbm,'Ar_pbm':Ar_pbm,'delPhi_pbm':delPhi_pbm})
     return tempDF
 
 def prep_annual_signal_data(
@@ -254,7 +254,6 @@ def prep_annual_signal_data(
     
     #read in the SNTemp data
     ds_pre = xr.open_zarr(pretrain_file)
-    
     #read in the observed temperature data and join to the SNTemp data
     obs = [ds_pre.sortby(["seg_id_nat","date"])]
     obs.append(xr.open_zarr(obs_temper_file).transpose())
@@ -262,7 +261,6 @@ def prep_annual_signal_data(
     obs=obs[[air_temp_col,water_temp_pbm_col,water_temp_obs_col]]
     obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})
-    
     #split into testing and training
     obs_trn, obs_val, obs_tst = separate_trn_tst(obs, train_start_date,
         train_end_date,
@@ -270,14 +268,12 @@ def prep_annual_signal_data(
         val_end_date,
         test_start_date,
         test_end_date)
-    
-    
+      
     #get the annual signal properties for the training, validation, and testing data
     GW_trn = annual_temp_stats(obs_trn)
     GW_tst = annual_temp_stats(obs_tst)
     GW_val = annual_temp_stats(obs_val)
     
-    #scale the Ar_obs & delPhi_obs
     GW_trn_scale = deepcopy(GW_trn)
     GW_trn_scale['Ar_obs'] = (GW_trn['Ar_obs']-np.nanmean(GW_trn['Ar_obs']))/np.nanstd(GW_trn['Ar_obs'])
     GW_trn_scale['delPhi_obs'] = (GW_trn['delPhi_obs']-np.nanmean(GW_trn['delPhi_obs']))/np.nanstd(GW_trn['delPhi_obs'])

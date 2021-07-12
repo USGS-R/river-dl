@@ -33,7 +33,7 @@ def sel_partition_data(dataset, start_dates, end_dates):
     (can have multiple discontinuos periods)
     :return: dataset of just those dates
     """
-    # if it just one date range
+   # if it just one date range
     if isinstance(start_dates, str):
         if isinstance(end_dates, str):
             return dataset.sel(date=slice(start_dates, end_dates))

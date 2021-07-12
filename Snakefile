@@ -50,7 +50,7 @@ rule prep_io_data:
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'],
                   primary_variable=config['primary_variable'],
-                  log_q=False, segs=None,
+                  log_q=False,
                   out_file=output[0])
                  
                   

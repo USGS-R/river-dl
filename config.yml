@@ -1,10 +1,10 @@
 # Input files
-obs_flow: "data_DRB/obs_flow_full"
-obs_temp: "data_DRB/obs_temp_full"
-sntemp_file: "data_DRB/uncal_sntemp_input_output"
-dist_matrix: "data_DRB/distance_matrix.npz"
+obs_flow: "data_DRB/obs_flow_subset"
+obs_temp: "data_DRB/obs_temp_subset"
+sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
+dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
-out_dir: "output_DRB_noGW"
+out_dir: "output_DRB_subset_test"
 
 code_dir: "river_dl"
 
@@ -15,8 +15,8 @@ primary_variable: "temp"
 lambdas: [1,1]
 
 #lamb2 and lamb3 are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lamb2: 2
-lamb3: 0.1
+lamb2: 1
+lamb3: 1
 
 #anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
 loss_type: "noGW"
@@ -37,6 +37,6 @@ test_end_date:
   - '1985-09-30'
   - '2021-09-30'
 
-pt_epochs: 200
-ft_epochs: 100
+pt_epochs: 10
+ft_epochs: 5
 hidden_size: 20

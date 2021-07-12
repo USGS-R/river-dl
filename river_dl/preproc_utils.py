@@ -610,10 +610,9 @@ def sort_dist_matrix(mat, row_col_names, segs=None):
     sort the distance matrix by seg_id_nat
     :return:
     """
-    print(row_col_names)
-    row_col_names = row_col_names.astype(type(segs[0]))
+    if segs is not None:
+        row_col_names = row_col_names.astype(type(segs[0]))
     df = pd.DataFrame(mat, columns=row_col_names, index=row_col_names)
-    print(df.head)
     if segs:
         df = df[segs]
         df = df.loc[segs]

@@ -1,26 +1,15 @@
 # Input files
-obs_flow: "data_DRB/obs_flow_subset"
-obs_temp: "data_DRB/obs_temp_subset"
-sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
-dist_matrix: "data_DRB/distance_matrix_subset.npz"
+obs_flow: "../drb-dl-model/data/in/obs_flow_subset"
+obs_temp: "../drb-dl-model/data/in/obs_temp_subset"
+sntemp_file: "../drb-dl-model/data/in/uncal_sntemp_input_output_subset"
+dist_matrix: "../drb-dl-model/data/in/distance_matrix_subset.npz"
 
-out_dir: "output_DRB_subset_test"
-
-code_dir: "river_dl"
+out_dir: "test_val_functionality"
+code_dir: "/home/jsadler/river-dl/river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
-primary_variable: "temp"
-
-lambdas: [1,1]
-
-#lamb2 and lamb3 are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lamb2: 1
-lamb3: 1
-
-#anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
-loss_type: "noGW"
-
+primary_variable: "flow"
+lambdas: [100, 100]
 
 train_start_date:
   - '1985-10-01'
@@ -37,6 +26,6 @@ test_end_date:
   - '1985-09-30'
   - '2021-09-30'
 
-pt_epochs: 10
-ft_epochs: 5
+pt_epochs: 1
+ft_epochs: 1
 hidden_size: 20

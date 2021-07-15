@@ -6,13 +6,9 @@ from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl import loss_functions as lf
-from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
-
-
 
 out_dir = config['out_dir']
 code_dir = config['code_dir']
-
 loss_function = lf.multitask_rmse(config['lambdas'])
 
 rule all:
@@ -21,14 +17,6 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
-        expand("{outdir}/GW_stats_{partition}.csv",
-                outdir=out_dir,
-                partition=['trn', 'tst','val']
-        ),
-        expand("{outdir}/GW_summary.csv", outdir=out_dir
-        ),
-        
-
 
 rule prep_io_data:
     input:
@@ -50,37 +38,17 @@ rule prep_io_data:
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'],
                   primary_variable=config['primary_variable'],
-                  log_q=False,
-                  out_file=output[0])
-                 
-                  
-                  
-                  
-rule prep_ann_temp:
-    input:
-         config['obs_temp'],
-         config['sntemp_file'],
-         "{outdir}/prepped.npz",
-    output:
-        "{outdir}/prepped_withGW.npz",
-    run:
-        prep_annual_signal_data(input[0], input[1], input[2],
-                  train_start_date=config['train_start_date'],
-                  train_end_date=config['train_end_date'],
-                  val_start_date=config['val_start_date'],
-                  val_end_date=config['val_end_date'],
-                  test_start_date=config['test_start_date'],
-                  test_end_date=config['test_end_date'], 
-                  gwVarList = config['gw_vars'],
+                  log_q=False, segs=None,
                   out_file=output[0])
 
+
 # use "train" if wanting to use GPU on HPC
-#rule train:
+# rule train:
 #    input:
-#        "{outdir}/prepped_withGW.npz"
+#        "{outdir}/prepped.npz"
 #    output:
-#        directory("{outdir}/trained_weights/"),
-#        directory("{outdir}/pretrained_weights/"),
+#        directory("{outdir}/trained_model/"),
+#        directory("{outdir}/pretrained_model/"),
 #    params:
 #        # getting the base path to put the training outputs in
 #        # I omit the last slash (hence '[:-1]' so the split works properly
@@ -88,20 +56,17 @@ rule prep_ann_temp:
 #        pt_epochs=config['pt_epochs'],
 #        ft_epochs=config['ft_epochs'],
 #        lamb=config['lamb'],
-#        lamb2=config['lamb2'],
-#        lamb3=config['lamb3'],
-#        loss = config['loss_type'],
 #    shell:
 #        """
 #        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
+#        run_training -e /home/jsadler/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lambdas {params.lamb} --loss_func multitask_rmse --model rgcn -s 135"
 #        """
- 
- 
+
+
 # use "train_model" if wanting to use CPU or local GPU
 rule train_model_local_or_cpu:
     input:
-        "{outdir}/prepped_withGW.npz"
+        "{outdir}/prepped.npz"
     output:
         directory("{outdir}/trained_weights/"),
         directory("{outdir}/pretrained_weights/"),
@@ -111,8 +76,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'], lamb2=config['lamb2'],lamb3=config['lamb3'])
-
+                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
 
 rule make_predictions:
     input:
@@ -127,9 +91,7 @@ rule make_predictions:
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
                              logged_q=False, num_tasks=2)
-                             
-        
-                             
+
 
 def get_grp_arg(wildcards):
     if wildcards.metric_type == 'overall':
@@ -161,7 +123,7 @@ rule combine_metrics:
                          group=params.grp_arg,
                          outfile=output[0])
 
-                         
+
 rule plot_prepped_data:
     input:
         "{outdir}/prepped.npz",
@@ -170,30 +132,3 @@ rule plot_prepped_data:
     run:
         plot_obs(input[0], wildcards.variable, output[0],
                  partition=wildcards.partition)
-
-                 
-rule compile_pred_GW_stats:
-    input:
-        "{outdir}/prepped_withGW.npz",
-        "{outdir}/trn_preds.feather",
-        "{outdir}/tst_preds.feather",
-        "{outdir}/val_preds.feather"
-    output:
-        "{outdir}/GW_stats_trn.csv",
-        "{outdir}/GW_stats_tst.csv",
-        "{outdir}/GW_stats_val.csv",
-    run: 
-        calc_pred_ann_temp(input[0],input[1],input[2], input[3], output[0], output[1], output[2])
-        
-rule calc_gw_summary_metrics:
-    input:
-        "{outdir}/GW_stats_trn.csv",
-        "{outdir}/GW_stats_tst.csv",
-        "{outdir}/GW_stats_val.csv",
-    output:
-        "{outdir}/GW_summary.csv",
-        "{outdir}/GW_scatter.png",
-        "{outdir}/GW_boxplot.png",
-    run:
-        calc_gw_metrics(input[0],input[1],input[2],output[0], output[1], output[2])
- 

@@ -35,7 +35,7 @@ def amp_phi (Date, temp, isWater=False):
     #convert the date to decimal years
     date_decimal = make_decimal_date(Date)
     
-    #remove water temps below 1C or above 45C to avoid complex freeze-thaw dynamics near 0 C and because >60C is likely erroneous  
+    #remove water temps below 1C or above 45C to avoid complex freeze-thaw dynamics near 0 C and because >45C is likely erroneous  
     if isWater:
         temp = [x if x >=1 and x<=45 else np.nan for x in temp]
     

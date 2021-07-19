@@ -259,8 +259,10 @@ def prep_annual_signal_data(
 
     #read in the observed temperature data and join to the SNTemp data
     obs = [ds_pre.sortby(["seg_id_nat","date"])]
-    obs.append(xr.open_zarr(obs_temper_file).transpose())
-    obs=xr.merge(obs,join="left")
+    tempFile = xr.open_zarr(obs_temper_file).transpose()
+    tempFile['seg_id_nat']=tempFile['seg_id_nat'].astype(int)
+    obs.append(tempFile)
+    obs=xr.merge(obs,join="outer")
     obs=obs[[air_temp_col,water_temp_pbm_col,water_temp_obs_col]]
     obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})

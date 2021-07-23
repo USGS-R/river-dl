@@ -168,7 +168,7 @@ def train_model(
             
             model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=lamb2,lamb3=lamb3))
         elif model_type == "rgcn":
-            model.compile(optimizer_ft, loss=loss_func)
+            model.compile(optimizer_ft, loss=loss_func_ft)
 
         csv_log_ft = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")

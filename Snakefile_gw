@@ -1,6 +1,7 @@
-#this is an example snakefile for utilizing the groundwater loss function 
+#this is an example snakefile for utilizing the groundwater loss function
 
 import os
+import numpy as np
 
 from river_dl.preproc_utils import prep_data
 from river_dl.evaluate import combined_metrics
@@ -87,7 +88,16 @@ rule prep_ann_temp:
 #        module load analytics cuda10.1/toolkit/10.1.105 
 #        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
 #        """
- 
+
+#get the GW loss parameters
+def get_gw_loss(input_data, temp_var="seg_tave_water"):
+    io_data=np.load(input_data)
+    temp_index = np.where(io_data['y_vars']==temp_var)[0]
+    temp_mean = io_data['y_mean'][temp_index]
+    temp_sd = io_data['y_std'][temp_index]
+    gw_mean = io_data['GW_mean']
+    gw_std = io_data['GW_std']
+    return lf.weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=config['lamb2'],lamb3=config['lamb3'])
  
 # use "train_model" if wanting to use CPU or local GPU
 rule train_model_local_or_cpu:
@@ -102,7 +112,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0],config['pt_epochs'], config['ft_epochs'], other_workflow.config['hidden_size'],
-                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+                    loss_func=loss_function, loss_func_ft = get_gw_loss(input[0]),out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
 
 
 

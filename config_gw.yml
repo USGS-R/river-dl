@@ -18,9 +18,6 @@ lambdas: [1,1]
 lamb2: 1
 lamb3: 1
 
-#anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
-loss_type: "noGW"
-
 
 train_start_date:
   - '1985-10-01'

@@ -158,17 +158,8 @@ def train_model(
         
         
         
-        if model_type == "rgcn" and loss_type.lower()=="gw":
-            #extract these for use in the GW loss function
-            temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
-            temp_mean = io_data['y_mean'][temp_index]
-            temp_sd = io_data['y_std'][temp_index]
-            gw_mean = io_data['GW_mean']
-            gw_std = io_data['GW_std']
-            
-            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=lamb2,lamb3=lamb3))
-        elif model_type == "rgcn":
-            model.compile(optimizer_ft, loss=loss_func_ft)
+
+        model.compile(optimizer_ft, loss=loss_func_ft)
 
         csv_log_ft = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
@@ -176,12 +167,12 @@ def train_model(
 
         x_trn_obs = io_data["x_trn"]
 
-        if loss_type.lower()!="gw":
-            y_trn_obs = io_data["y_obs_trn"]
-        else:
+        if "GW_trn_reshape" in io_data.files:
             y_trn_obs = np.concatenate(
                 [io_data["y_obs_trn"], io_data["GW_trn_reshape"]], axis=2
             )
+        else:
+            y_trn_obs = io_data["y_obs_trn"]
 
 
         model.fit(

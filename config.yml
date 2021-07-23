@@ -9,17 +9,9 @@ out_dir: "output_DRB_test"
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
 primary_variable: "temp"
 
 lambdas: [100,100]
-
-#lamb2 and lamb3 are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lamb2: 1
-lamb3: 1
-
-#anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
-loss_type: "noGW"
 
 
 train_start_date:

@@ -28,6 +28,7 @@ def train_model(
     hidden_units,
     loss_func,
     out_dir,
+    loss_func_ft = None,
     model_type="rgcn",
     loss_type="GW",
     seed=None,
@@ -47,6 +48,9 @@ def train_model(
     :param hidden_units: [int] number of hidden layers
     :param loss_func: [function] loss function that the model will be fit to
     :param out_dir: [str] directory where the output files should be written
+    :param loss_func_ft: [function] optional 2nd loss function to use for the 
+    finetune epochs, if None, loss_func will be used for both pretrain and 
+    finetune
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
     'gru')
     :param seed: [int] random seed
@@ -63,6 +67,10 @@ def train_model(
         print("Default GPU Device: {}".format(tf.test.gpu_device_name()))
     else:
         print("Not using GPU")
+    
+    #use loss_func for both pretrain and finetune if loss_func_ft is not given
+    if loss_func_ft is None:
+        loss_func_ft = loss_func
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)

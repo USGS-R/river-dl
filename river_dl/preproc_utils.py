@@ -33,7 +33,7 @@ def sel_partition_data(dataset, start_dates, end_dates):
     (can have multiple discontinuos periods)
     :return: dataset of just those dates
     """
-    # if it just one date range
+   # if it just one date range
     if isinstance(start_dates, str):
         if isinstance(end_dates, str):
             return dataset.sel(date=slice(start_dates, end_dates))
@@ -598,25 +598,30 @@ def prep_data(
         "y_std": y_std.to_array().values,
         "y_mean": y_mean.to_array().values,
         "y_vars": np.array(y_vars),
-        "dist_matrix": prep_adj_matrix(distfile, "upstream"),
+        "dist_matrix": prep_adj_matrix(distfile, "upstream", segs=segs),
     }
     if out_file:
         np.savez_compressed(out_file, **data)
     return data
 
 
-def sort_dist_matrix(mat, row_col_names):
+def sort_dist_matrix(mat, row_col_names, segs=None):
     """
     sort the distance matrix by seg_id_nat
     :return:
     """
+    if segs is not None:
+        row_col_names = row_col_names.astype(type(segs[0]))
     df = pd.DataFrame(mat, columns=row_col_names, index=row_col_names)
+    if segs:
+        df = df[segs]
+        df = df.loc[segs]
     df = df.sort_index(axis=0)
     df = df.sort_index(axis=1)
     return df
 
 
-def prep_adj_matrix(infile, dist_type, out_file=None):
+def prep_adj_matrix(infile, dist_type, out_file=None, segs=None):
     """
     process adj matrix.
     **The resulting matrix is sorted by seg_id_nat **
@@ -628,7 +633,7 @@ def prep_adj_matrix(infile, dist_type, out_file=None):
     """
     adj_matrices = np.load(infile)
     adj = adj_matrices[dist_type]
-    adj = sort_dist_matrix(adj, adj_matrices["rowcolnames"])
+    adj = sort_dist_matrix(adj, adj_matrices["rowcolnames"], segs=segs)
     adj = np.where(np.isinf(adj), 0, adj)
     adj = -adj
     mean_adj = np.mean(adj[adj != 0])

@@ -5,6 +5,7 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel
+from river_dl.loss_functions import weighted_masked_rmse_gw
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -28,8 +29,11 @@ def train_model(
     loss_func,
     out_dir,
     model_type="rgcn",
+    loss_type="GW",
     seed=None,
     dropout=0,
+    lamb2=0,
+    lamb3=0,
     recurrent_dropout=0,
     num_tasks=1,
     learning_rate_pre=0.005,
@@ -118,6 +122,7 @@ def train_model(
         model.compile(optimizer_pre, loss=loss_func)
 
         csv_log_pre = tf.keras.callbacks.CSVLogger(
+            
             os.path.join(out_dir, f"pretrain_log.csv")
         )
         model.fit(
@@ -142,15 +147,34 @@ def train_model(
     # finetune
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-
-        model.compile(optimizer_ft, loss=loss_func)
+        
+        
+        
+        if model_type == "rgcn" and loss_type.lower()=="gw":
+            #extract these for use in the GW loss function
+            temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
+            temp_mean = io_data['y_mean'][temp_index]
+            temp_sd = io_data['y_std'][temp_index]
+            gw_mean = io_data['GW_mean']
+            gw_std = io_data['GW_std']
+            
+            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=lamb2,lamb3=lamb3))
+        elif model_type == "rgcn":
+            model.compile(optimizer_ft, loss=loss_func)
 
         csv_log_ft = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
         )
 
         x_trn_obs = io_data["x_trn"]
-        y_trn_obs = io_data["y_obs_trn"]
+
+        if loss_type.lower()!="gw":
+            y_trn_obs = io_data["y_obs_trn"]
+        else:
+            y_trn_obs = np.concatenate(
+                [io_data["y_obs_trn"], io_data["GW_trn_reshape"]], axis=2
+            )
+
 
         model.fit(
             x=x_trn_obs,
@@ -167,7 +191,7 @@ def train_model(
     with open(out_time_file, "a") as f:
         f.write(
             f"elapsed time finetune:\
-                 {finetune_time_elapsed} \n"
+                 {finetune_time_elapsed} \nloss type: {loss_type}\n"
         )
 
     return model

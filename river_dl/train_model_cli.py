@@ -28,9 +28,9 @@ def get_loss_func_from_str(loss_func_str, lambdas=None):
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-o", "--outdir", help="directory where the output should" "be written"
+    "-o", "--out_dir", help="directory where the output should" "be written"
 )
-parser.add_argument("-i", "--in_data", help="the input data file")
+parser.add_argument("-i", "--in_data_file", help="the input data file")
 parser.add_argument(
     "-u", "--hidden_units", help="num of hidden units", type=int, default=20
 )
@@ -64,6 +64,23 @@ parser.add_argument(
     choices=["lstm", "rgcn", "gru"],
     default="rgcn",
 )
+parser.add_argument(
+    "--loss",
+    help="type of loss function",
+    choices=["noGW", "GW"],
+    default="noGW",
+)
+
+
+
+parser.add_argument(
+    "--lamb2", help="lambda for weighting Ar gradient", default=2.0, type=float
+)
+
+parser.add_argument(
+    "--lamb3", help="lambda for weighting deltaPhi gradient", default=0.1, type=float
+)
+
 parser.add_argument(
     "--num_tasks",
     help="number of tasks (variables to be predicted)",
@@ -111,8 +128,11 @@ model = train_model(
     loss_func=loss_func,
     dropout=args.dropout,
     recurrent_dropout=args.recurrent_dropout,
+    lamb2=args.lamb2,
+    lamb3=args.lamb3,
     seed=args.random_seed,
     learning_rate_ft=args.ft_learn_rate,
     learning_rate_pre=args.pt_learn_rate,
     model_type=args.model,
+    loss_type = args.loss,
 )

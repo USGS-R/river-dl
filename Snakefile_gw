@@ -1,4 +1,6 @@
 #this is an example snakefile for utilizing the groundwater loss function 
+#to use this snakefile, type:
+#snakemake -s Snakefile_gw --configfile config_gw.yml -j1
 
 import os
 

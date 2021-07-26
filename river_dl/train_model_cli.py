@@ -28,9 +28,9 @@ def get_loss_func_from_str(loss_func_str, lambdas=None):
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-o", "--outdir", help="directory where the output should" "be written"
+    "-o", "--out_dir", help="directory where the output should" "be written"
 )
-parser.add_argument("-i", "--in_data", help="the input data file")
+parser.add_argument("-i", "--in_data_file", help="the input data file")
 parser.add_argument(
     "-u", "--hidden_units", help="num of hidden units", type=int, default=20
 )
@@ -71,9 +71,7 @@ parser.add_argument(
     default="noGW",
 )
 
-parser.add_argument(
-    "--lamb", help="lambda for weighting aux gradient", default=1.0, type=float
-)
+
 
 parser.add_argument(
     "--lamb2", help="lambda for weighting Ar gradient", default=2.0, type=float

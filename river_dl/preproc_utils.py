@@ -581,7 +581,7 @@ def prep_y_data(
         ),
         "y_std": y_std.to_array().values,
         "y_mean": y_mean.to_array().values,
-        "y_vars": y_vars,
+        f"y_{y_type}_vars": y_vars,
     }
     return data
 
@@ -596,7 +596,8 @@ def prep_all_data(
     test_start_date,
     test_end_date,
     x_vars,
-    y_vars,
+    y_vars_finetune=None,
+    y_vars_pretrain=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
@@ -639,7 +640,8 @@ def prep_all_data(
     (usually 'time')
     :param x_vars: [list] variables_to_log that should be used as input. If None, all
     of the variables_to_log will be used
-    :param y_vars: [str or list of str] target variable(s)
+    :param y_vars_finetune: [str or list of str] finetune target variable(s)
+    :param y_vars_pretrain: [str or list of str] pretrain target variable(s)
     :param seq_len: [int] length of sequences (e.g., 365)
     :param pretrain_file: [str] Zarr file with the pretraining data. Should have
     a spatial coordinate and a time coordinate that are specified in the
@@ -794,7 +796,7 @@ def prep_all_data(
     if y_data_file:
         y_obs_data = prep_y_data(
             y_data_file=y_data_file,
-            y_vars=y_vars,
+            y_vars=y_vars_finetune,
             x_data=x_data,
             train_start_date=train_start_date,
             train_end_date=train_end_date,
@@ -815,7 +817,7 @@ def prep_all_data(
         if pretrain_file:
             y_pre_data = prep_y_data(
                 y_data_file=pretrain_file,
-                y_vars=y_vars,
+                y_vars=y_vars_pretrain,
                 x_data=x_data,
                 train_start_date=train_start_date,
                 train_end_date=train_end_date,
@@ -838,7 +840,7 @@ def prep_all_data(
     elif pretrain_file and not y_obs_data:
         y_pre_data = prep_y_data(
             y_data_file=pretrain_file,
-            y_vars=y_vars,
+            y_vars=y_vars_pretrain,
             x_data=x_data,
             train_start_date=train_start_date,
             train_end_date=train_end_date,

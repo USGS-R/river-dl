@@ -684,6 +684,9 @@ def prep_all_data(
             "y_vars": y_dataset variable names
             "dist_matrix": prepared adjacency matrix
     """
+    if pretrain_file and not y_vars_pretrain:
+        raise ValueError("included pretrain file but no pretrain vars")
+
     x_data = xr.open_zarr(x_data_file)
     x_data = x_data.sortby([spatial_idx_name, time_idx_name])
 

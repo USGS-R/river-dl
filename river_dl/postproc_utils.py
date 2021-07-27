@@ -28,37 +28,35 @@ def load_if_not_df(pred_data):
         return pred_data
 
 
-def trim_obs(obs, preds):
-    obs_trim = obs.reset_index()
-    trim_preds = preds.reset_index()
-    obs_trim = obs_trim[
-        (obs_trim.date >= trim_preds.date.min())
-        & (obs_trim.date <= trim_preds.date.max())
-        & (obs_trim.seg_id_nat.isin(trim_preds.seg_id_nat.unique()))
-    ]
-    return obs_trim.set_index(["date", "seg_id_nat"])
-
-
-def fmt_preds_obs(pred_data, obs_file, variable):
+def fmt_preds_obs(pred_data, obs_file, spatial_idx_name, time_idx_name):
     """
     combine predictions and observations in one dataframe
     :param pred_data:[str] filepath to the predictions file
     :param obs_file:[str] filepath to the observations file
-    :param variable: [str] either 'flow' or 'temp'
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
     """
-    obs_var, seg_var = get_var_names(variable)
     pred_data = load_if_not_df(pred_data)
-    # pred_data.loc[:, "seg_id_nat"] = pred_data["seg_id_nat"].astype(int)
-    if {"date", "seg_id_nat"}.issubset(pred_data.columns):
-        pred_data.set_index(["date", "seg_id_nat"], inplace=True)
+
+    if {time_idx_name, spatial_idx_name}.issubset(pred_data.columns):
+        pred_data.set_index([time_idx_name, spatial_idx_name], inplace=True)
     obs = xr.open_zarr(obs_file).to_dataframe()
-    obs_cln = obs[[obs_var]]
-    obs_cln.columns = ["obs"]
-    preds = pred_data[[seg_var]]
-    preds.columns = ["pred"]
-    obs_cln_trim = trim_obs(obs_cln, preds)
-    combined = preds.join(obs_cln_trim)
-    return combined
+    variables_data = {}
+
+    for var_name in pred_data.columns:
+        obs_var = obs.copy()
+        obs_var = obs_var[[var_name]]
+        obs_var.columns = ["obs"]
+        preds_var = pred_data[[var_name]]
+        preds_var.columns = ["pred"]
+        # doing `loc` subsets the obs to the preds. This greatly speeds up the
+        # following join
+        obs_var = obs_var.loc[preds_var.index]
+        combined = preds_var.join(obs_var)
+        variables_data[var_name] = combined
+    return variables_data
 
 
 def plot_obs(prepped_data, variable, outfile, partition="trn"):

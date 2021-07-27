@@ -500,7 +500,7 @@ def prep_y_data(
     prepare y_dataset data
 
     :param y_data_file: [str] temperature observations file
-    :param y_vars: [list of str] which variables_to_log to prepare data for
+    :param y_vars: [str or list of str] target variable(s)
     :param x_data: [xr.Dataset] xarray dataset used to match spatial and
     temporal domain
     :param spatial_idx_name: [str] name of column that is used for spatial
@@ -529,6 +529,11 @@ def prep_y_data(
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
+    # I assume that if `y_vars` is a string only one variable has been passed
+    # so I put that in a list which is what the rest of the functions expect
+    if isinstance(y_vars, str):
+        y_vars = [y_vars]
+        
     y_data = read_obs(y_data_file, y_vars, x_data)
 
     y_trn, y_val, y_tst = separate_trn_tst(
@@ -634,7 +639,7 @@ def prep_data(
     (usually 'time')
     :param x_vars: [list] variables_to_log that should be used as input. If None, all
     of the variables_to_log will be used
-    :param y_vars: [list of str] which variables_to_log to prepare data for
+    :param y_vars: [str or list of str] target variable(s)
     :param seq_len: [int] length of sequences (e.g., 365)
     :param pretrain_file: [str] Zarr file with the pretraining data. Should have
     a spatial coordinate and a time coordinate that are specified in the

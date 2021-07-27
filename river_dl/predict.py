@@ -37,11 +37,7 @@ def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
 
 
 def load_model_from_weights(
-    model_type,
-    model_weights_dir,
-    hidden_size,
-    dist_matrix=None,
-    flow_in_temp=False,
+    model_type, model_weights_dir, hidden_size, dist_matrix=None, num_tasks=1,
 ):
     """
     load a TF model from the model weights directory
@@ -49,15 +45,15 @@ def load_model_from_weights(
     :param model_weights_dir: [str] directory to saved model weights
     :param hidden_size: [int] the number of hidden units in model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'
-    :param flow_in_temp: [bool] whether the flow should be an input into temp
-    :return:
+    :param num_tasks: [int] number of tasks (variables to be predicted)
+    :return: TF model
     """
     if model_type == "rgcn":
-        model = RGCNModel(hidden_size, A=dist_matrix, flow_in_temp=flow_in_temp)
+        model = RGCNModel(hidden_size, A=dist_matrix, num_tasks=num_tasks)
     elif model_type.startswith("lstm"):
-        model = LSTMModel(hidden_size)
+        model = LSTMModel(hidden_size, num_tasks=num_tasks)
     elif model_type == "gru":
-        model = GRUModel(hidden_size)
+        model = GRUModel(hidden_size, num_tasks=num_tasks)
     else:
         raise ValueError(
             f'model_type must be "lstm", "gru" or "rgcn", (not {model_type})'
@@ -74,8 +70,8 @@ def predict_from_io_data(
     io_data,
     partition,
     outfile,
-    flow_in_temp=False,
     log_vars=False,
+    num_tasks=1,
 ):
     """
     make predictions from trained model
@@ -86,9 +82,9 @@ def predict_from_io_data(
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
-    :param flow_in_temp: [bool] whether the flow should be an input into temp
     :param log_vars: [list-like] which variables (if any) were logged in data
     prep
+    :param num_tasks: [int] number of tasks (variables to be predicted)
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -97,7 +93,7 @@ def predict_from_io_data(
         model_weights_dir,
         hidden_size,
         io_data.get("dist_matrix"),
-        flow_in_temp,
+        num_tasks=num_tasks,
     )
 
     if partition != "trn":
@@ -306,8 +302,8 @@ def predict_from_arbitrary_data(
     time_idx_name,
     seq_len=365,
     dist_matrix=None,
-    flow_in_temp=False,
     log_vars=None,
+    num_tasks=1,
 ):
     """
     make predictions given raw data that is potentially independent from the
@@ -349,7 +345,11 @@ def predict_from_arbitrary_data(
             )
 
     model = load_model_from_weights(
-        model_type, model_weights_dir, hidden_size, dist_matrix, flow_in_temp,
+        model_type,
+        model_weights_dir,
+        hidden_size,
+        dist_matrix,
+        num_tasks=num_tasks,
     )
 
     ds = xr.open_zarr(raw_data_file)

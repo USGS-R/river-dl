@@ -35,7 +35,7 @@ def sel_partition_data(dataset, time_idx_name, start_dates, end_dates):
     (can have multiple discontinuos periods)
     :return: dataset of just those dates
     """
-    # if it just one date range
+   # if it just one date range
     if isinstance(start_dates, str):
         if isinstance(end_dates, str):
             return dataset.sel({time_idx_name: slice(start_dates, end_dates)})
@@ -859,7 +859,8 @@ def sort_dist_matrix(mat, row_col_names, segs=None):
     sort the distance matrix by id
     :return:
     """
-    row_col_names = row_col_names.astype(type(segs[0]))
+    if segs is not None:
+        row_col_names = row_col_names.astype(type(segs[0]))
     df = pd.DataFrame(mat, columns=row_col_names, index=row_col_names)
     if segs:
         df = df[segs]

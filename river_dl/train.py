@@ -5,6 +5,7 @@ from numpy.lib.npyio import NpzFile
 import datetime
 import tensorflow as tf
 from river_dl.RGCN import RGCNModel
+from river_dl.loss_functions import weighted_masked_rmse_gw
 from river_dl.rnns import LSTMModel, GRUModel
 
 
@@ -25,13 +26,16 @@ def train_model(
     pretrain_epochs,
     finetune_epochs,
     hidden_units,
-    out_dir,
     loss_func,
-    flow_in_temp=False,
+    out_dir,
     model_type="rgcn",
+    loss_type="GW",
     seed=None,
     dropout=0,
-    lamb=1,
+    lamb2=0,
+    lamb3=0,
+    recurrent_dropout=0,
+    num_tasks=1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
 ):
@@ -41,18 +45,16 @@ def train_model(
     :param pretrain_epochs: [int] number of pretrain epochs
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
+    :param loss_func: [function] loss function that the model will be fit to
     :param out_dir: [str] directory where the output files should be written
-    :param loss_func: [function] loss function. only supported for rgcn
-    currently
-    :param flow_in_temp: [bool] whether the flow predictions should feed
-    into the temp predictions
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
-    'lstm_grad_correction')
+    'gru')
     :param seed: [int] random seed
-    :param dropout: [float] dropout rate for "lstm" model (0-1.0)
-    :param lamb: [float] (short for 'lambda') weight between 0 and 1. How much
-    to weight the auxiliary rmse is weighted compared to the main rmse. The
-    difference between one and lambda becomes the main rmse weight.
+    :param recurrent_dropout: [float] value between 0 and 1 for the probability
+    of a reccurent element to be zero
+    :param dropout: [float] value between 0 and 1 for the probability of an
+    input element to be zero
+    :param num_tasks: [int] number of tasks (variables to be predicted)
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
@@ -73,28 +75,33 @@ def train_model(
         batch_size = num_years
 
     if model_type == "lstm":
-        model = LSTMModel(hidden_units, lamb=lamb)
+        model = LSTMModel(
+            hidden_units,
+            num_tasks=num_tasks,
+            recurrent_dropout=recurrent_dropout,
+            dropout=dropout,
+        )
     elif model_type == "rgcn":
         dist_matrix = io_data["dist_matrix"]
         model = RGCNModel(
             hidden_units,
-            flow_in_temp=flow_in_temp,
+            num_tasks=num_tasks,
             A=dist_matrix,
             rand_seed=seed,
-        )
-    elif model_type == "lstm_grad_correction":
-        grad_log_file = os.path.join(out_dir, "grad_correction.txt")
-        model = LSTMModel(
-            hidden_units,
-            gradient_correction=True,
-            lamb=lamb,
             dropout=dropout,
-            grad_log_file=grad_log_file,
+            recurrent_dropout=recurrent_dropout,
         )
     elif model_type == "gru":
-        model = GRUModel(hidden_units, lamb=lamb)
+        model = GRUModel(
+            hidden_units,
+            num_tasks=num_tasks,
+            recurrent_dropout=recurrent_dropout,
+            dropout=dropout,
+        )
     else:
-        raise ValueError(f"{model_type} is not a supported model type")
+        raise ValueError(
+            f"The 'model_type' provided ({model_type}) is not supported"
+        )
 
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
@@ -110,20 +117,12 @@ def train_model(
         # use built in 'fit' method unless model is grad correction
         x_trn_pre = io_data["x_trn"]
         # combine with weights to pass to loss function
-        try:
-            y_trn_pre = np.concatenate(
-                [io_data["y_pre_trn"], io_data["y_pre_wgts"]], axis=2
-            )
-        except KeyError:
-            raise KeyError("trying to pretrain, but no y pretrain ('y_pre_trn')"
-                           "data found")
+        y_trn_pre = io_data["y_pre_trn"]
 
-        if model_type == "rgcn":
-            model.compile(optimizer_pre, loss=loss_func)
-        else:
-            model.compile(optimizer_pre)
+        model.compile(optimizer_pre, loss=loss_func)
 
         csv_log_pre = tf.keras.callbacks.CSVLogger(
+            
             os.path.join(out_dir, f"pretrain_log.csv")
         )
         model.fit(
@@ -149,19 +148,31 @@ def train_model(
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
-        if model_type == "rgcn":
+        if model_type == "rgcn" and loss_type.lower()=="gw":
+            #extract these for use in the GW loss function
+            temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
+            temp_mean = io_data['y_mean'][temp_index]
+            temp_sd = io_data['y_std'][temp_index]
+            gw_mean = io_data['GW_mean']
+            gw_std = io_data['GW_std']
+            
+            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=lamb2,lamb3=lamb3))
+        elif model_type == "rgcn":
             model.compile(optimizer_ft, loss=loss_func)
-        else:
-            model.compile(optimizer_ft)
 
         csv_log_ft = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
         )
 
         x_trn_obs = io_data["x_trn"]
-        y_trn_obs = np.concatenate(
-            [io_data["y_obs_trn"], io_data["y_obs_wgts"]], axis=2
-        )
+
+        if loss_type.lower()!="gw":
+            y_trn_obs = io_data["y_obs_trn"]
+        else:
+            y_trn_obs = np.concatenate(
+                [io_data["y_obs_trn"], io_data["GW_trn_reshape"]], axis=2
+            )
+
 
         model.fit(
             x=x_trn_obs,
@@ -178,7 +189,7 @@ def train_model(
     with open(out_time_file, "a") as f:
         f.write(
             f"elapsed time finetune:\
-                 {finetune_time_elapsed} \n"
+                 {finetune_time_elapsed} \nloss type: {loss_type}\n"
         )
 
     return model

@@ -1,3 +1,11 @@
 *.swp
-data/
 *.npz
+data*/
+output*/
+*.ipynb
+*.ipynb_checkpoints/*
+.snakemake/
+*__pycache__*
+.ipynb_checkpoints*
+*.slurm
+*.out

@@ -28,7 +28,10 @@ def load_if_not_df(pred_data):
         return pred_data
 
 
-def fmt_preds_obs(pred_data, obs_file, spatial_idx_name, time_idx_name):
+def fmt_preds_obs(pred_data,
+                  obs_file,
+                  spatial_idx_name="seg_id_nat",
+                  time_idx_name="date"):
     """
     combine predictions and observations in one dataframe
     :param pred_data:[str] filepath to the predictions file

@@ -135,7 +135,13 @@ def calc_metrics(df):
 
 
 def overall_metrics(
-    pred_file,obs_file, partition, spatial_idx_name, time_idx_name, group=None, outfile=None
+        pred_file,
+        obs_file,
+        partition,
+        spatial_idx_name="seg_id_nat",
+        time_idx_name="date",
+        group=None,
+        outfile=None
 ):
     """
     calculate metrics for a certain group (or no group at all) for a given

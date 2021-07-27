@@ -19,10 +19,10 @@ def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
     unscale output data given a standard deviation and a mean value for the
     outputs
     :param y_scl: [pd dataframe] scaled output data (predicted or observed)
-    :param y_std:[numpy array] array of standard deviation of variables [n_out]
+    :param y_std:[numpy array] array of standard deviation of variables_to_log [n_out]
     :param y_mean:[numpy array] array of variable means [n_out]
-    :param y_vars: [list-like] y variable names
-    :param log_vars: [list-like] which variables (if any) were logged in data
+    :param y_vars: [list-like] y_dataset variable names
+    :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
     :return: unscaled data
     """
@@ -45,7 +45,7 @@ def load_model_from_weights(
     :param model_weights_dir: [str] directory to saved model weights
     :param hidden_size: [int] the number of hidden units in model
     :param dist_matrix: [np array] the distance matrix if using 'rgcn'
-    :param num_tasks: [int] number of tasks (variables to be predicted)
+    :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
     :return: TF model
     """
     if model_type == "rgcn":
@@ -82,9 +82,9 @@ def predict_from_io_data(
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
-    :param log_vars: [list-like] which variables (if any) were logged in data
+    :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
-    :param num_tasks: [int] number of tasks (variables to be predicted)
+    :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -138,11 +138,11 @@ def predict(
     :param keep_last_frac: [float] fraction of the predictions to keep starting
     from the *end* of the predictions (0-1). (1 means you keep all of the
     predictions, .75 means you keep the final three quarters of the predictions)
-    :param y_stds:[np array] the standard deviation of the y data
-    :param y_means:[np array] the means of the y data
-    :param y_vars:[np array] the variable names of the y data
+    :param y_stds:[np array] the standard deviation of the y_dataset data
+    :param y_means:[np array] the means of the y_dataset data
+    :param y_vars:[np array] the variable names of the y_dataset data
     :param outfile: [str] the file where the output data should be stored
-    :param log_vars: [list-like] which variables (if any) were logged in data
+    :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
     :return: out predictions
     """
@@ -230,7 +230,7 @@ def predict_one_date_range(
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
-    :param log_vars: [list-like] which variables (if any) were logged in data
+    :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
     :param keep_last_frac: [float] fraction of the predictions to keep starting
     from the *end* of the predictions (0-1). (1 means you keep all of the
@@ -314,8 +314,8 @@ def predict_from_arbitrary_data(
     :param pred_start_date: [str] start date of predictions (fmt: YYYY-MM-DD)
     :param pred_end_date: [str] end date of predictions (fmt: YYYY-MM-DD)
     :param train_io_data: [str or np NpzFile] the path to or the loaded data
-    that was used to train the model. This file must contain the variables
-    names, the standard deviations, and the means of the X and Y variables. Only
+    that was used to train the model. This file must contain the variables_to_log
+    names, the standard deviations, and the means of the X and Y variables_to_log. Only
     in with this information can the model be used properly
     :param model_weights_dir: [str] path to the directory where the TF model
     weights are stored
@@ -330,7 +330,7 @@ def predict_from_arbitrary_data(
     provided, will look for it in the "train_io_data" file.
     :param flow_in_temp: [bool] whether the flow should be an input into temp
     for the rgcn model
-    :param log_vars: [list-like] which variables (if any) were logged in data
+    :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
     :return: [pd dataframe] the predictions
     """

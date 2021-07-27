@@ -125,7 +125,7 @@ def read_obs(obs_file, y_vars, x_data):
     make sure we have the same indexing.
     :param x_data: [xr.Dataset] xarray dataset used to match spatial and
     temporal domain
-    :param y_vars: [list of str] which variables to prepare data for
+    :param y_vars: [list of str] which variables_to_log to prepare data for
     :param obs_file: [list] filenames of observation file
     :return: [xr dataset] the observations in the same time
     """
@@ -170,7 +170,7 @@ def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
 def reshape_for_training(data):
     """
     reshape the data for training
-    :param data: training data (either x or y or mask) dims: [nbatch, nseg,
+    :param data: training data (either x or y_dataset or mask) dims: [nbatch, nseg,
     len_seq, nfeat/nout]
     :return: reshaped data [nbatch * nseg, len_seq, nfeat/nout]
     """
@@ -197,10 +197,10 @@ def get_exclude_start_end(exclude_grp):
 
 def get_exclude_vars(exclude_grp):
     """
-    get the variables to exclude for the exclude group
+    get the variables_to_log to exclude for the exclude group
     :param exclude_grp: [dict] dictionary representing the exclude group from
     the exclude yml file
-    :return: [list] variables to exclude
+    :return: [list] variables_to_log to exclude
     """
     variable = exclude_grp.get("variable")
     if not variable or variable == "both":
@@ -237,7 +237,7 @@ def get_exclude_seg_ids(exclude_grp, all_segs):
 def exclude_segments(y_data, exclude_segs):
     """
     exclude segments from being trained on by setting their weights as zero
-    :param y_data:[xr dataset] y data. this is used to get the dimensions
+    :param y_data:[xr dataset] y_dataset data. this is used to get the dimensions
     :param exclude_segs: [list] list of segments to exclude in the loss
     calculation
     :return:
@@ -262,7 +262,7 @@ def exclude_segments(y_data, exclude_segs):
 def initialize_weights(y_data, initial_val=1):
     """
     initialize all weights with a value.
-    :param y_data:[xr dataset] y data. this is used to get the dimensions
+    :param y_data:[xr dataset] y_dataset data. this is used to get the dimensions
     :param initial_val: [num] a number to initialize the weights with. should
     be between 0 and 1 (inclusive)
     :return: [xr dataset] dataset weights initialized with a uniform value
@@ -462,18 +462,18 @@ def check_if_finite(xarr):
     assert np.isfinite(xarr.to_array().values).all()
 
 
-def log_variables(y, variables):
+def log_variables(y_dataset, variables_to_log):
     """
     take the log of given variables
-    :param variables: [list of str] variables to take the log of
-    :param y: [xr dataset] the y data
+    :param variables_to_log: [list of str] variables to take the log of
+    :param y_dataset: [xr dataset] the y data
     :return: [xr dataset] the data logged
     """
-    for v in variables:
-        y[v].load()
-        y[v].loc[:, :] = y[v] + 1e-6
-        y[v].loc[:, :] = xr.ufuncs.log(y[v])
-    return y
+    for v in variables_to_log:
+        y_dataset[v].load()
+        y_dataset[v].loc[:, :] = y_dataset[v] + 1e-6
+        y_dataset[v].loc[:, :] = xr.ufuncs.log(y_dataset[v])
+    return y_dataset
 
 
 def prep_y_data(
@@ -497,10 +497,10 @@ def prep_y_data(
     y_mean=None,
 ):
     """
-    prepare y data
+    prepare y_dataset data
 
     :param y_data_file: [str] temperature observations file
-    :param y_vars: [list of str] which variables to prepare data for
+    :param y_vars: [list of str] which variables_to_log to prepare data for
     :param x_data: [xr.Dataset] xarray dataset used to match spatial and
     temporal domain
     :param spatial_idx_name: [str] name of column that is used for spatial
@@ -520,12 +520,12 @@ def prep_y_data(
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
     :param seq_len: [int] length of sequences (e.g., 365)
-    :param log_vars: [list-like] which variables (if any) to take log of
+    :param log_vars: [list-like] which variables_to_log (if any) to take log of
     :param exclude_file: [str] path to exclude file
-    :param normalize_y: [bool] whether or not to normalize the y values
+    :param normalize_y: [bool] whether or not to normalize the y_dataset values
     :param y_type: [str] "obs" if observations or "pre" if pretraining
-    :param y_std: [array-like] standard deviations of y variables
-    :param y_mean: [array-like] means of y variables
+    :param y_std: [array-like] standard deviations of y_dataset variables_to_log
+    :param y_mean: [array-like] means of y_dataset variables_to_log
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
@@ -545,7 +545,7 @@ def prep_y_data(
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)
 
-    # filter pretrain/finetune y
+    # filter pretrain/finetune y_dataset
     if exclude_file:
         exclude_segs = read_exclude_segs_file(exclude_file)
         y_wgts = exclude_segments(y_trn, exclude_segs=exclude_segs)
@@ -553,7 +553,7 @@ def prep_y_data(
         y_wgts = initialize_weights(y_trn)
 
     if normalize_y:
-        # scale y training data and get the mean and std
+        # scale y_dataset training data and get the mean and std
         if not isinstance(y_std, xr.Dataset) or not isinstance(
             y_mean, xr.Dataset
         ):
@@ -632,9 +632,9 @@ def prep_data(
     index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
     (usually 'time')
-    :param x_vars: [list] variables that should be used as input. If None, all
-    of the variables will be used
-    :param y_vars: [list of str] which variables to prepare data for
+    :param x_vars: [list] variables_to_log that should be used as input. If None, all
+    of the variables_to_log will be used
+    :param y_vars: [list of str] which variables_to_log to prepare data for
     :param seq_len: [int] length of sequences (e.g., 365)
     :param pretrain_file: [str] Zarr file with the pretraining data. Should have
     a spatial coordinate and a time coordinate that are specified in the
@@ -650,7 +650,7 @@ def prep_data(
     :param log_y_vars: [bool] whether or not to take the log of discharge in
     training
     :param segs: [list-like] which segments to prepare the data for
-    :param normalize_y: [bool] whether or not to normalize the y values
+    :param normalize_y: [bool] whether or not to normalize the y_dataset values
     :param out_file: [str] file to where the values will be written
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
@@ -666,15 +666,15 @@ def prep_data(
             "times_val": dates of the validation data
             "ids_tst": segment ids of the test data
             "times_tst": dates of the test data
-            'y_pre_trn': y pretrain data for train set
-            'y_obs_trn': y observations for train set
-            "y_pre_wgts": y weights for pretrain data
-            "y_obs_wgts": weights for y observations
-            "y_obs_val": y observations for train set
-            "y_obs_tst": y observations for train set
-            "y_std": standard deviations of y data
-            "y_mean": means of y data
-            "y_vars": y variable names
+            'y_pre_trn': y_dataset pretrain data for train set
+            'y_obs_trn': y_dataset observations for train set
+            "y_pre_wgts": y_dataset weights for pretrain data
+            "y_obs_wgts": weights for y_dataset observations
+            "y_obs_val": y_dataset observations for train set
+            "y_obs_tst": y_dataset observations for train set
+            "y_std": standard deviations of y_dataset data
+            "y_mean": means of y_dataset data
+            "y_vars": y_dataset variable names
             "dist_matrix": prepared adjacency matrix
     """
     x_data = xr.open_zarr(x_data_file)
@@ -850,7 +850,7 @@ def prep_data(
             y_type="pre",
         )
     else:
-        raise Warning("No y data was provided")
+        raise Warning("No y_dataset data was provided")
 
     all_data = {**x_data_dict, **y_obs_data, **y_pre_data}
     if out_file:

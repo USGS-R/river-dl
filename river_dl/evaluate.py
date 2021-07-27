@@ -8,8 +8,8 @@ from river_dl.loss_functions import rmse, nse, kge
 def filter_negative_preds(y_true, y_pred):
     """
     filters out negative predictions and prints a warning if there are >5% of predictions as negative
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
+    :param y_true: [array-like] observed y_dataset values
+    :param y_pred: [array-like] predicted y_dataset values
     :return: [array-like] filtered data
     """
     # print a warning if there are a lot of negatives
@@ -29,8 +29,8 @@ def filter_negative_preds(y_true, y_pred):
 def rmse_logged(y_true, y_pred):
     """
     compute the rmse of the logged data
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
+    :param y_true: [array-like] observed y_dataset values
+    :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the rmse of the logged data
     """
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
@@ -40,8 +40,8 @@ def rmse_logged(y_true, y_pred):
 def nse_logged(y_true, y_pred):
     """
     compute the rmse of the logged data
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
+    :param y_true: [array-like] observed y_dataset values
+    :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the nse of the logged data
     """
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
@@ -52,8 +52,8 @@ def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
     """
     filter an array by a percentile of the observations. The data less than
     or greater than if `less_than=False`) will be changed to NaN
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
+    :param y_true: [array-like] observed y_dataset values
+    :param y_pred: [array-like] predicted y_dataset values
     :param percentile: [number] percentile number 0-100
     :param less_than: [bool] whether you want the data *less than* the
     percentile. If False, the data greater than the percentile will remain.
@@ -72,8 +72,8 @@ def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
 def percentile_metric(y_true, y_pred, metric, percentile, less_than=True):
     """
     compute an evaluation metric for a specified percentile of the observations
-    :param y_true: [array-like] observed y values
-    :param y_pred: [array-like] predicted y values
+    :param y_true: [array-like] observed y_dataset values
+    :param y_pred: [array-like] predicted y_dataset values
     :param metric: [function] metric function
     :param percentile: [number] percentile number 0-100
     :param less_than: [bool] whether you want the data *less than* the

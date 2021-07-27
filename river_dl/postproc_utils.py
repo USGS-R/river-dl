@@ -99,9 +99,9 @@ def plot_ts(pred_file, obs_file, variable, out_file):
 
 def prepped_array_to_df(data_array, dates, ids, col_names):
     """
-    convert prepped x or y data in numpy array to pandas df
+    convert prepped x or y_dataset data in numpy array to pandas df
     (reshape and make into pandas DFs)
-    :param data_array:[numpy array] array of x or y data [nbatch, seq_len,
+    :param data_array:[numpy array] array of x or y_dataset data [nbatch, seq_len,
     n_out]
     :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
     :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]

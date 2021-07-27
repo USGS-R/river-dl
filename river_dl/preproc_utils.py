@@ -533,7 +533,7 @@ def prep_y_data(
     # so I put that in a list which is what the rest of the functions expect
     if isinstance(y_vars, str):
         y_vars = [y_vars]
-        
+
     y_data = read_obs(y_data_file, y_vars, x_data)
 
     y_trn, y_val, y_tst = separate_trn_tst(
@@ -586,7 +586,7 @@ def prep_y_data(
     return data
 
 
-def prep_data(
+def prep_all_data(
     x_data_file,
     y_data_file,
     train_start_date,

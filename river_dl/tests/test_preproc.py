@@ -24,7 +24,7 @@ def test_read_exclude():
 
 
 def test_prep_data():
-    prepped_data = preproc_utils.prep_data(
+    prepped_data = preproc_utils.prep_all_data(
         x_data_file="test_data/test_data",
         y_data_file="test_data/obs_temp_flow",
         train_start_date="2003-09-15",
@@ -60,7 +60,7 @@ def test_prep_data():
 
 
 def test_prep_data_w_pretrain():
-    prepped_data = preproc_utils.prep_data(
+    prepped_data = preproc_utils.prep_all_data(
         x_data_file="test_data/test_data",
         y_data_file="test_data/obs_temp_flow",
         pretrain_file="test_data/obs_temp_flow",

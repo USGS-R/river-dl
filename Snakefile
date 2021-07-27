@@ -1,6 +1,6 @@
 import os
 
-from river_dl.preproc_utils import prep_data
+from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
@@ -27,7 +27,7 @@ rule prep_io_data:
     output:
         "{outdir}/prepped.npz"
     run:
-        prep_data(input[0], input[1], input[2], input[3],
+        prep_all_data(input[0], input[1], input[2], input[3],
                   x_vars=config['x_vars'],
                   catch_prop_file=None,
                   exclude_file=None,

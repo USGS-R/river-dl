@@ -27,6 +27,16 @@ def load_if_not_df(pred_data):
     else:
         return pred_data
 
+def trim_obs(obs, preds, spatial_idx_name="seg_id_nat", time_idx_name="date"):
+    obs_trim = obs.reset_index()
+    trim_preds = preds.reset_index()
+    obs_trim = obs_trim[
+        (obs_trim[time_idx_name] >= trim_preds[time_idx_name].min())
+        & (obs_trim[time_idx_name] <= trim_preds[time_idx_name].max())
+        & (obs_trim[spatial_idx_name].isin(trim_preds[spatial_idx_name].unique()))
+    ]
+    return obs_trim.set_index([time_idx_name, spatial_idx_name])
+
 
 def fmt_preds_obs(pred_data,
                   obs_file,
@@ -54,9 +64,8 @@ def fmt_preds_obs(pred_data,
         obs_var.columns = ["obs"]
         preds_var = pred_data[[var_name]]
         preds_var.columns = ["pred"]
-        # doing `loc` subsets the obs to the preds. This greatly speeds up the
-        # following join
-        obs_var = obs_var.loc[preds_var.index]
+        # trimming obs to preds speeds up following join greatly
+        obs_var = trim_obs(obs_var, preds_var, spatial_idx_name, time_idx_name)
         combined = preds_var.join(obs_var)
         variables_data[var_name] = combined
     return variables_data

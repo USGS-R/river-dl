@@ -99,7 +99,7 @@ def get_gw_loss(input_data, temp_var="seg_tave_water"):
     temp_sd = io_data['y_std'][temp_index]
     gw_mean = io_data['GW_mean']
     gw_std = io_data['GW_std']
-    return lf.weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=config['lamb2'],lamb3=config['lamb3'])
+    return lf.weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=config['lambda'],lamb2=config['lamb2'],lamb3=config['lamb3'])
  
 # use "train_model" if wanting to use CPU or local GPU
 rule train_model_local_or_cpu:

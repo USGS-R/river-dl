@@ -105,7 +105,7 @@ def predict_from_io_data(
         model,
         io_data[f"x_{partition}"],
         io_data[f"ids_{partition}"],
-        io_data[f"dates_{partition}"],
+        io_data[f"times_{partition}"],
         io_data[f"y_std"],
         io_data[f"y_mean"],
         io_data[f"y_vars"],

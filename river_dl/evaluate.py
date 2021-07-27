@@ -134,7 +134,7 @@ def calc_metrics(df):
     return pd.Series(metrics)
 
 
-def overall_metrics(
+def partition_metrics(
         pred_file,
         obs_file,
         partition,

@@ -20,15 +20,20 @@ rule all:
 
 rule prep_io_data:
     input:
-         config['obs_temp'],
-         config['obs_flow'],
          config['sntemp_file'],
+         config['obs_file'],
          config['dist_matrix'],
     output:
         "{outdir}/prepped.npz"
     run:
-        prep_all_data(input[0], input[1], input[2], input[3],
+        prep_all_data(
+                  x_data_file=input[0],
+                  pretrain_file=input[0],
+                  y_data_file=input[1],
+                  distfile=input[2],
                   x_vars=config['x_vars'],
+                  y_vars_pretrain=['seg_tave_water', 'seg_outflow'],
+                  y_vars_finetune=['temp_c', 'discharge_cms'],
                   catch_prop_file=None,
                   exclude_file=None,
                   train_start_date=config['train_start_date'],
@@ -37,8 +42,7 @@ rule prep_io_data:
                   val_end_date=config['val_end_date'],
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'],
-                  primary_variable=config['primary_variable'],
-                  log_q=False, segs=None,
+                  segs=None,
                   out_file=output[0])
 
 
@@ -90,7 +94,7 @@ rule make_predictions:
         predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
-                             logged_q=False, num_tasks=2)
+                             num_tasks=2)
 
 
 def get_grp_arg(wildcards):
@@ -106,8 +110,7 @@ def get_grp_arg(wildcards):
 
 rule combine_metrics:
     input:
-         config['obs_temp'],
-         config['obs_flow'],
+         config['obs_file'],
          "{outdir}/trn_preds.feather",
          "{outdir}/val_preds.feather"
     output:
@@ -116,10 +119,9 @@ rule combine_metrics:
     params:
         grp_arg = get_grp_arg
     run:
-        combined_metrics(obs_temp=input[0],
-                         obs_flow=input[1],
-                         pred_trn=input[2],
-                         pred_val=input[3],
+        combined_metrics(obs_file=input[0],
+                         pred_trn=input[1],
+                         pred_val=input[2],
                          group=params.grp_arg,
                          outfile=output[0])
 

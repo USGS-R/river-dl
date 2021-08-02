@@ -4,7 +4,7 @@ obs_temp: "data_DRB/obs_temp_subset"
 sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
 dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
-out_dir: "output_DRB_subset_test"
+out_dir: "output_DRB_subset_FFT2_test"
 
 code_dir: "river_dl"
 
@@ -19,7 +19,7 @@ lamb2: 1
 lamb3: 1
 
 #anything other than GW (case insensitive) will use the standard loss function (rmse of temp & rmse of flow)
-loss_type: "noGW"
+loss_type: "GW"
 
 
 train_start_date:
@@ -37,6 +37,6 @@ test_end_date:
   - '1985-09-30'
   - '2021-09-30'
 
-pt_epochs: 10
+pt_epochs: 0
 ft_epochs: 5
 hidden_size: 20

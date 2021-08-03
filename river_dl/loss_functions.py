@@ -194,45 +194,58 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
         
         rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
-        
+
+        tf.debugging.assert_all_finite(
+            rmse_loss, 'Nans is a bad loss to have'
+        )
         return rmse_loss
     return rmse_masked_combined_gw
 
-def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd,gw_mean, gw_std):
-    #assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
-    #assumes the first two columns of data are the observed flow and temperature, and the remaining 
-    #ones (extracted here) are the data for gw analysis
+
+def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
+    # assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
+    # assumes the first two columns of data are the observed flow and temperature, and the remaining
+    # ones (extracted here) are the data for gw analysis
     y_true = data[:, :, 2:]
 
-    y_pred_temp = y_pred[:,:,int(temp_index):(int(temp_index)+1)] #extract just the predicted temperature
-    #unscale the predicted temps prior to calculating the amplitude and phase
-    y_pred_temp = y_pred_temp*temp_sd+temp_mean
-
+    y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
+    # unscale the predicted temps prior to calculating the amplitude and phase
+    y_pred_temp = y_pred_temp * temp_sd + temp_mean
+    y_pred_temp = tf.squeeze(y_pred_temp)
     y_pred_mean = tf.reduce_mean(y_pred_temp, 1, keepdims=True)
     temp_demean = y_pred_temp - y_pred_mean
-    fft_tf = tf.signal.rfft(tf.squeeze(temp_demean))
+    fft_tf = tf.signal.rfft(temp_demean)
     Phiw = tf.math.angle(fft_tf)
-    #phiIndex = tf.argmax(tf.abs(fft_tf), 1)
-    #Phiw_out = Phiw[:,phiIndex]
-    Phiw_out = Phiw[:,1]
-    Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]
+    phiIndex = tf.argmax(tf.abs(fft_tf), 1)
+    idx = tf.stack(
+        [tf.reshape(tf.range(tf.shape(Phiw)[0]), (-1, 1)),
+         tf.reshape(tf.cast(phiIndex, tf.int32), (tf.shape(phiIndex)[0], 1))],
+        axis=-1)
+    Phiw_out = tf.squeeze(tf.gather_nd(Phiw, idx))
 
-    y_true_air = y_true[:,:,-1]
+    Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
+
+    y_true_air = y_true[:, :, -1]
     y_true_air_mean = tf.reduce_mean(y_true_air, 1, keepdims=True)
     air_demean = y_true_air - y_true_air_mean
-    fft_tf_air = tf.signal.rfft(tf.squeeze(air_demean))
+    fft_tf_air = tf.signal.rfft(air_demean)
     Phia = tf.math.angle(fft_tf_air)
-    #phiIndex_air = tf.argmax(tf.abs(fft_tf_air), 1)
-    #Phia_out = Phia[:,phiIndex_air,...]
-    Phia_out = Phia[:,1]
-    Aa = tf.reduce_max(tf.abs(fft_tf_air), 1) / fft_tf_air.shape[1]
 
+    phiIndex_air = tf.argmax(tf.abs(fft_tf_air), 1)
+    ida = tf.stack(
+        [tf.reshape(tf.range(tf.shape(Phia)[0]), (-1, 1)),
+         tf.reshape(tf.cast(phiIndex_air, tf.int32), (tf.shape(phiIndex_air)[0], 1))],
+        axis=-1)
+    Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
 
-    #calculate and scale predicted values
-    #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-    delPhi_pred = ((Phiw_out-Phia_out)*365/(2*m.pi)-gw_mean[1])/gw_std[1]
-    #Ar_pred = the ratio of the water temp and air temp amplitudes
-    Ar_pred = (Aw/Aa-gw_mean[0])/gw_std[0]
-    
-    return y_true[:,0,0], Ar_pred, y_true[:,0,1], delPhi_pred
+    Aa = tf.reduce_max(tf.abs(fft_tf_air), 1) / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
+
+    # calculate and scale predicted values
+    # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
+    delPhi_pred = ((Phiw_out - Phia_out) * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+    # Ar_pred = the ratio of the water temp and air temp amplitudes
+    Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
+
+    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
+
 

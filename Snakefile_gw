@@ -44,8 +44,15 @@ use rule all from other_workflow as other_all with:
         ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
+        expand("{outdir}/config_gw.yml", outdir=out_dir),
 
-
+rule copy_config:
+    output:
+        "{outdir}/config_gw.yml"
+    shell:
+        """
+        scp config_gw.yml {output[0]}
+        """
 
         
  
@@ -104,7 +111,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0],config['pt_epochs'], config['ft_epochs'], other_workflow.config['hidden_size'],
-                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'], lamb2=config['lamb2'],lamb3=config['lamb3'])
+                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2, loss_type=config['loss_type'],lamb1=config['lambdas'][1], lamb2=config['lamb2'],lamb3=config['lamb3'])
 
 
 

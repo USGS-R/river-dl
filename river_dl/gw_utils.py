@@ -20,7 +20,7 @@ def amp_phi (Date, temp, isWater=False):
     :param isWater: boolean indicator if the temp data is water temps (versus air)
     :returns: amplitude and phase
     """
-    
+
     # Johnson, Z.C., Johnson, B.G., Briggs, M.A., Snyder, C.D., Hitt, N.P., and Devine, W.D., 2021, Heed the data gap: Guidelines for 
     #using incomplete datasets in annual stream temperature analyses: Ecological Indicators, v. 122, p. 107229, 
     #http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
@@ -46,6 +46,8 @@ def amp_phi (Date, temp, isWater=False):
 #     phi = math.asin(model.coef_[1]/amp)
 
 #this solves the regression using stats models, which provides confidence intervals on the coefficients
+
+
     X = sm.add_constant(x)
     try:
         model = sm.OLS(temp,X, missing='drop')
@@ -106,76 +108,90 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
-        #get the air temp properties
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
-        air_amp.append(amp)
-        air_amp_low.append(amp_low)
-        air_amp_high.append(amp_high)
-        air_phi.append(phi)
-        air_phi_low.append(phi_low)
-        air_phi_high.append(phi_high)
+        waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
+        #require temps > 1 and <60 C for signal analysis
+        waterDF.loc[(waterDF.tave_water<1)|(waterDF.tave_water>60),"tave_water"]=np.nan
+        waterDF.dropna(inplace=True)
+        waterDF['waterYear']=waterDF['date'].dt.year 
+        waterDF.loc[waterDF['date'].dt.month>=10,"waterYear"]= waterDF.loc[waterDF['date'].dt.month>=10,'date'].dt.year+1
+        waterSum = waterDF.loc[~waterDF.tave_water.isnull(),['waterYear','tave_water']].groupby('waterYear',as_index=False).count()
+        waterSum=waterSum[waterSum.tave_water>=300]
+        waterDF = waterDF[waterDF.waterYear.isin(waterSum.waterYear)]
 
-        #get the process-based model (pbm) water temp properties
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[water_temp_pbm_col][:,i].values,isWater=True)
-        water_amp_pbm.append(amp)
-        water_amp_low_pbm.append(amp_low)
-        water_amp_high_pbm.append(amp_high)
-        water_phi_pbm.append(phi)
-        water_phi_low_pbm.append(phi_low)
-        water_phi_high_pbm.append(phi_high)
+
+        thisData = thisData.assign_coords(
+    waterYear=('date', [x.year if x.month < 10 else (x.year+1) for x in pd.Series(thisData['date'].values) ]))    
+
         
-        #get the observed water temp properties
-        #ensure sufficient data
-        if np.sum(np.isfinite(thisData[water_temp_obs_col][:,i].values))>(365): #this requires at least 1 yr of data
-            waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
-            #require temps > 1 and <60 C for signal analysis
-            waterDF.loc[(waterDF.tave_water<1)|(waterDF.tave_water>60),"tave_water"]=np.nan
-            waterDF.dropna(inplace=True)
-            
-            if waterDF.shape[0]<(365):
-                amp = np.nan
-                phi = np.nan
-                amp_low = np.nan
-                amp_high = np.nan
-                phi_low = np.nan
-                phi_high = np.nan
-            else:
-                ### old code that may be used again for adding additional data requirements for the temp signal analysis
-                #get the longest set of temp records with no gaps >49 days
-                #dateDiff = [0]
-                #dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
-                #waterDF['dateDiff']=dateDiff
-                #if max(dateDiff)>31:
-                #    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF.date))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF.date==np.nanmax(waterDF.date))].values, include_lowest=True, labels=False)
-                #    waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
-                #    #keep the longest series
-                #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
-                #    waterDF = waterDF.loc[waterDF.bin==maxBin]
+        if waterSum.shape[0]>0:
+            #print(thisSeg)
+            #print(waterSum)
+            #get the air temp properties
+            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[air_temp_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=False)
+            air_amp.append(amp)
+            air_amp_low.append(amp_low)
+            air_amp_high.append(amp_high)
+            air_phi.append(phi)
+            air_phi_low.append(phi_low)
+            air_phi_high.append(phi_high)
+
+            #get the process-based model (pbm) water temp properties
+            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[water_temp_pbm_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=True)
+            water_amp_pbm.append(amp)
+            water_amp_low_pbm.append(amp_low)
+            water_amp_high_pbm.append(amp_high)
+            water_phi_pbm.append(phi)
+            water_phi_low_pbm.append(phi_low)
+            water_phi_high_pbm.append(phi_high)
+
+            #get the observed water temp properties
+            #ensure sufficient data
+            if np.sum(np.isfinite(thisData[water_temp_obs_col][:,i].values))>(365): #this requires at least 1 yr of data
+
+
                 
-                if waterDF.shape[0]>=(365):
+                    ### old code that may be used again for adding additional data requirements for the temp signal analysis
+                    #get the longest set of temp records with no gaps >49 days
+                    #dateDiff = [0]
+                    #dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
+                    #waterDF['dateDiff']=dateDiff
+                    #if max(dateDiff)>31:
+                    #    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF.date))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF.date==np.nanmax(waterDF.date))].values, include_lowest=True, labels=False)
+                    #    waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
+                    #    #keep the longest series
+                    #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
+                    #    waterDF = waterDF.loc[waterDF.bin==maxBin]
+
                     amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
-                else:
-                    amp = np.nan
-                    phi = np.nan
-                    amp_low = np.nan
-                    amp_high = np.nan
-                    phi_low = np.nan
-                    phi_high = np.nan
-            
+
         else:
+            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
+            air_amp.append(amp)
+            air_amp_low.append(amp_low)
+            air_amp_high.append(amp_high)
+            air_phi.append(phi)
+            air_phi_low.append(phi_low)
+            air_phi_high.append(phi_high)      
             amp = np.nan
             phi = np.nan
             amp_low = np.nan
             amp_high = np.nan
             phi_low = np.nan
             phi_high = np.nan
+            water_amp_pbm.append(np.nan)
+            water_amp_low_pbm.append(np.nan)
+            water_amp_high_pbm.append(np.nan)
+            water_phi_pbm.append(np.nan)
+            water_phi_low_pbm.append(np.nan)
+            water_phi_high_pbm.append(np.nan)
         water_amp_obs.append(amp)
         water_amp_low_obs.append(amp_low)
         water_amp_high_obs.append(amp_high)
         water_phi_obs.append(phi)
         water_phi_low_obs.append(phi_low)
         water_phi_high_obs.append(phi_high)
-
+    print(len(water_amp_obs))
+    print(len(air_amp))
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
     delPhi_obs = [(water_phi_obs[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     
@@ -264,7 +280,7 @@ def prep_annual_signal_data(
     obs.append(tempFile)
     
     #using an outer join keeps all data, but requires the assumption that the air temp properties from PRMS (WY1981 - 2016) were valid for WY 2017-2020
-    obs=xr.merge(obs,join="outer")
+    obs=xr.merge(obs,join="left")
     obs=obs[[air_temp_col,water_temp_pbm_col,water_temp_obs_col]]
     obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})

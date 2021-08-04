@@ -12,7 +12,7 @@ from copy import deepcopy
 from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
 
-def amp_phi (Date, temp, isWater=False, r_thresh=0.85):
+def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
     """
     calculate the annual signal properties (phase and amplitude) for a temperature times series
     :param Date: vector of dates
@@ -52,25 +52,27 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.85):
     try:
         model = sm.OLS(temp,X, missing='drop')
         results = model.fit()
-
-        if results.rsquared >= r_thresh:
-            confInt = np.array(results.conf_int())
-      
-            amp = math.sqrt(results.params[1]**2+results.params[2]**2)
-            amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
-            amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
-    
-            phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
-            phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
-            phi_low = np.min(phiRange)
-            phi_high = np.max(phiRange)
-        else:
+       
+        if results.rsquared < r_thresh and isWater:
             amp=np.nan
             phi=np.nan
             amp_low=np.nan
             amp_high=np.nan
             phi_low=np.nan
             phi_high = np.nan
+
+        else:
+            confInt = np.array(results.conf_int())
+
+            amp = math.sqrt(results.params[1]**2+results.params[2]**2)
+            amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
+            amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
+
+            phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
+            phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
+            phi_low = np.min(phiRange)
+            phi_high = np.max(phiRange)
+
 
     except:
         amp=np.nan

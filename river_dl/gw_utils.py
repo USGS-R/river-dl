@@ -12,7 +12,7 @@ from copy import deepcopy
 from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
 
-def amp_phi (Date, temp, isWater=Falsei, r_thresh=0.85):
+def amp_phi (Date, temp, isWater=False, r_thresh=0.85):
     """
     calculate the annual signal properties (phase and amplitude) for a temperature times series
     :param Date: vector of dates

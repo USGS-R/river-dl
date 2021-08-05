@@ -60,6 +60,13 @@ def train_model(
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
     """
+
+    print(loss_type)
+    print(lamb1)
+    print(lamb2)
+    print(lamb3)
+
+
     if tf.test.gpu_device_name():
         print("Default GPU Device: {}".format(tf.test.gpu_device_name()))
     else:
@@ -159,7 +166,7 @@ def train_model(
             gw_mean = io_data['GW_mean']
             gw_std = io_data['GW_std']
             temp_air_index = np.where(io_data['x_cols']=='seg_tave_air')[0]
-            
+            print("using the gw loss")
             model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=lamb1,lamb2=lamb2,lamb3=lamb3))
         elif model_type == "rgcn":
             model.compile(optimizer_ft, loss=loss_func)

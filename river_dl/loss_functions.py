@@ -194,7 +194,7 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
         #if not tf.math.is_finite(rmse_delPhi):
         #    rmse_delPhi = 0
         
-        rmse_loss = rmse_main + lamb * rmse_aux #+ lamb2*rmse_Ar #+lamb3*rmse_delPhi
+        rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
 
         tf.debugging.assert_all_finite(
             rmse_loss, 'Nans is a bad loss to have'

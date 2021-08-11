@@ -7,15 +7,15 @@ through pulling the river-dl docker image locally and on Tallgrass as well as on
 the associated snakemake workflow.
 
 ### 1) Pull the Docker and run River-dl locally 
-Pull the river-dl image from docker hub. Earlier versions can be pulled by
-specifying the tag (i.e. `v1.1`) instead of using `latest` 
+Pull the river-dl image from Gitlab. Versions can be specified by
+adding the version tag (i.e. `v1.1`) after river-dl in the format `image:tag`  
 
-`docker pull simontopp/river-dl:latest`
+`docker pull code.chs.usgs.gov:5001/wma/wp/river-dl`
 
 Navigate to the river-dl repsository.  Once there, create a container from the image and open it
 with the river-dl repository mounted as volume.
 
-`docker run --entrypoint bash -it --mount "src=$(pwd),target=/river-dl,type=bind" -w '/river-dl' simontopp/river-dl`
+`docker run --entrypoint bash -it --mount "src=$(pwd),target=/river-dl,type=bind" -w '/river-dl' river-dl`
 
 Above, the `-it` flag creates an interactive container, `--mount` mounts the container to your current 
 working directory (with read/write access), and `-w` sets the working directory within the docker container.
@@ -41,18 +41,24 @@ On Tallgrass, load singularity
 
 `module load singularity`
 
-Pull the river-dl image from dockerhub and convert it to a singularity image. Replace `latest` with desired tag.
-The following pulls the image into the river-dl directory on Tallgrass and names the converted .sif image `riv-dl-sing.sif`.
+Navigate to your river-dl directory
 
-`singularity pull ~/river-dl/riv-dl-sing.sif docker://simontopp/river-dl:latest`
+`cd river-dl/`
+
+Pull the river-dl container image from GitLab and convert it to a singularity image. Versions can be specified by
+adding the version tag (i.e. `v1.1`) after river-dl in the format `image:tag`.
+
+`singularity pull --docker-login docker://code.chs.usgs.gov:5001/wma/wp/river-dl`
+
+You should now have a `.sif` file in the river-dl directory.  This is the singularity image.
 
 _Running River-dl in the singularity container_
 
 Allocate a GPU node and open a bash script within that node
 
-`salloc -N 1 -n 1 -c 8 -p gpu -A [Account] -t 2:00:00 --gres=gpu:1`
+`salloc -N 1 -n 1 -c 8 -p gpu -A <Account> -t 2:00:00 --gres=gpu:1`
 
-`srun -A [Account] --pty bash`
+`srun -A <Account> --pty bash`
 
 Set up the environment and specify paths to necessary nvidia libraries
 
@@ -61,7 +67,7 @@ Set up the environment and specify paths to necessary nvidia libraries
 `export LD_LIBRARY_PATH=/cm/shared/apps/nvidia/TensorRT-6.0.1.5/lib:/cm/shared/apps/nvidia/cudnn_7.6.5/lib64:$LD_LIBRARY_PATH`
 
 Move to the river-dl directory
-`cd [path to river-dl]`
+`cd <path to river-dl>`
 
 Start the singularity container and bind the necessary nvidia libraries and your river-dl directory.
 
@@ -69,23 +75,33 @@ Start the singularity container and bind the necessary nvidia libraries and your
 
 Run the snakemake workflow
 
-`snakemake --configfile config.yml --cores all`
+`snakemake --configfile config.yml --cores 1`
+
+_Currently, running the snakemake with more than 1 core causes tensorflow to overload the GPU memory, it's not clear why this
+is, but we're working on specifying computing resources in the snakefile to avoid this_
 
 ### 3) Updating the docker image
+First, you'll need to create an access token to push the updated container to the Gitlab registry.
+  * Create your access token on [Gitlab](https://code.chs.usgs.gov/-/profile/personal_access_tokens)
+  * [Authenticate gitlab](https://docs.gitlab.com/ee/user/packages/container_registry/#authenticate-with-the-container-registry)
+    using your access token by running the following command and entering your generated token when
+    prompted for your password.
+    
+    `docker login code.chs.usgs.gov:5001 -u <username>`
 
-If you need to update the container image for some reason (i.e. add an additional package), you'll need to re-build the image
-locally on your lap-top or desktop using the Dockerfile in the base directory of river-dl.  To do this, open up the dockerfile and add the packages you need
-to the list, then run: 
+To update the container image (i.e. add an additional package), you'll need to re-build the image
+locally on your lap-top or desktop using the Dockerfile in the base directory of river-dl. Then you'll need to push the new
+image to the container repository on Gitlab. To do this, open up the dockerfile and add the packages you need
+to the list, then build the container by running the following and replacing the tag with your version
+tag: 
 
-`docker build -t river-dl:v0.1 .`
+`docker build -t code.chs.usgs.gov:5001/wma/wp/river-dl:<tag> .`
 
-Above, the `-t` flag is what allows you to name the container in the name:tag format.
+Push the rebuilt container to Gitlab
 
-Then push your updated image to docker hub (you'll need to make an account if you don't have one).
+`docker push code.chs.usgs.gov:5001/wma/wp/river-dl:<tag>`
 
-`docker push river-dl:v0.1`
-
-At this point, follow this instruction in steps 1 and 2 to use your updated container.
+At this point, repull the new container/tag and follow instructions in steps 1 and 2 to run the container.
 
 ### Planned additions:
 Eventually this readme will include additional instructions for running interactive sessions through a jupyter notebook

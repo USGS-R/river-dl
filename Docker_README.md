@@ -90,7 +90,7 @@ First, you'll need to create an access token to push the updated container to th
     `docker login code.chs.usgs.gov:5001 -u <username>`
 
 To update the container image (i.e. add an additional package), you'll need to re-build the image
-locally on your lap-top or desktop using the Dockerfile in the base directory of river-dl. Then you'll need to push the new
+locally on your laptop or desktop using the Dockerfile in the base directory of river-dl. Then you'll need to push the new
 image to the container repository on Gitlab. To do this, open up the dockerfile and add the packages you need
 to the list, then build the container by running the following and replacing the tag with your version
 tag: 

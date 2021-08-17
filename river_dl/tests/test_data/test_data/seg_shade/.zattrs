@@ -1,6 +1,6 @@
 {
     "_ARRAY_DIMENSIONS": [
-        "seg_id_nat",
-        "date"
+        "segs_test",
+        "times_test"
     ]
 }

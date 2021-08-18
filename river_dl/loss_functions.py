@@ -88,7 +88,7 @@ def multitask_kge(lambdas):
 
 def multitask_loss(lambdas, loss_func):
     """
-    calculate a weighted multi-task loss for a given number of variables with a
+    calculate a weighted multi-task loss for a given number of variables_to_log with a
     given loss function
     :param lambdas: [array-like float] The factor that losses will be
     multiplied by before being added together.

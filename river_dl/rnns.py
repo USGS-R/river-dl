@@ -10,7 +10,7 @@ class LSTMModel(tf.keras.Model):
     ):
         """
         :param hidden_size: [int] the number of hidden units
-        :param num_tasks: [int] number of tasks (variables to be predicted)
+        :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
         :param recurrent_dropout: [float] value between 0 and 1 for the
         probability of a recurrent element to be zero
         :param dropout: [float] value between 0 and 1 for the probability of an
@@ -59,7 +59,7 @@ class GRUModel(LSTMModel):
     ):
         """
         :param hidden_size: [int] the number of hidden units
-        :param num_tasks: [int] number of tasks (variables to be predicted)
+        :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
         :param recurrent_dropout: [float] value between 0 and 1 for the
         probability of a recurrent element to be zero
         :param dropout: [float] value between 0 and 1 for the probability of an

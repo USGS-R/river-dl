@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from copy import deepcopy
 
-from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs, convert_batch_reshape
+from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
 
 def amp_phi (Date, temp, isWater=False):
@@ -270,7 +270,7 @@ def prep_annual_signal_data(
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})
 
     #split into testing and training
-    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, train_start_date,
+    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, 'date',train_start_date,
         train_end_date,
         val_start_date,
         val_end_date,
@@ -291,9 +291,9 @@ def prep_annual_signal_data(
     #add the GW data to the y_dataset dataset
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['dates_trn'])), np.max(np.unique(preppedData['dates_trn'])))),gwVarList)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['dates_tst'])), np.max(np.unique(preppedData['dates_tst'])))),gwVarList)
-    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['dates_val'])), np.max(np.unique(preppedData['dates_val'])))),gwVarList)
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList)
+    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList)
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
     data['GW_val']=GW_val
@@ -401,9 +401,9 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
     
-    gw_trn = calc_amp_phi(trn_preds)
-    gw_tst = calc_amp_phi(tst_preds)
-    gw_val = calc_amp_phi(val_preds)
+    gw_trn = calc_amp_phi(trn_preds,"temp_c")
+    gw_tst = calc_amp_phi(tst_preds,"temp_c")
+    gw_val = calc_amp_phi(val_preds,"temp_c")
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)
@@ -436,7 +436,6 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name
             thisData = valDF
             partition="val"
         for thisVar in ['Ar','delPhi']:
-            print(thisVar)
             tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_pred".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_pred".format(thisVar):"pred"}))).T
             tempDF['variable']=thisVar
             tempDF['partition']=partition

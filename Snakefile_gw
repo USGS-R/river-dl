@@ -4,7 +4,7 @@
 
 import os
 
-from river_dl.preproc_utils import prep_data
+from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
@@ -51,7 +51,7 @@ use rule all from other_workflow as other_all with:
  
 rule prep_ann_temp:
     input:
-         config['obs_temp'],
+         config['obs_file'],
          config['sntemp_file'],
          "{outdir}/prepped.npz",
     output:

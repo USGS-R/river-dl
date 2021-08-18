@@ -150,7 +150,7 @@ def train_model(
 
         if model_type == "rgcn" and loss_type.lower()=="gw":
             #extract these for use in the GW loss function
-            temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
+            temp_index = np.where(io_data['y_pre_vars']=="seg_tave_water")[0]
             temp_mean = io_data['y_mean'][temp_index]
             temp_sd = io_data['y_std'][temp_index]
             gw_mean = io_data['GW_mean']

@@ -677,11 +677,14 @@ def prep_all_data(
             'y_obs_trn': y_dataset observations for train set
             "y_pre_wgts": y_dataset weights for pretrain data
             "y_obs_wgts": weights for y_dataset observations
-            "y_obs_val": y_dataset observations for train set
+            "y_obs_val": y_dataset observations for validation set
             "y_obs_tst": y_dataset observations for train set
             "y_std": standard deviations of y_dataset data
             "y_mean": means of y_dataset data
-            "y_vars": y_dataset variable names
+            "y_obs_vars": y_dataset observation variable names
+            'y_pre_val': y_dataset pretrain data for validation data
+            'y_pre_tst': y_dataset pretrain data for test data
+            'y_pre_vars':  y_dataset pretrain data variable names
             "dist_matrix": prepared adjacency matrix
     """
     if pretrain_file and not y_vars_pretrain:

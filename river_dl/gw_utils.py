@@ -291,9 +291,11 @@ def prep_annual_signal_data(
     #add the GW data to the y_dataset dataset
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
+
     data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList)
     data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList)
     data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList)
+
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
     data['GW_val']=GW_val

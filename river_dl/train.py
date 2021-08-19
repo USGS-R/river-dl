@@ -155,6 +155,7 @@ def train_model(
             temp_sd = io_data['y_std'][temp_index]
             gw_mean = io_data['GW_mean']
             gw_std = io_data['GW_std']
+            temp_air_index = np.where(io_data['x_cols']=='seg_tave_air')[0]
             
             model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=1,lamb2=lamb2,lamb3=lamb3))
         elif model_type == "rgcn":
@@ -168,19 +169,27 @@ def train_model(
 
         if loss_type.lower()!="gw":
             y_trn_obs = io_data["y_obs_trn"]
-        else:
-            y_trn_obs = np.concatenate(
-                [io_data["y_obs_trn"], io_data["GW_trn_reshape"]], axis=2
+            model.fit(
+                x=x_trn_obs,
+                y=y_trn_obs,
+                epochs=finetune_epochs,
+                batch_size=batch_size,
+                callbacks=[csv_log_ft],
             )
+        else:
+            air_unscaled = io_data['x_trn'][:,:,temp_air_index]*io_data['x_std'][temp_air_index] +io_data['x_mean'][temp_air_index]
+            y_trn_obs = np.concatenate(
+                [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
+            )
+            with tf.device('/CPU:0'):
+                model.fit(
+                    x=x_trn_obs,
+                    y=y_trn_obs,
+                    epochs=finetune_epochs,
+                    batch_size=batch_size,
+                    callbacks=[csv_log_ft],
+                )
 
-
-        model.fit(
-            x=x_trn_obs,
-            y=y_trn_obs,
-            epochs=finetune_epochs,
-            batch_size=batch_size,
-            callbacks=[csv_log_ft],
-        )
 
         model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 

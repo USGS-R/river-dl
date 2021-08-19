@@ -192,19 +192,13 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
         Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std)
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
-        
-        #if not tf.math.is_finite(rmse_delPhi):
-        #    rmse_delPhi = 0
-        
+
         rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
 
         tf.debugging.assert_all_finite(
             rmse_loss, 'Nans is a bad loss to have'
         )
-
         return rmse_loss
- 
-
     return rmse_masked_combined_gw
 
 
@@ -218,7 +212,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
     # unscale the predicted temps prior to calculating the amplitude and phase
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
     y_pred_temp = tf.squeeze(y_pred_temp)
-
     y_pred_mean = tf.reduce_mean(y_pred_temp, 1, keepdims=True)
     temp_demean = y_pred_temp - y_pred_mean
     fft_tf = tf.signal.rfft(temp_demean)
@@ -232,9 +225,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
 
     Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
 
-
     y_true_air = y_true[:, :, -1]
-
     y_true_air_mean = tf.reduce_mean(y_true_air, 1, keepdims=True)
     air_demean = y_true_air - y_true_air_mean
     fft_tf_air = tf.signal.rfft(air_demean)
@@ -254,7 +245,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
     delPhi_pred = ((Phiw_out - Phia_out) * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
     # Ar_pred = the ratio of the water temp and air temp amplitudes
     Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
-
 
     return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
 

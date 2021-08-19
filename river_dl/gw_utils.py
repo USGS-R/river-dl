@@ -52,7 +52,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
     try:
         model = sm.OLS(temp,X, missing='drop')
         results = model.fit()
-       
+        
         if results.rsquared < r_thresh and isWater:
             amp=np.nan
             phi=np.nan
@@ -119,6 +119,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
+
         waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
         #require temps > 1 and <60 C for signal analysis
         waterDF.loc[(waterDF.tave_water<1)|(waterDF.tave_water>60),"tave_water"]=np.nan
@@ -131,7 +132,8 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
 
 
         thisData = thisData.assign_coords(
-    waterYear=('date', [x.year if x.month < 10 else (x.year+1) for x in pd.Series(thisData['date'].values) ]))    
+    waterYear=('date', [x.year if x.month < 10 else (x.year+1) for x in pd.Series(thisData['date'].values) ]))
+        
 
         
         if waterSum.shape[0]>0:
@@ -157,7 +159,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
 
             #get the observed water temp properties
             #ensure sufficient data
-            if np.sum(np.isfinite(thisData[water_temp_obs_col][:,i].values))>(365): #this requires at least 1 yr of data
+            #if np.sum(np.isfinite(thisData[water_temp_obs_col][:,i].values))>(365): #this requires at least 1 yr of data
 
 
                 
@@ -173,7 +175,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
                     #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
                     #    waterDF = waterDF.loc[waterDF.bin==maxBin]
 
-                    amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
+            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
 
         else:
             amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
@@ -201,8 +203,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
         water_phi_obs.append(phi)
         water_phi_low_obs.append(phi_low)
         water_phi_high_obs.append(phi_high)
-    print(len(water_amp_obs))
-    print(len(air_amp))
+
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
     delPhi_obs = [(water_phi_obs[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     

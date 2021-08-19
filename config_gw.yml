@@ -1,7 +1,7 @@
 # Input files
-obs_file: "data_DRB/obs_temp_flow_subset"
-sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
-dist_matrix: "data_DRB/distance_matrix_subset.npz"
+obs_file: "data_DRB/obs_temp_flow_full"
+sntemp_file: "data_DRB/uncal_sntemp_input_output"
+dist_matrix: "data_DRB/distance_matrix.npz"
 
 out_dir: "output_DRB_test"
 

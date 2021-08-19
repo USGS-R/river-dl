@@ -18,6 +18,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
     :param Date: vector of dates
     :param temp: vector of temperatures
     :param isWater: boolean indicator if the temp data is water temps (versus air)
+    :param r_thresh: minimum R2 for the water linear regressions (otherwise NA is returned for regression coefficients)
     :returns: amplitude and phase
     """
 

@@ -2,6 +2,8 @@ import numpy as np
 import math as m
 import tensorflow as tf
 
+#from river_dl.train import train_model
+
 
 @tf.function
 def rmse(y_true, y_pred):
@@ -88,7 +90,7 @@ def multitask_kge(lambdas):
 
 def multitask_loss(lambdas, loss_func):
     """
-    calculate a weighted multi-task loss for a given number of variables with a
+    calculate a weighted multi-task loss for a given number of variables_to_log with a
     given loss function
     :param lambdas: [array-like float] The factor that losses will be
     multiplied by before being added together.
@@ -199,11 +201,12 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
         tf.debugging.assert_all_finite(
             rmse_loss, 'Nans is a bad loss to have'
         )
-        
+
         return rmse_loss
  
 
     return rmse_masked_combined_gw
+
 
 def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
     # assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
@@ -215,7 +218,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
     # unscale the predicted temps prior to calculating the amplitude and phase
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
     y_pred_temp = tf.squeeze(y_pred_temp)
-    
+
     y_pred_mean = tf.reduce_mean(y_pred_temp, 1, keepdims=True)
     temp_demean = y_pred_temp - y_pred_mean
     fft_tf = tf.signal.rfft(temp_demean)
@@ -229,7 +232,8 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
 
     Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
 
-    y_true_air = y_true[:, :, -1]    
+
+    y_true_air = y_true[:, :, -1]
 
     y_true_air_mean = tf.reduce_mean(y_true_air, 1, keepdims=True)
     air_demean = y_true_air - y_true_air_mean
@@ -251,4 +255,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
     # Ar_pred = the ratio of the water temp and air temp amplitudes
     Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
 
-    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred    
+
+    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
+
+

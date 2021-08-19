@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 
 
 def select_data(df, col, selection):
@@ -9,34 +10,45 @@ def select_data(df, col, selection):
 
 
 def sel_date_segs(df, segs, start_date, end_date):
+    df = df[df["seg_id_nat"].notna()]
+    df["seg_id_nat"] = df.seg_id_nat.astype(int)
     df = select_data(df, "date", slice(start_date, end_date))
     df = select_data(df, "seg_id_nat", segs)
+    df = df.rename(columns={"seg_id_nat": "segs_test", "date": "times_test"})
+    df.set_index(["segs_test", "times_test"], inplace=True)
     return df
 
 
 # need to subset this data so it's just two years and two sites. I think
 # such a dataset should be representative enough to run tests against
-dfs = pd.read_feather("../../data/in/uncal_sntemp_input_output_subset.feather")
+data_dir = "../../../drb-dl-model/data/in/"
+dfs = pd.read_feather(
+    os.path.join(data_dir, "uncal_sntemp_input_output_subset.feather")
+)
 dfs["date"] = pd.to_datetime(dfs["date"])
 dft = pd.read_csv(
-    "../../data/in/obs_flow_subset.csv",
+    os.path.join(data_dir, "obs_temp_full.csv"),
     parse_dates=["date"],
     infer_datetime_format=True,
 )
 dfq = pd.read_csv(
-    "../../data/in/obs_temp_subset.csv",
+    os.path.join(data_dir, "obs_flow_full.csv"),
     parse_dates=["date"],
     infer_datetime_format=True,
 )
 
-start_date = "2004-09-15"
+start_date = "2003-09-15"
 end_date = "2006-10-15"
-segs = ["2012", "2007"]
+segs = [2012, 2007]
 
 dft = sel_date_segs(dft, segs, start_date, end_date)
 dfq = sel_date_segs(dfq, segs, start_date, end_date)
 dfs = sel_date_segs(dfs, segs, start_date, end_date)
 
-dft.to_csv("test_data/obs_temp_full.csv", index=False)
-dfq.to_csv("test_data/obs_flow_full.csv", index=False)
-dfs.to_feather("test_data/uncal_sntemp_input_output.feather")
+dft = dft[["temp_c"]]
+dfq = dfq[["discharge_cms"]]
+
+df_combined = dft.join(dfq)
+
+df_combined.to_xarray().to_zarr("test_data/obs_temp_flow", mode="w")
+dfs.to_xarray().to_zarr("test_data/test_data", mode="w")

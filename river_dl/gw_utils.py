@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from copy import deepcopy
 
-from river_dl.preproc_utils import separate_trn_tst, read_multiple_obs, convert_batch_reshape
+from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
 
 def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
@@ -268,7 +268,7 @@ def prep_annual_signal_data(
     :param io_data_file: [str] the prepped data file
     :param train_start_date, train_end_date, val_start_date,val_end_date,test_start_date,test_end_date: [str]
     the start and end dates of the training, validation, and testing periods
-    :param gwVarList: [str] list of groundwater-relevant variables
+    :param gwVarList: [str] list of groundwater-relevant variables_to_log
     :param out_file: [str] file to where the values will be written
     :param water_temp_pbm_col: str with the column name of the process-based model predicted water temperatures in degrees C
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
@@ -297,7 +297,7 @@ def prep_annual_signal_data(
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})
 
     #split into testing and training
-    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, train_start_date,
+    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, 'date',train_start_date,
         train_end_date,
         val_start_date,
         val_end_date,
@@ -315,12 +315,14 @@ def prep_annual_signal_data(
     GW_trn_scale['Ar_obs'] = (GW_trn['Ar_obs']-np.nanmean(GW_trn['Ar_obs']))/np.nanstd(GW_trn['Ar_obs'])
     GW_trn_scale['delPhi_obs'] = (GW_trn['delPhi_obs']-np.nanmean(GW_trn['delPhi_obs']))/np.nanstd(GW_trn['delPhi_obs'])
     
-    #add the GW data to the y dataset
+    #add the GW data to the y_dataset dataset
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['dates_trn'])), np.max(np.unique(preppedData['dates_trn'])))),gwVarList)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['dates_tst'])), np.max(np.unique(preppedData['dates_tst'])))),gwVarList)
-    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['dates_val'])), np.max(np.unique(preppedData['dates_val'])))),gwVarList)
+
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList)
+    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList)
+
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
     data['GW_val']=GW_val
@@ -391,7 +393,7 @@ def make_GW_dataset (GW_data,x_data,varList):
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
     :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
     :param x_data: [str] observation dataset
-    :param varList: [str] variables to keep in the final dataset
+    :param varList: [str] variables_to_log to keep in the final dataset
     :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
     """
     #make a dataframe with all combinations of segment and date and then join the annual temperature signal properties dataframe to it
@@ -428,9 +430,9 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
     
-    gw_trn = calc_amp_phi(trn_preds)
-    gw_tst = calc_amp_phi(tst_preds)
-    gw_val = calc_amp_phi(val_preds)
+    gw_trn = calc_amp_phi(trn_preds,"temp_c")
+    gw_tst = calc_amp_phi(tst_preds,"temp_c")
+    gw_val = calc_amp_phi(val_preds,"temp_c")
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)
@@ -463,7 +465,6 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name
             thisData = valDF
             partition="val"
         for thisVar in ['Ar','delPhi']:
-            print(thisVar)
             tempDF = pd.DataFrame(calc_metrics(thisData[["{}_obs".format(thisVar),"{}_pred".format(thisVar)]].rename(columns={"{}_obs".format(thisVar):"obs","{}_pred".format(thisVar):"pred"}))).T
             tempDF['variable']=thisVar
             tempDF['partition']=partition
@@ -501,12 +502,12 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name
                 for x in range(len(thisData['{}_obs'.format(thisMetric)])):
                     thisColor = colorDict[thisData.group[x]]
                     ax.plot([thisData['{}_obs'.format(thisMetric+"_low")][x],thisData['{}_obs'.format(thisMetric+"_high")][x]],[thisData['{}_pred'.format(thisMetric)][x],thisData['{}_pred'.format(thisMetric)][x]], color=thisColor)
-#                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
+#                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y_dataset=thisData['{}_pred'.format(thisMetric)],label="RGCN",color="blue")
                 for thisGroup in np.unique(thisData['group']):
                     thisColor = colorDict[thisGroup]
                     ax.scatter(x=thisData.loc[thisData.group==thisGroup,'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group==thisGroup,'{}_pred'.format(thisMetric)],label="RGCN - %s"%thisGroup,color=thisColor)
                 
-#                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
+#                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y_dataset=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
                 for i, label in enumerate(thisData.seg_id_nat):
                     ax.annotate(int(label), (thisData['{}_obs'.format(thisMetric)][i],thisData['{}_pred'.format(thisMetric)][i]))
                 if thisFig==1:

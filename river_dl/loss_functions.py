@@ -192,7 +192,7 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
         Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std)
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
-        
+
         rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
 
         tf.debugging.assert_all_finite(

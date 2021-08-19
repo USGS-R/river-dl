@@ -61,10 +61,6 @@ def train_model(
     :return: [tf model]  finetuned model
     """
 
-    print(loss_type)
-    print(lamb1)
-    print(lamb2)
-    print(lamb3)
 
 
     if tf.test.gpu_device_name():

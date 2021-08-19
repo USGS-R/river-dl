@@ -27,38 +27,48 @@ def load_if_not_df(pred_data):
     else:
         return pred_data
 
-
-def trim_obs(obs, preds):
+def trim_obs(obs, preds, spatial_idx_name="seg_id_nat", time_idx_name="date"):
     obs_trim = obs.reset_index()
     trim_preds = preds.reset_index()
     obs_trim = obs_trim[
-        (obs_trim.date >= trim_preds.date.min())
-        & (obs_trim.date <= trim_preds.date.max())
-        & (obs_trim.seg_id_nat.isin(trim_preds.seg_id_nat.unique()))
+        (obs_trim[time_idx_name] >= trim_preds[time_idx_name].min())
+        & (obs_trim[time_idx_name] <= trim_preds[time_idx_name].max())
+        & (obs_trim[spatial_idx_name].isin(trim_preds[spatial_idx_name].unique()))
     ]
-    return obs_trim.set_index(["date", "seg_id_nat"])
+    return obs_trim.set_index([time_idx_name, spatial_idx_name])
 
 
-def fmt_preds_obs(pred_data, obs_file, variable):
+def fmt_preds_obs(pred_data,
+                  obs_file,
+                  spatial_idx_name="seg_id_nat",
+                  time_idx_name="date"):
     """
     combine predictions and observations in one dataframe
     :param pred_data:[str] filepath to the predictions file
     :param obs_file:[str] filepath to the observations file
-    :param variable: [str] either 'flow' or 'temp'
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
     """
-    obs_var, seg_var = get_var_names(variable)
     pred_data = load_if_not_df(pred_data)
-    # pred_data.loc[:, "seg_id_nat"] = pred_data["seg_id_nat"].astype(int)
-    if {"date", "seg_id_nat"}.issubset(pred_data.columns):
-        pred_data.set_index(["date", "seg_id_nat"], inplace=True)
+
+    if {time_idx_name, spatial_idx_name}.issubset(pred_data.columns):
+        pred_data.set_index([time_idx_name, spatial_idx_name], inplace=True)
     obs = xr.open_zarr(obs_file).to_dataframe()
-    obs_cln = obs[[obs_var]]
-    obs_cln.columns = ["obs"]
-    preds = pred_data[[seg_var]]
-    preds.columns = ["pred"]
-    obs_cln_trim = trim_obs(obs_cln, preds)
-    combined = preds.join(obs_cln_trim)
-    return combined
+    variables_data = {}
+
+    for var_name in pred_data.columns:
+        obs_var = obs.copy()
+        obs_var = obs_var[[var_name]]
+        obs_var.columns = ["obs"]
+        preds_var = pred_data[[var_name]]
+        preds_var.columns = ["pred"]
+        # trimming obs to preds speeds up following join greatly
+        obs_var = trim_obs(obs_var, preds_var, spatial_idx_name, time_idx_name)
+        combined = preds_var.join(obs_var)
+        variables_data[var_name] = combined
+    return variables_data
 
 
 def plot_obs(prepped_data, variable, outfile, partition="trn"):
@@ -98,9 +108,9 @@ def plot_ts(pred_file, obs_file, variable, out_file):
 
 def prepped_array_to_df(data_array, dates, ids, col_names):
     """
-    convert prepped x or y data in numpy array to pandas df
+    convert prepped x or y_dataset data in numpy array to pandas df
     (reshape and make into pandas DFs)
-    :param data_array:[numpy array] array of x or y data [nbatch, seq_len,
+    :param data_array:[numpy array] array of x or y_dataset data [nbatch, seq_len,
     n_out]
     :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
     :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]

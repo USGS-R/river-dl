@@ -54,7 +54,7 @@ def train_model(
     of a reccurent element to be zero
     :param dropout: [float] value between 0 and 1 for the probability of an
     input element to be zero
-    :param num_tasks: [int] number of tasks (variables to be predicted)
+    :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
@@ -66,7 +66,6 @@ def train_model(
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data["dist_matrix"]
 
     n_seg = len(np.unique(io_data["ids_trn"]))
     if n_seg > 1:
@@ -83,6 +82,7 @@ def train_model(
             dropout=dropout,
         )
     elif model_type == "rgcn":
+        dist_matrix = io_data["dist_matrix"]
         model = RGCNModel(
             hidden_units,
             num_tasks=num_tasks,
@@ -147,12 +147,10 @@ def train_model(
     # finetune
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-        
-        
-        
+
         if model_type == "rgcn" and loss_type.lower()=="gw":
             #extract these for use in the GW loss function
-            temp_index = np.where(io_data['y_vars']=="seg_tave_water")[0]
+            temp_index = np.where(io_data['y_pre_vars']=="seg_tave_water")[0]
             temp_mean = io_data['y_mean'][temp_index]
             temp_sd = io_data['y_std'][temp_index]
             gw_mean = io_data['GW_mean']

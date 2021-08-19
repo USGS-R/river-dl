@@ -1,7 +1,7 @@
 {
     "chunks": [
         2,
-        761
+        1127
     ],
     "compressor": {
         "blocksize": 0,
@@ -10,13 +10,17 @@
         "id": "blosc",
         "shuffle": 1
     },
-    "dtype": "|S3",
+    "dtype": "|O",
     "fill_value": null,
-    "filters": null,
+    "filters": [
+        {
+            "id": "vlen-utf8"
+        }
+    ],
     "order": "C",
     "shape": [
         2,
-        761
+        1127
     ],
     "zarr_format": 2
 }

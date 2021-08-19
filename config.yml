@@ -1,15 +1,13 @@
 # Input files
-obs_flow: "data_DRB/obs_flow_subset"
-obs_temp: "data_DRB/obs_temp_subset"
-sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
-dist_matrix: "data_DRB/distance_matrix_subset.npz"
+obs_file: "../drb-dl-model/data/in/obs_flow_temp_subset"
+sntemp_file: "../drb-dl-model/data/in/uncal_sntemp_input_output_subset"
+dist_matrix: "../drb-dl-model/data/in/distance_matrix_subset.npz"
 
-out_dir: "output_DRB_test"
+out_dir: "out_103_test"
 
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-primary_variable: "temp"
 
 lambdas: [100,100]
 
@@ -29,6 +27,6 @@ test_end_date:
   - '1985-09-30'
   - '2021-09-30'
 
-pt_epochs: 20
-ft_epochs: 10
+pt_epochs: 2
+ft_epochs: 2
 hidden_size: 20

@@ -169,20 +169,27 @@ def train_model(
 
         if loss_type.lower()!="gw":
             y_trn_obs = io_data["y_obs_trn"]
+            model.fit(
+                x=x_trn_obs,
+                y=y_trn_obs,
+                epochs=finetune_epochs,
+                batch_size=batch_size,
+                callbacks=[csv_log_ft],
+            )
         else:
             air_unscaled = io_data['x_trn'][:,:,temp_air_index]*io_data['x_std'][temp_air_index] +io_data['x_mean'][temp_air_index]
             y_trn_obs = np.concatenate(
                 [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
             )
+            with tf.device('/CPU:0'):
+                model.fit(
+                    x=x_trn_obs,
+                    y=y_trn_obs,
+                    epochs=finetune_epochs,
+                    batch_size=batch_size,
+                    callbacks=[csv_log_ft],
+                )
 
-
-        model.fit(
-            x=x_trn_obs,
-            y=y_trn_obs,
-            epochs=finetune_epochs,
-            batch_size=batch_size,
-            callbacks=[csv_log_ft],
-        )
 
         model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 

@@ -26,9 +26,9 @@ def train_model(
     pretrain_epochs,
     finetune_epochs,
     hidden_units,
-    loss_func,
+    loss_func_ft,
     out_dir,
-    loss_func_ft = None,
+    loss_func_pre = None,
     model_type="rgcn",
     seed=None,
     dropout=0,
@@ -43,10 +43,10 @@ def train_model(
     :param pretrain_epochs: [int] number of pretrain epochs
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
-    :param loss_func: [function] loss function that the model will be fit to
+    :param loss_func_ft: [function] loss function that the model will be fit to
     :param out_dir: [str] directory where the output files should be written
-    :param loss_func_ft: [function] optional 2nd loss function to use for the 
-    finetune epochs, if None, loss_func will be used for both pretrain and 
+    :param loss_func_pre: [function] optional 2nd loss function to use for the 
+    pretrain epochs, if None, loss_func_ft will be used for both pretrain and 
     finetune
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
     'gru')
@@ -69,8 +69,8 @@ def train_model(
         print("Not using GPU")
     
     #use loss_func for both pretrain and finetune if loss_func_ft is not given
-    if loss_func_ft is None:
-        loss_func_ft = loss_func
+    if loss_func_pre is None:
+        loss_func_pre = loss_func_ft
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
@@ -127,7 +127,7 @@ def train_model(
         # combine with weights to pass to loss function
         y_trn_pre = io_data["y_pre_trn"]
 
-        model.compile(optimizer_pre, loss=loss_func)
+        model.compile(optimizer_pre, loss=loss_func_pre)
 
         csv_log_pre = tf.keras.callbacks.CSVLogger(
             

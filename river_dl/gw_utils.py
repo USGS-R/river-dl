@@ -53,7 +53,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
     try:
         model = sm.OLS(temp,X, missing='drop')
         results = model.fit()
-        
+
         if results.rsquared < r_thresh and isWater:
             amp=np.nan
             phi=np.nan
@@ -343,7 +343,7 @@ def prep_annual_signal_data(
     #data2['GW_cols']=GW_trn.columns.values.astype('str')
     #np.savez_compressed(out_file2, **data2)
 
-def calc_amp_phi(thisData, water_temp_pred_col = "seg_tave_water"):
+def calc_amp_phi(thisData, water_temp_pred_col = "temp_c"):
     """
     compiles temperature signal properties for predicted temperatures
     :param thisData: [dataset] dataset of predicted temperatures
@@ -431,7 +431,7 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     trn_preds = pd.read_feather(trn_data)
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
-    
+
     gw_trn = calc_amp_phi(trn_preds,"temp_c")
     gw_tst = calc_amp_phi(tst_preds,"temp_c")
     gw_val = calc_amp_phi(val_preds,"temp_c")

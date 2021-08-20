@@ -15,9 +15,8 @@ primary_variable: "temp"
 #weight of the loss for the secondary variable
 lambdas: [1,1]
 
-#lamb2 and lamb3 are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lamb2: 0.6
-lamb3: 0.6
+#lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
+lambdas_gw: [1, 1]
 
 
 train_start_date:
@@ -36,7 +35,7 @@ test_end_date:
   - '2021-09-30'
 
 
-pt_epochs: 5
-ft_epochs: 5
+pt_epochs: 200
+ft_epochs: 100
 
 hidden_size: 20

@@ -175,7 +175,7 @@ def kge_norm_loss(y_true, y_pred):
 def kge_loss(y_true, y_pred):
     return -1 * kge(y_true, y_pred)
 
-def weighted_masked_rmse_gw(loss_function_task, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=0.5,lamb_Ar=0, lamb_delPhi=0, num_task=2):
+def weighted_masked_rmse_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb_Ar=0, lamb_delPhi=0, num_task=2):
     """
     calculate a weighted, masked rmse that includes the groundwater terms
     :param lamb, lamb2, lamb3: [float] (short for lambda). The factor that the auxiliary loss, Ar loss, and deltaPhi loss
@@ -186,15 +186,13 @@ def weighted_masked_rmse_gw(loss_function_task, temp_index,temp_mean, temp_sd,gw
     """
 
     def rmse_masked_combined_gw(data, y_pred):
-        #rmse_main = rmse(data[:, :, 0], y_pred[:,:,0])
-        #rmse_aux = rmse(data[:, :, 1], y_pred[:,:,1])
-        
+     
         Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task)
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
 
-        #rmse_loss = rmse_main + lamb * rmse_aux + lamb_Ar*rmse_Ar +lamb_delPhi*rmse_delPhi
-        rmse_loss = loss_function_task(data[:,:,:num_task],y_pred) + lamb_Ar*rmse_Ar +lamb_delPhi*rmse_delPhi
+        
+        rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lamb_Ar*rmse_Ar +lamb_delPhi*rmse_delPhi
 
         tf.debugging.assert_all_finite(
             rmse_loss, 'Nans is a bad loss to have'

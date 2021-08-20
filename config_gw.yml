@@ -12,7 +12,6 @@ x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet
 gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
 primary_variable: "temp"
 
-#weight of the loss for the secondary variable
 lambdas: [1,1]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
@@ -35,7 +34,7 @@ test_end_date:
   - '2021-09-30'
 
 
-pt_epochs: 200
-ft_epochs: 100
+pt_epochs: 10
+ft_epochs: 10
 
 hidden_size: 20

@@ -2,6 +2,8 @@ import numpy as np
 import math as m
 import tensorflow as tf
 
+#from river_dl.train import train_model
+
 
 @tf.function
 def rmse(y_true, y_pred):
@@ -88,7 +90,7 @@ def multitask_kge(lambdas):
 
 def multitask_loss(lambdas, loss_func):
     """
-    calculate a weighted multi-task loss for a given number of variables with a
+    calculate a weighted multi-task loss for a given number of variables_to_log with a
     given loss function
     :param lambdas: [array-like float] The factor that losses will be
     multiplied by before being added together.
@@ -190,51 +192,60 @@ def weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean, gw_std, lamb=
         Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std)
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
-        
+
         rmse_loss = rmse_main + lamb * rmse_aux + lamb2*rmse_Ar +lamb3*rmse_delPhi
-        
+
+        tf.debugging.assert_all_finite(
+            rmse_loss, 'Nans is a bad loss to have'
+        )
         return rmse_loss
     return rmse_masked_combined_gw
 
-def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd,gw_mean, gw_std):
-    #assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
-    #assumes the first two columns of data are the observed flow and temperature, and the remaining 
-    #ones (extracted here) are the data for gw analysis
-    y_true = data[:, :, 2:]
-    y_pred_temp = y_pred[:,:,int(temp_index):(int(temp_index)+1)] #extract just the predicted temperature
-    #unscale the predicted temps prior to calculating the amplitude and phase
-    y_pred_temp = y_pred_temp*temp_sd+temp_mean
-    
-    x_lm = y_true[:,:,-2:] #extract the sin(wt) and cos(wt)
-    #a tensor of the sin(wt) and cos(wt) for each reach x day, the 1's are for the intercept of the linear regression
-    # T(t) = T_mean + a*sin(wt) + b*cos(wt)
-    # Johnson, Z.C., Johnson, B.G., Briggs, M.A., Snyder, C.D., Hitt, N.P., and Devine, W.D., 2021, Heed the data gap: Guidelines for 
-    #using incomplete datasets in annual stream temperature analyses: Ecological Indicators, v. 122, p. 107229, 
-    #http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
 
-    X_mat=tf.stack((tf.constant(1., shape=y_pred_temp[:,:,0].shape), x_lm[:,:,0],x_lm[:,:,1]),axis=1)
-    
-    #getting the coefficients using a 3-d version of the normal equation:
-    #https://cmdlinetips.com/2020/03/linear-regression-using-matrix-multiplication-in-python-using-numpy/
-    #http://mlwiki.org/index.php/Normal_Equation
-    X_mat_T = tf.transpose(X_mat,perm=(0,2,1))
-    X_mat_T_dot = tf.einsum('bij,bjk->bik',X_mat_T,X_mat)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
-    X_mat_inv = tf.linalg.pinv(X_mat_T_dot)
-    X_mat_inv_dot = tf.einsum('bij,bjk->bik',X_mat_inv,X_mat_T)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
-    a_b = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_pred_temp)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
-    
-    #the tensor a_b has the coefficients from the regression (reach x [[intercept],[a],[b]])
-    #Aw = amplitude of the water temp sinusoid (deg C)
-    #A = sqrt (a^2 + b^2)
-    Aw = tf.math.sqrt(a_b[:,1,0]**2+a_b[:,2,0]**2)
-    #Phiw = phase of the water temp sinusoid (radians)
-    #Phi = (3/2)* pi - atan (b/a) - in radians
-    Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
-    
-    #calculate and scale predicted values
-    #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-    delPhi_pred = ((Phiw-y_true[:,0,2])*365/(2*m.pi)-gw_mean[1])/gw_std[1]
-    #Ar_pred = the ratio of the water temp and air temp amplitudes
-    Ar_pred = (Aw/y_true[:,0,3]-gw_mean[0])/gw_std[0]
-    
-    return y_true[:,0,0], Ar_pred, y_true[:,0,1], delPhi_pred
+def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
+    # assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
+    # assumes the first two columns of data are the observed flow and temperature, and the remaining
+    # ones (extracted here) are the data for gw analysis
+    y_true = data[:, :, 2:]
+
+    y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
+    # unscale the predicted temps prior to calculating the amplitude and phase
+    y_pred_temp = y_pred_temp * temp_sd + temp_mean
+    y_pred_temp = tf.squeeze(y_pred_temp)
+    y_pred_mean = tf.reduce_mean(y_pred_temp, 1, keepdims=True)
+    temp_demean = y_pred_temp - y_pred_mean
+    fft_tf = tf.signal.rfft(temp_demean)
+    Phiw = tf.math.angle(fft_tf)
+    phiIndex = tf.argmax(tf.abs(fft_tf), 1)
+    idx = tf.stack(
+        [tf.reshape(tf.range(tf.shape(Phiw)[0]), (-1, 1)),
+         tf.reshape(tf.cast(phiIndex, tf.int32), (tf.shape(phiIndex)[0], 1))],
+        axis=-1)
+    Phiw_out = tf.squeeze(tf.gather_nd(Phiw, idx))
+
+    Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
+
+    y_true_air = y_true[:, :, -1]
+    y_true_air_mean = tf.reduce_mean(y_true_air, 1, keepdims=True)
+    air_demean = y_true_air - y_true_air_mean
+    fft_tf_air = tf.signal.rfft(air_demean)
+    Phia = tf.math.angle(fft_tf_air)
+
+    phiIndex_air = tf.argmax(tf.abs(fft_tf_air), 1)
+    ida = tf.stack(
+        [tf.reshape(tf.range(tf.shape(Phia)[0]), (-1, 1)),
+         tf.reshape(tf.cast(phiIndex_air, tf.int32), (tf.shape(phiIndex_air)[0], 1))],
+        axis=-1)
+    Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
+
+    Aa = tf.reduce_max(tf.abs(fft_tf_air), 1) / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
+
+    # calculate and scale predicted values
+    # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
+    delPhi_pred = ((Phiw_out - Phia_out) * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+    # Ar_pred = the ratio of the water temp and air temp amplitudes
+    Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
+
+    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
+
+

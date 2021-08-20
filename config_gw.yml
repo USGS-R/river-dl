@@ -1,10 +1,10 @@
 # Input files
-obs_flow: "data_DRB/obs_flow_subset"
-obs_temp: "data_DRB/obs_temp_subset"
+obs_file: "data_DRB/obs_temp_flow_subset"
 sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
 dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
-out_dir: "output_DRB_subset_test"
+out_dir: "output_DRB_test"
+
 
 code_dir: "river_dl"
 
@@ -13,11 +13,11 @@ gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
 primary_variable: "temp"
 
 #weight of the loss for the secondary variable
-lambda: 1
+lambdas: [1,1]
 
 #lamb2 and lamb3 are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lamb2: 1
-lamb3: 1
+lamb2: 0.6
+lamb3: 0.6
 
 
 train_start_date:
@@ -35,6 +35,8 @@ test_end_date:
   - '1985-09-30'
   - '2021-09-30'
 
-pt_epochs: 10
+
+pt_epochs: 5
 ft_epochs: 5
+
 hidden_size: 20

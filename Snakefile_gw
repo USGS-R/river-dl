@@ -5,7 +5,7 @@
 import os
 import numpy as np
 
-from river_dl.preproc_utils import prep_data
+from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
@@ -45,14 +45,21 @@ use rule all from other_workflow as other_all with:
         ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
+        expand("{outdir}/config_gw.yml", outdir=out_dir),
 
-
+rule copy_config:
+    output:
+        "{outdir}/config_gw.yml"
+    shell:
+        """
+        scp config_gw.yml {output[0]}
+        """
 
         
  
 rule prep_ann_temp:
     input:
-         config['obs_temp'],
+         config['obs_file'],
          config['sntemp_file'],
          "{outdir}/prepped.npz",
     output:
@@ -92,14 +99,15 @@ rule prep_ann_temp:
 #        """
 
 #get the GW loss parameters
-def get_gw_loss(input_data, temp_var="seg_tave_water"):
+def get_gw_loss(input_data, temp_var="temp_c"):
     io_data=np.load(input_data)
-    temp_index = np.where(io_data['y_vars']==temp_var)[0]
+    temp_index = np.where(io_data['y_obs_vars']==temp_var)[0]
     temp_mean = io_data['y_mean'][temp_index]
     temp_sd = io_data['y_std'][temp_index]
     gw_mean = io_data['GW_mean']
     gw_std = io_data['GW_std']
-    return lf.weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=config['lambda'],lamb2=config['lamb2'],lamb3=config['lamb3'])
+    return lf.weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=config['lambdas'][1],lamb2=config['lamb2'],lamb3=config['lamb3'])
+
  
 # use "train_model" if wanting to use CPU or local GPU
 rule train_model_local_or_cpu:
@@ -113,10 +121,7 @@ rule train_model_local_or_cpu:
         # I omit the last slash (hence '[:-1]' so the split works properly
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
-        train_model(input[0],config['pt_epochs'], config['ft_epochs'], other_workflow.config['hidden_size'],
-                    loss_func=loss_function, loss_func_ft = get_gw_loss(input[0]),out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
-
-
+        train_model(input[0],config['pt_epochs'], config['ft_epochs'], other_workflow.config['hidden_size'],loss_func=loss_function, loss_func_ft = get_gw_loss(input[0]),out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
 
                  
 rule compile_pred_GW_stats:

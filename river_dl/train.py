@@ -30,11 +30,8 @@ def train_model(
     out_dir,
     loss_func_ft = None,
     model_type="rgcn",
-    loss_type="GW",
     seed=None,
     dropout=0,
-    lamb2=0,
-    lamb3=0,
     recurrent_dropout=0,
     num_tasks=1,
     learning_rate_pre=0.005,
@@ -58,11 +55,14 @@ def train_model(
     of a reccurent element to be zero
     :param dropout: [float] value between 0 and 1 for the probability of an
     input element to be zero
-    :param num_tasks: [int] number of tasks (variables to be predicted)
+    :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
     :param learning_rate_pre: [float] the pretrain learning rate
     :param learning_rate_ft: [float] the finetune learning rate
     :return: [tf model]  finetuned model
     """
+
+
+
     if tf.test.gpu_device_name():
         print("Default GPU Device: {}".format(tf.test.gpu_device_name()))
     else:
@@ -74,7 +74,6 @@ def train_model(
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
-    dist_matrix = io_data["dist_matrix"]
 
     n_seg = len(np.unique(io_data["ids_trn"]))
     if n_seg > 1:
@@ -91,6 +90,7 @@ def train_model(
             dropout=dropout,
         )
     elif model_type == "rgcn":
+        dist_matrix = io_data["dist_matrix"]
         model = RGCNModel(
             hidden_units,
             num_tasks=num_tasks,
@@ -155,11 +155,9 @@ def train_model(
     # finetune
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
-        
-        
-        
 
         model.compile(optimizer_ft, loss=loss_func_ft)
+
 
         csv_log_ft = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
@@ -167,21 +165,33 @@ def train_model(
 
         x_trn_obs = io_data["x_trn"]
 
+
         if "GW_trn_reshape" in io_data.files:
+            temp_air_index = np.where(io_data['x_vars']=='seg_tave_air')[0]
+            air_unscaled = io_data['x_trn'][:,:,temp_air_index]*io_data['x_std'][temp_air_index] +io_data['x_mean'][temp_air_index]
             y_trn_obs = np.concatenate(
-                [io_data["y_obs_trn"], io_data["GW_trn_reshape"]], axis=2
+                [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
             )
+            
+            with tf.device('/CPU:0'):
+                model.fit(
+                    x=x_trn_obs,
+                    y=y_trn_obs,
+                    epochs=finetune_epochs,
+                    batch_size=batch_size,
+                    callbacks=[csv_log_ft],
+                )
         else:
             y_trn_obs = io_data["y_obs_trn"]
+            model.fit(
+                x=x_trn_obs,
+                y=y_trn_obs,
+                epochs=finetune_epochs,
+                batch_size=batch_size,
+                callbacks=[csv_log_ft],
+            )
+        
 
-
-        model.fit(
-            x=x_trn_obs,
-            y=y_trn_obs,
-            epochs=finetune_epochs,
-            batch_size=batch_size,
-            callbacks=[csv_log_ft],
-        )
 
         model.save_weights(os.path.join(out_dir, f"trained_weights/"))
 
@@ -190,7 +200,7 @@ def train_model(
     with open(out_time_file, "a") as f:
         f.write(
             f"elapsed time finetune:\
-                 {finetune_time_elapsed} \nloss type: {loss_type}\n"
+                 {finetune_time_elapsed} \nloss type: gw\n"
         )
 
     return model

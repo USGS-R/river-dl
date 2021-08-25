@@ -1,15 +1,15 @@
 # Input files
-obs_file: "../drb-dl-model/data/in/obs_flow_temp_subset"
-sntemp_file: "../drb-dl-model/data/in/uncal_sntemp_input_output_subset"
-dist_matrix: "../drb-dl-model/data/in/distance_matrix_subset.npz"
+obs_file: "data_DRB/obs_temp_flow_subset"
+sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
+dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
-out_dir: "out_103_test"
+out_dir: "output_DRB_test"
 
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 
-lambdas: [100,100]
+lambdas: [1,1]
 
 
 train_start_date:

@@ -26,15 +26,12 @@ def train_model(
     pretrain_epochs,
     finetune_epochs,
     hidden_units,
-    loss_func,
+    loss_func_ft,
     out_dir,
+    loss_func_pre = None,
     model_type="rgcn",
-    loss_type="GW",
     seed=None,
     dropout=0,
-    lamb1=0,
-    lamb2=0,
-    lamb3=0,
     recurrent_dropout=0,
     num_tasks=1,
     learning_rate_pre=0.005,
@@ -46,8 +43,11 @@ def train_model(
     :param pretrain_epochs: [int] number of pretrain epochs
     :param finetune_epochs: [int] number of finetune epochs
     :param hidden_units: [int] number of hidden layers
-    :param loss_func: [function] loss function that the model will be fit to
+    :param loss_func_ft: [function] loss function that the model will be fit to
     :param out_dir: [str] directory where the output files should be written
+    :param loss_func_pre: [function] optional 2nd loss function to use for the 
+    pretrain epochs, if None, loss_func_ft will be used for both pretrain and 
+    finetune
     :param model_type: [str] which model to use (either 'lstm', 'rgcn', or
     'gru')
     :param seed: [int] random seed
@@ -67,6 +67,10 @@ def train_model(
         print("Default GPU Device: {}".format(tf.test.gpu_device_name()))
     else:
         print("Not using GPU")
+    
+    #use loss_func for both pretrain and finetune if loss_func_ft is not given
+    if loss_func_pre is None:
+        loss_func_pre = loss_func_ft
 
     start_time = datetime.datetime.now()
     io_data = get_data_if_file(io_data)
@@ -123,7 +127,7 @@ def train_model(
         # combine with weights to pass to loss function
         y_trn_pre = io_data["y_pre_trn"]
 
-        model.compile(optimizer_pre, loss=loss_func)
+        model.compile(optimizer_pre, loss=loss_func_pre)
 
         csv_log_pre = tf.keras.callbacks.CSVLogger(
             
@@ -152,19 +156,8 @@ def train_model(
     if finetune_epochs > 0:
         optimizer_ft = tf.optimizers.Adam(learning_rate=learning_rate_ft)
 
-        if model_type == "rgcn" and loss_type.lower()=="gw":
-            #extract these for use in the GW loss function
-            temp_index = np.where(io_data['y_pre_vars']=="seg_tave_water")[0]
-            temp_mean = io_data['y_mean'][temp_index]
-            temp_sd = io_data['y_std'][temp_index]
-            gw_mean = io_data['GW_mean']
-            gw_std = io_data['GW_std']
-            temp_air_index = np.where(io_data['x_cols']=='seg_tave_air')[0]
- 
-            model.compile(optimizer_ft, loss=weighted_masked_rmse_gw(temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lamb=lamb1,lamb2=lamb2,lamb3=lamb3))
+        model.compile(optimizer_ft, loss=loss_func_ft)
 
-        elif model_type == "rgcn":
-            model.compile(optimizer_ft, loss=loss_func)
 
         csv_log_ft = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
@@ -172,20 +165,14 @@ def train_model(
 
         x_trn_obs = io_data["x_trn"]
 
-        if loss_type.lower()!="gw":
-            y_trn_obs = io_data["y_obs_trn"]
-            model.fit(
-                x=x_trn_obs,
-                y=y_trn_obs,
-                epochs=finetune_epochs,
-                batch_size=batch_size,
-                callbacks=[csv_log_ft],
-            )
-        else:
+
+        if "GW_trn_reshape" in io_data.files:
+            temp_air_index = np.where(io_data['x_vars']=='seg_tave_air')[0]
             air_unscaled = io_data['x_trn'][:,:,temp_air_index]*io_data['x_std'][temp_air_index] +io_data['x_mean'][temp_air_index]
             y_trn_obs = np.concatenate(
                 [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
             )
+            
             with tf.device('/CPU:0'):
                 model.fit(
                     x=x_trn_obs,
@@ -194,6 +181,16 @@ def train_model(
                     batch_size=batch_size,
                     callbacks=[csv_log_ft],
                 )
+        else:
+            y_trn_obs = io_data["y_obs_trn"]
+            model.fit(
+                x=x_trn_obs,
+                y=y_trn_obs,
+                epochs=finetune_epochs,
+                batch_size=batch_size,
+                callbacks=[csv_log_ft],
+            )
+        
 
 
         model.save_weights(os.path.join(out_dir, f"trained_weights/"))
@@ -203,7 +200,7 @@ def train_model(
     with open(out_time_file, "a") as f:
         f.write(
             f"elapsed time finetune:\
-                 {finetune_time_elapsed} \nloss type: {loss_type}\n"
+                 {finetune_time_elapsed} \nloss type: gw\n"
         )
 
     return model

@@ -80,7 +80,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
+                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
 
 rule make_predictions:
     input:

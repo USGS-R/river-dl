@@ -32,8 +32,8 @@ rule prep_io_data:
                   y_data_file=input[1],
                   distfile=input[2],
                   x_vars=config['x_vars'],
-                  y_vars_pretrain=['seg_tave_water', 'seg_outflow'],
-                  y_vars_finetune=['temp_c', 'discharge_cms'],
+                  y_vars_pretrain=config['y_vars_pretrain'],
+                  y_vars_finetune=config['y_vars_finetune'],
                   catch_prop_file=None,
                   exclude_file=None,
                   train_start_date=config['train_start_date'],
@@ -80,7 +80,7 @@ rule train_model_local_or_cpu:
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=2)
+                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']))
 
 rule make_predictions:
     input:
@@ -94,7 +94,7 @@ rule make_predictions:
         predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
-                             num_tasks=2)
+                             num_tasks=len(config['y_vars_finetune']))
 
 
 def get_grp_arg(wildcards):

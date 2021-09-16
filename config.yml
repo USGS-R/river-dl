@@ -1,18 +1,22 @@
 # Input files
-obs_file: "data_DRB/obs_temp_flow_full"
-sntemp_file: "data_DRB/sntemp_inputs_outputs_drb"
-dist_matrix: "data_DRB/distance_matrix.npz"
+obs_file: "data_DRB/Obs_temp_flow_drb_full"
+sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full"
+dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
-out_dir: "output_DRB_updatedInputs_repeated_base"
+out_dir: "output_DRB_test"
 
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 
-y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
-y_vars_finetune: ['temp_c', 'discharge_cms']
+y_vars_pretrain: ['seg_tave_water']
+#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
 
-lambdas: [1,0]
+y_vars_finetune: ['temp_c']
+#y_vars_finetune: ['temp_c', 'discharge_cms']
+
+lambdas: [1]
+#lambdas: [1,0]
 
 
 train_start_date:

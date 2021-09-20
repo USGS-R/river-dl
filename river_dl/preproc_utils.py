@@ -536,6 +536,11 @@ def prep_y_data(
 
     y_data = read_obs(y_data_file, y_vars, x_data)
 
+    if 'seg_tave_water' in y_data:
+        y_data['seg_tave_water'].values=np.where(y_data['seg_tave_water'].values< -90,np.nan,y_data['seg_tave_water'].values)
+        y_data['seg_tave_water'].values=np.where(y_data['seg_tave_water'].values> 40,np.nan,y_data['seg_tave_water'].values)
+
+
     y_trn, y_val, y_tst = separate_trn_tst(
         y_data,
         time_idx_name,

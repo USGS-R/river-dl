@@ -1,8 +1,7 @@
 # Input files
-obs_file: "data_DRB/Obs_temp_flow_drb_full_no3558"
-sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
-dist_matrix: "data_DRB/distance_matrix_drb_full_no3558.npz"
-reach_attr_file: "data_DRB/reach_attributes_drb.csv"
+obs_file: "data_DRB/obs_temp_flow_subset"
+sntemp_file: "data_DRB/uncal_sntemp_input_output_subset"
+dist_matrix: "data_DRB/distance_matrix_subset.npz"
 
 out_dir: "output_DRB_test"
 
@@ -11,32 +10,22 @@ code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
-y_vars_pretrain: ['seg_tave_water']
-#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
+primary_variable: "temp"
 
-y_vars_finetune: ['temp_c']
-#y_vars_finetune: ['temp_c', 'discharge_cms']
-
-lambdas: [1]
+lambdas: [1,1]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
 lambdas_gw: [1, 1]
 
 
 train_start_date:
-  - '1984-10-01'
-  - '2015-10-01'
+  - '1985-10-01'
+  - '2016-10-01'
 train_end_date:
-  - '2010-09-30'
+  - '2006-09-30'
   - '2020-09-30'
-val_start_date:
-  - '1979-10-01'
-  - '2010-10-01'
-  - '2020-10-01'
-val_end_date:
-  - '1984-09-30'
-  - '2015-09-30'
-  - '2021-09-30'
+val_start_date: '2006-10-01'
+val_end_date: '2016-09-30'
 test_start_date:
   - '1980-10-01'
   - '2020-10-01'

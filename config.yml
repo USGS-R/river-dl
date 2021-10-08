@@ -1,46 +1,34 @@
 # Input files
-obs_file: "data_DRB/obs_temp_full_prior"
-sntemp_file: "data_DRB/uncal_sntemp_input_output_prior"
+obs_file: "data_DRB/obs_temp_flow_full"
+sntemp_file: "data_DRB/sntemp_inputs_outputs_drb"
 dist_matrix: "data_DRB/distance_matrix.npz"
 
-
-out_dir: "output_DRB_test_master_single_priorInputs"
+out_dir: "output_DRB_updatedInputs_repeated_base"
 
 code_dir: "river_dl"
 
 x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 
-y_vars_pretrain: ['seg_tave_water']
-#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
+y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
+y_vars_finetune: ['temp_c', 'discharge_cms']
 
-y_vars_finetune: ['temp_c']
-#y_vars_finetune: ['temp_c', 'discharge_cms']
-
-lambdas: [1]
-#lambdas: [1,0]
+lambdas: [1,0]
 
 
 train_start_date:
-  - '1984-10-01'
-  - '2015-10-01'
+  - '1985-10-01'
+  - '2016-10-01'
 train_end_date:
-  - '2010-09-30'
+  - '2006-09-30'
   - '2020-09-30'
-val_start_date:
-  - '1979-10-01'
-  - '2010-10-01'
-  - '2020-10-01'
-val_end_date:
-  - '1984-09-30'
-  - '2015-09-30'
-  - '2021-09-30'
+val_start_date: '2006-10-01'
+val_end_date: '2016-09-30'
 test_start_date:
   - '1980-10-01'
   - '2020-10-01'
 test_end_date:
   - '1985-09-30'
   - '2021-09-30'
-
 
 pt_epochs: 200
 ft_epochs: 100

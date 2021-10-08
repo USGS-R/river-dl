@@ -17,24 +17,12 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
-        expand("{outdir}/config.yml",
-                outdir = out_dir,
-        )
-
-
-rule copy_config:
-    output:
-        "{outdir}/config.yml"
-    shell:
-        """
-        scp config.yml {output[0]}
-        """
 
 rule prep_io_data:
     input:
-        config['sntemp_file'],
-        config['obs_file'],
-        config['dist_matrix'],
+         config['sntemp_file'],
+         config['obs_file'],
+         config['dist_matrix'],
     output:
         "{outdir}/prepped.npz"
     run:
@@ -122,20 +110,20 @@ def get_grp_arg(wildcards):
 
 rule combine_metrics:
     input:
-       config['obs_file'],
-       "{outdir}/trn_preds.feather",
-       "{outdir}/val_preds.feather"
+         config['obs_file'],
+         "{outdir}/trn_preds.feather",
+         "{outdir}/val_preds.feather"
     output:
-       "{outdir}/{metric_type}_metrics.csv"
+         "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'
     params:
-       grp_arg = get_grp_arg
+        grp_arg = get_grp_arg
     run:
-       combined_metrics(obs_file=input[0],
-                             pred_trn=input[1],
-                             pred_val=input[2],
-                             group=params.grp_arg,
-                             outfile=output[0])
+        combined_metrics(obs_file=input[0],
+                         pred_trn=input[1],
+                         pred_val=input[2],
+                         group=params.grp_arg,
+                         outfile=output[0])
 
 
 rule plot_prepped_data:
@@ -145,4 +133,4 @@ rule plot_prepped_data:
         "{outdir}/{variable}_{partition}.png",
     run:
         plot_obs(input[0], wildcards.variable, output[0],
-                             partition=wildcards.partition)
+                 partition=wildcards.partition)

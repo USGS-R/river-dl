@@ -96,7 +96,7 @@ def predict_from_io_data(
         num_tasks=num_tasks,
     )
 
-    if partition != "trn":
+    if partition == "trn":
         keep_frac = 1
     else:
         keep_frac = 0.5

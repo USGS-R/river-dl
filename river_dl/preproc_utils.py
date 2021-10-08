@@ -495,6 +495,8 @@ def prep_y_data(
     y_type="obs",
     y_std=None,
     y_mean=None,
+    trn_offset = 1.0,
+    tst_val_offset = 1.0
 ):
     """
     prepare y_dataset data
@@ -526,6 +528,8 @@ def prep_y_data(
     :param y_type: [str] "obs" if observations or "pre" if pretraining
     :param y_std: [array-like] standard deviations of y_dataset variables_to_log
     :param y_mean: [array-like] means of y_dataset variables_to_log
+    :param trn_offset: [str] value for the training offset
+    :param tst_val_offset: [str] value for the testing and validation offset
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
     """
@@ -568,16 +572,16 @@ def prep_y_data(
 
     data = {
         f"y_{y_type}_trn": convert_batch_reshape(
-            y_trn, spatial_idx_name, time_idx_name, seq_len=seq_len
+            y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
         ),
         f"y_{y_type}_wgts": convert_batch_reshape(
-            y_wgts, spatial_idx_name, time_idx_name, seq_len=seq_len
+            y_wgts, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
         ),
         f"y_{y_type}_val": convert_batch_reshape(
-            y_val, spatial_idx_name, time_idx_name, offset=0.5, seq_len=seq_len
+            y_val, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
         ),
         f"y_{y_type}_tst": convert_batch_reshape(
-            y_tst, spatial_idx_name, time_idx_name, offset=0.5, seq_len=seq_len
+            y_tst, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
         ),
         "y_std": y_std.to_array().values,
         "y_mean": y_mean.to_array().values,
@@ -611,6 +615,8 @@ def prep_all_data(
     out_file=None,
     segs=None,
     normalize_y=True,
+    trn_offset = 1.0,
+    tst_val_offset = 1.0
 ):
     """
     prepare input and output data for DL model training read in and process
@@ -659,6 +665,8 @@ def prep_all_data(
     :param segs: [list-like] which segments to prepare the data for
     :param normalize_y: [bool] whether or not to normalize the y_dataset values
     :param out_file: [str] file to where the values will be written
+    :param trn_offset: [str] value for the training offset
+    :param tst_val_offset: [str] value for the testing and validation offset
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             "x_trn": x training data
@@ -723,20 +731,21 @@ def prep_all_data(
 
     x_data_dict = {
         "x_trn": convert_batch_reshape(
-            x_trn_scl, spatial_idx_name, time_idx_name, seq_len=seq_len
+            x_trn_scl, spatial_idx_name, time_idx_name, seq_len=seq_len,
+            offset=trn_offset,
         ),
         "x_val": convert_batch_reshape(
             x_val_scl,
             spatial_idx_name,
             time_idx_name,
-            offset=0.5,
+            offset=tst_val_offset,
             seq_len=seq_len,
         ),
         "x_tst": convert_batch_reshape(
             x_tst_scl,
             spatial_idx_name,
             time_idx_name,
-            offset=0.5,
+            offset=tst_val_offset,
             seq_len=seq_len,
         ),
         "x_std": x_std.to_array().values,
@@ -747,6 +756,7 @@ def prep_all_data(
             spatial_idx_name,
             spatial_idx_name,
             time_idx_name,
+            offset=trn_offset,
             seq_len=seq_len,
         ),
         "times_trn": coord_as_reshaped_array(
@@ -754,6 +764,7 @@ def prep_all_data(
             time_idx_name,
             spatial_idx_name,
             time_idx_name,
+            offset=trn_offset,
             seq_len=seq_len,
         ),
         "ids_val": coord_as_reshaped_array(
@@ -761,7 +772,7 @@ def prep_all_data(
             spatial_idx_name,
             spatial_idx_name,
             time_idx_name,
-            offset=0.5,
+            offset=tst_val_offset,
             seq_len=seq_len,
         ),
         "times_val": coord_as_reshaped_array(
@@ -769,7 +780,7 @@ def prep_all_data(
             time_idx_name,
             spatial_idx_name,
             time_idx_name,
-            offset=0.5,
+            offset=tst_val_offset,
             seq_len=seq_len,
         ),
         "ids_tst": coord_as_reshaped_array(
@@ -777,7 +788,7 @@ def prep_all_data(
             spatial_idx_name,
             spatial_idx_name,
             time_idx_name,
-            offset=0.5,
+            offset=tst_val_offset,
             seq_len=seq_len,
         ),
         "times_tst": coord_as_reshaped_array(
@@ -785,7 +796,7 @@ def prep_all_data(
             time_idx_name,
             spatial_idx_name,
             time_idx_name,
-            offset=0.5,
+            offset=tst_val_offset,
             seq_len=seq_len,
         ),
     }
@@ -817,6 +828,8 @@ def prep_all_data(
             exclude_file=exclude_file,
             normalize_y=normalize_y,
             y_type="obs",
+            trn_offset = trn_offset,
+            tst_val_offset = tst_val_offset
         )
         # if there is a y_data_file and a pretrain file, use the observation
         # mean and standard deviation to do the scaling/centering
@@ -840,6 +853,8 @@ def prep_all_data(
                 y_type="pre",
                 y_std=y_obs_data["y_std"],
                 y_mean=y_obs_data["y_mean"],
+                trn_offset = trn_offset,
+                tst_val_offset = tst_val_offset
             )
     # if there is no observation file, use the pretrain mean and standard dev
     # to do the scaling/centering
@@ -861,6 +876,8 @@ def prep_all_data(
             exclude_file=exclude_file,
             normalize_y=normalize_y,
             y_type="pre",
+            trn_offset = trn_offset,
+            tst_val_offset = tst_val_offset
         )
     else:
         raise Warning("No y_dataset data was provided")

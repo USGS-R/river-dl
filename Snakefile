@@ -32,8 +32,8 @@ rule copy_config:
 def asRunConfig(config, outFile):
     #store some run parameters
     config['runDate']=date.today().strftime("%m/%d/%y")
-    config['gitBranch']=[x.strip().replace("* ","") for x in subprocess.check_output(["git","branch"], cwd=os.path.realpath("")).strip().decode().split("\n") if x.strip().startswith("*")][0]
-    config['gitCommit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=os.path.realpath("")).strip().decode()
+    config['gitBranch']=[x.strip().replace("* ","") for x in subprocess.check_output(["git","branch"], cwd=os.getcwd()).strip().decode().split("\n") if x.strip().startswith("*")][0]
+    config['gitCommit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=os.getcwd()).strip().decode()
     with open(outFile,'w') as f:
         yaml.dump(config, f, default_flow_style=False)
 

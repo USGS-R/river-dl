@@ -1,4 +1,5 @@
-import os
+import os, subprocess, yaml
+from datetime import date
 
 from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
@@ -15,11 +16,9 @@ rule all:
     input:
         expand("{outdir}/{metric_type}_metrics.csv",
                 outdir=out_dir,
-                metric_type=['overall', 'month', 'reach', 'month_reach'],
-        ),
-        expand("{outdir}/config.yml",
-                outdir = out_dir,
-        )
+                metric_type=['overall', 'month', 'reach', 'month_reach']),
+        expand("{outdir}/config.yml", outdir=out_dir),
+        expand("{outdir}/asRunConfig.yml", outdir=out_dir),
 
 
 rule copy_config:
@@ -29,6 +28,21 @@ rule copy_config:
         """
         scp config.yml {output[0]}
         """
+
+def asRunConfig(config, outFile):
+    #store some run parameters
+    config['runDate']=date.today().strftime("%m/%d/%y")
+    config['gitBranch']=[x.strip().replace("* ","") for x in subprocess.check_output(["git","branch"], cwd=os.path.realpath("")).strip().decode().split("\n") if x.strip().startswith("*")][0]
+    config['gitCommit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=os.path.realpath("")).strip().decode()
+    with open(outFile,'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+
+
+rule as_run_config:
+    output:
+        "{outdir}/asRunConfig.yml"
+    run:
+        asRunConfig(config,output[0])
 
 rule prep_io_data:
     input:

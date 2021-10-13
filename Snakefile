@@ -32,8 +32,9 @@ rule copy_config:
 def asRunConfig(config, outFile):
     #store some run parameters
     config['runDate']=date.today().strftime("%m/%d/%y")
-    config['gitBranch']=[x.strip().replace("* ","") for x in subprocess.check_output(["git","branch"], cwd=os.getcwd()).strip().decode().split("\n") if x.strip().startswith("*")][0]
-    config['gitCommit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=os.getcwd()).strip().decode()
+    print(os.getcwd())
+    config['gitBranch']=[x.strip().replace("* ","") for x in subprocess.check_output(["git","branch"], cwd=os.path.realpath("")).strip().decode().split("\n") if x.strip().startswith("*")][0]
+    config['gitCommit'] = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=os.path.realpath("")).strip().decode()
     with open(outFile,'w') as f:
         yaml.dump(config, f, default_flow_style=False)
 
@@ -46,9 +47,9 @@ rule as_run_config:
 
 rule prep_io_data:
     input:
-        config['sntemp_file'],
-        config['obs_file'],
-        config['dist_matrix'],
+         config['sntemp_file'],
+         config['obs_file'],
+         config['dist_matrix'],
     output:
         "{outdir}/prepped.npz"
     run:
@@ -122,7 +123,8 @@ rule make_predictions:
         predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
-                             num_tasks=len(config['y_vars_finetune']),trn_offset = config['trn_offset'],
+                             num_tasks=len(config['y_vars_finetune']),
+                             trn_offset = config['trn_offset'],
                              tst_val_offset = config['tst_val_offset'])
 
 
@@ -139,20 +141,20 @@ def get_grp_arg(wildcards):
 
 rule combine_metrics:
     input:
-       config['obs_file'],
-       "{outdir}/trn_preds.feather",
-       "{outdir}/val_preds.feather"
+         config['obs_file'],
+         "{outdir}/trn_preds.feather",
+         "{outdir}/val_preds.feather"
     output:
-       "{outdir}/{metric_type}_metrics.csv"
+         "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'
     params:
-       grp_arg = get_grp_arg
+        grp_arg = get_grp_arg
     run:
-       combined_metrics(obs_file=input[0],
-                             pred_trn=input[1],
-                             pred_val=input[2],
-                             group=params.grp_arg,
-                             outfile=output[0])
+        combined_metrics(obs_file=input[0],
+                         pred_trn=input[1],
+                         pred_val=input[2],
+                         group=params.grp_arg,
+                         outfile=output[0])
 
 
 rule plot_prepped_data:
@@ -162,4 +164,4 @@ rule plot_prepped_data:
         "{outdir}/{variable}_{partition}.png",
     run:
         plot_obs(input[0], wildcards.variable, output[0],
-                             partition=wildcards.partition)
+                 partition=wildcards.partition)

@@ -69,7 +69,9 @@ rule prep_io_data:
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'],
                   segs=None,
-                  out_file=output[0])
+                  out_file=output[0],
+                  trn_offset = config['trn_offset'],
+                  tst_val_offset = config['tst_val_offset'])
 
 
 # use "train" if wanting to use GPU on HPC

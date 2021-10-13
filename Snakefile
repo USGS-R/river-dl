@@ -122,7 +122,8 @@ rule make_predictions:
         predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
                              hidden_size=config['hidden_size'], io_data=input[1],
                              partition=wildcards.partition, outfile=output[0],
-                             num_tasks=len(config['y_vars_finetune']))
+                             num_tasks=len(config['y_vars_finetune']),trn_offset = config['trn_offset'],
+                             tst_val_offset = config['tst_val_offset'])
 
 
 def get_grp_arg(wildcards):

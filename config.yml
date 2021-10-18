@@ -5,7 +5,7 @@ sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
 dist_matrix: "data_DRB/distance_matrix_drb_full_no3558.npz"
 
 
-out_dir: "output_DRB_offsetTest_2021_10_12_master_tempOnly"
+out_dir: "output_DRB_master_05_repeated"
 
 
 code_dir: "river_dl"
@@ -27,19 +27,23 @@ y_vars_finetune: ['temp_c']
 lambdas: [1]
 #lambdas: [1,0]
 
-trn_offset: 1.0
-tst_val_offset: 1.0
+trn_offset: 0.5
+tst_val_offset: 0.5
 
 train_start_date:
-  - '1979-10-01'
-  - '2010-10-01'
+  - '1984-10-01'
+  - '2015-10-01'
 train_end_date:
-  - '2004-09-30'
+  - '2010-09-30'
   - '2020-09-30'
 val_start_date:
-  - '2004-10-01'
+  - '1979-10-01'
+  - '2010-10-01'
+  - '2020-10-01'
 val_end_date:
-  - '2010-09-30'
+  - '1984-09-30'
+  - '2015-09-30'
+  - '2021-09-30'
 test_start_date:
   - '1980-10-01'
   - '2020-10-01'

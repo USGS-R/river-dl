@@ -12,7 +12,7 @@ from copy import deepcopy
 from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
 
-def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
+def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     """
     calculate the annual signal properties (phase and amplitude) for a temperature times series
     :param Date: vector of dates
@@ -54,7 +54,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
         model = sm.OLS(temp,X, missing='drop')
         results = model.fit()
 
-        if results.rsquared < r_thresh and isWater:
+        if results.rsquared < r_thresh and isWater and tempType=="obs":
             amp=np.nan
             phi=np.nan
             amp_low=np.nan
@@ -350,7 +350,7 @@ def prep_annual_signal_data(
     #data2['GW_cols']=GW_trn.columns.values.astype('str')
     #np.savez_compressed(out_file2, **data2)
 
-def calc_amp_phi(thisData, water_temp_pred_col = "temp_c"):
+def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="obs"):
     """
     compiles temperature signal properties for predicted temperatures
     :param thisData: [dataset] dataset of predicted temperatures
@@ -360,7 +360,7 @@ def calc_amp_phi(thisData, water_temp_pred_col = "temp_c"):
     water_amp_preds = []
     water_phi_preds = []
     for thisSeg in segList:
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True, tempType = tempType)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
@@ -439,9 +439,9 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
 
-    gw_trn = calc_amp_phi(trn_preds,"temp_c")
-    gw_tst = calc_amp_phi(tst_preds,"temp_c")
-    gw_val = calc_amp_phi(val_preds,"temp_c")
+    gw_trn = calc_amp_phi(trn_preds,"temp_c","pred")
+    gw_tst = calc_amp_phi(tst_preds,"temp_c","pred")
+    gw_val = calc_amp_phi(val_preds,"temp_c","pred")
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)

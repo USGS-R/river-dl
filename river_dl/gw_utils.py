@@ -261,7 +261,9 @@ def prep_annual_signal_data(
     water_temp_pbm_col = 'seg_tave_water',
     water_temp_obs_col = 'temp_c',
     segs = None,
-    reach_file = None
+    reach_file = None,
+    trn_offset = 1.0,
+    tst_val_offset = 1.0
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -277,6 +279,8 @@ def prep_annual_signal_data(
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
     :param reach_file: str with the file of reach attributes
+    :param trn_offset: [str] value for the training offset
+    :param tst_val_offset: [str] value for the testing and validataion offset
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -328,9 +332,9 @@ def prep_annual_signal_data(
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
 
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList)
-    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList)
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList, offset = trn_offset)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList, offset = tst_val_offset)
+    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList, offset = tst_val_offset)
 
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
@@ -397,7 +401,7 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     obsDF['delPhi_pred'] = (obsDF['water_phi_pred']-obsDF['air_phi'])*365/(2*math.pi)
     return obsDF
 
-def make_GW_dataset (GW_data,x_data,varList):
+def make_GW_dataset (GW_data,x_data,varList, offset = 1.0):
     """
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
     :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
@@ -422,7 +426,7 @@ def make_GW_dataset (GW_data,x_data,varList):
     obs2.append(prod.set_index(['date','seg_id_nat']).to_xarray())
     GW_ds = xr.merge(obs2, join="left")
     GW_ds = GW_ds[varList]
-    GW_Arr = convert_batch_reshape(GW_ds)
+    GW_Arr = convert_batch_reshape(GW_ds, offset = offset)
     
     return GW_Arr
     

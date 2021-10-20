@@ -19,6 +19,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     :param temp: vector of temperatures
     :param isWater: boolean indicator if the temp data is water temps (versus air)
     :param r_thresh: minimum R2 for the water linear regressions (otherwise NA is returned for regression coefficients)
+    :param tempType: type of temperature "obs" or "pred"
     :returns: amplitude and phase
     """
 
@@ -350,7 +351,7 @@ def prep_annual_signal_data(
     #data2['GW_cols']=GW_trn.columns.values.astype('str')
     #np.savez_compressed(out_file2, **data2)
 
-def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="obs"):
+def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="pred"):
     """
     compiles temperature signal properties for predicted temperatures
     :param thisData: [dataset] dataset of predicted temperatures

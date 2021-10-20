@@ -256,7 +256,6 @@ def prep_annual_signal_data(
     val_end_date,
     test_start_date,
     test_end_date,
-    gwVarList,
     out_file=None,
     air_temp_col = 'seg_tave_air',
     water_temp_pbm_col = 'seg_tave_water',
@@ -282,6 +281,7 @@ def prep_annual_signal_data(
     phase shift and amplitude ratio
     """
     
+    gwVarList = ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
     
     #read in the SNTemp data
     ds_pre = xr.open_zarr(pretrain_file)

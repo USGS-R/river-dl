@@ -12,13 +12,14 @@ from copy import deepcopy
 from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
 
-def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
+def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     """
     calculate the annual signal properties (phase and amplitude) for a temperature times series
     :param Date: vector of dates
     :param temp: vector of temperatures
     :param isWater: boolean indicator if the temp data is water temps (versus air)
     :param r_thresh: minimum R2 for the water linear regressions (otherwise NA is returned for regression coefficients)
+    :param tempType: type of temperature "obs" or "pred"
     :returns: amplitude and phase
     """
 
@@ -54,7 +55,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
         model = sm.OLS(temp,X, missing='drop')
         results = model.fit()
 
-        if results.rsquared < r_thresh and isWater:
+        if results.rsquared < r_thresh and isWater and tempType=="obs":
             amp=np.nan
             phi=np.nan
             amp_low=np.nan
@@ -86,13 +87,14 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8):
     return amp, phi, amp_low, amp_high, phi_low, phi_high
 
 
-def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water_temp_obs_col="seg_tave_water",air_temp_col = 'seg_tave_air'):
+def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water_temp_obs_col="seg_tave_water",air_temp_col = 'seg_tave_air', reservoirSegs = []):
     """
     calculate the annual signal properties (phase and amplitude) for temperature times series
     :param thisData: [xr dataset] with time series data of air and water temp for each segment
     :param water_temp_pbm_col: str with the column name of the process-based model predicted water temperatures in degrees C
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
+    :param reservoirSegs: [] array of segment numbers in / near reservoirs
     :returns: data frame with phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio for each segment, "low" and "high" values are the minimum and maximum 
     property values calculated with coefficient values within the 95th percent confidence interval
@@ -135,9 +137,8 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
         thisData = thisData.assign_coords(
     waterYear=('date', [x.year if x.month < 10 else (x.year+1) for x in pd.Series(thisData['date'].values) ]))
         
-
         
-        if waterSum.shape[0]>0:
+        if waterSum.shape[0]>0 and thisSeg not in reservoirSegs:
             #print(thisSeg)
             #print(waterSum)
             #get the air temp properties
@@ -255,12 +256,12 @@ def prep_annual_signal_data(
     val_end_date,
     test_start_date,
     test_end_date,
-    gwVarList,
     out_file=None,
     air_temp_col = 'seg_tave_air',
     water_temp_pbm_col = 'seg_tave_water',
     water_temp_obs_col = 'temp_c',
     segs = None,
+    reach_file = None
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -275,10 +276,12 @@ def prep_annual_signal_data(
     :param water_temp_pbm_col: str with the column name of the process-based model predicted water temperatures in degrees C
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
+    :param reach_file: str with the file of reach attributes
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
     
+    gwVarList = ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
     
     #read in the SNTemp data
     ds_pre = xr.open_zarr(pretrain_file)
@@ -297,6 +300,11 @@ def prep_annual_signal_data(
     obs=obs[[air_temp_col,water_temp_pbm_col,water_temp_obs_col]]
     obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})
+    if reach_file:
+        reachDF = pd.read_csv(reach_file)
+        reservoirSegs = reachDF.seg_id_nat.loc[reachDF.reach_class.isin(['contains_reservoir','downstream of reservoir (1)','downstream of reservoir (2)','reservoir_inlet_reach','reservoir_outlet_reach','within_reservoir'])].values
+    else:
+        reservoirSegs = []
 
     #split into testing and training
     obs_trn, obs_val, obs_tst = separate_trn_tst(obs, 'date',train_start_date,
@@ -307,9 +315,9 @@ def prep_annual_signal_data(
         test_end_date)
 
     #get the annual signal properties for the training, validation, and testing data
-    GW_trn = annual_temp_stats(obs_trn)
-    GW_tst = annual_temp_stats(obs_tst)
-    GW_val = annual_temp_stats(obs_val)
+    GW_trn = annual_temp_stats(obs_trn, reservoirSegs=reservoirSegs)
+    GW_tst = annual_temp_stats(obs_tst, reservoirSegs=reservoirSegs)
+    GW_val = annual_temp_stats(obs_val, reservoirSegs=reservoirSegs)
 
     
     #scale the Ar_obs & delPhi_obs
@@ -343,7 +351,7 @@ def prep_annual_signal_data(
     #data2['GW_cols']=GW_trn.columns.values.astype('str')
     #np.savez_compressed(out_file2, **data2)
 
-def calc_amp_phi(thisData, water_temp_pred_col = "temp_c"):
+def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="pred"):
     """
     compiles temperature signal properties for predicted temperatures
     :param thisData: [dataset] dataset of predicted temperatures
@@ -353,7 +361,7 @@ def calc_amp_phi(thisData, water_temp_pred_col = "temp_c"):
     water_amp_preds = []
     water_phi_preds = []
     for thisSeg in segList:
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True)
+        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True, tempType = tempType)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds})
@@ -432,9 +440,9 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
 
-    gw_trn = calc_amp_phi(trn_preds,"temp_c")
-    gw_tst = calc_amp_phi(tst_preds,"temp_c")
-    gw_val = calc_amp_phi(val_preds,"temp_c")
+    gw_trn = calc_amp_phi(trn_preds,"temp_c","pred")
+    gw_tst = calc_amp_phi(tst_preds,"temp_c","pred")
+    gw_val = calc_amp_phi(val_preds,"temp_c","pred")
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)

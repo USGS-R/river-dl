@@ -27,7 +27,7 @@ y_vars_finetune: ['temp_c']
 lambdas: [1]
 #lambdas: [1,0]
 
-trn_offset: 0.5
+trn_offset: 0.5 
 tst_val_offset: 0.5
 
 train_start_date:

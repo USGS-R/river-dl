@@ -294,7 +294,7 @@ def prep_annual_signal_data(
 
     #read in the observed temperature data and join to the SNTemp data
     obs = [ds_pre.sortby(["seg_id_nat","date"])]
-    tempFile = xr.open_zarr(obs_temper_file)
+    tempFile = xr.open_zarr(obs_temper_file).transpose()
     tempFile['seg_id_nat']=tempFile['seg_id_nat'].astype(int)
     obs.append(tempFile)
     

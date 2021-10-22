@@ -11,15 +11,14 @@ code_dir: "river_dl"
 
 #x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
-gw_vars: ['Ar_obs','delPhi_obs','air_phi','air_amp','sin_wt','cos_wt']
 
 y_vars_pretrain: ['seg_tave_water']
-#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
-
 y_vars_finetune: ['temp_c']
-#y_vars_finetune: ['temp_c', 'discharge_cms']
-
+#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']^M
+##y_vars_finetune: ['temp_c', 'discharge_cms']^M
+#
 lambdas: [1]
+#lambdas: [1,0]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
 lambdas_gw: [0.5, 0.5]
@@ -27,7 +26,6 @@ lambdas_gw: [0.5, 0.5]
 
 trn_offset: 1.0
 tst_val_offset: 1.0
-
 
 
 train_start_date:

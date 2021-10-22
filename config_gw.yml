@@ -16,6 +16,7 @@ y_vars_finetune: ['temp_c']
 #y_vars_pretrain: ['seg_tave_water', 'seg_outflow']^M
 ##y_vars_finetune: ['temp_c', 'discharge_cms']^M
 
+
 lambdas: [1]
 #lambdas: [1,0]
 

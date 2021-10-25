@@ -9,6 +9,10 @@ import tensorflow as tf
 def rmse(y_true, y_pred):
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
+    tf.debugging.assert_all_finite(
+        y_pred, 'AHHH - some NAs'
+        )
+
     num_y_true = tf.cast(
         tf.math.count_nonzero(~tf.math.is_nan(y_true)), tf.float32
     )

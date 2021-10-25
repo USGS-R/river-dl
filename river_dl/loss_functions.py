@@ -9,10 +9,6 @@ import tensorflow as tf
 def rmse(y_true, y_pred):
     y_true = tf.cast(y_true, tf.float32)
     y_pred = tf.cast(y_pred, tf.float32)
-    tf.debugging.assert_all_finite(
-        y_pred, 'AHHH - some NAs'
-        )
-
     num_y_true = tf.cast(
         tf.math.count_nonzero(~tf.math.is_nan(y_true)), tf.float32
     )
@@ -103,6 +99,7 @@ def multitask_loss(lambdas, loss_func):
     """
 
     def combine_loss(y_true, y_pred):
+        tf.debugging.assert_none_equal(tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_pred)), tf.int32),y_pred.shape[0],message="OH NO!! - Predicted temps are all NAN")
         losses = []
         n_vars = y_pred.shape[-1]
         for var_id in range(n_vars):

@@ -4,7 +4,7 @@ sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
 dist_matrix: "data_DRB/distance_matrix_drb_full_no3558.npz"
 reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
-out_dir: "output_DRB_offset_1.0_gw_05_05"
+out_dir: "output_DRB_offset_1.0_gw_0_0_cli"
 
 code_dir: "river_dl"
 
@@ -21,7 +21,7 @@ lambdas: [1]
 #lambdas: [1,0]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lambdas_gw: [0.5, 0.5]
+lambdas_gw: [0, 0]
 
 trn_offset: 1.0
 tst_val_offset: 1.0

@@ -111,6 +111,11 @@ def train_model(
             f"The 'model_type' provided ({model_type}) is not supported"
         )
 
+    print("SEED")
+    print("SEED")
+    print(seed)
+
+
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
         os.environ["TF_CUDNN_DETERMINISTIC"] = "1"

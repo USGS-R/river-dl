@@ -32,9 +32,7 @@ def asRunConfig(config, outFile):
     config['gitBranch']=branch
     config['gitCommit'] = commit
     #and the file info for the input files
-    config['input_file_info']={}
-    for thisFile in [x for x in config.keys() if "file" in x and x!="input_file_info"]:
-        config['input_file_info'][config[thisFile]]={'file_size':os.stat(config[thisFile]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[thisFile]).st_ctime))}
+    config['input_file_info']={config[x]:{'file_size':os.stat(config[x]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[x]).st_ctime))} for x in config.keys() if "file" in x and x!="input_file_info"}
     with open(outFile,'w') as f:
         yaml.dump(config, f, default_flow_style=False)
 

@@ -99,7 +99,6 @@ def multitask_loss(lambdas, loss_func):
     """
 
     def combine_loss(y_true, y_pred):
-        tf.debugging.assert_none_equal(tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_pred)), tf.int32),0,message="OH NO!! - Predicted temps are all NAN")
         losses = []
         n_vars = y_pred.shape[-1]
         for var_id in range(n_vars):

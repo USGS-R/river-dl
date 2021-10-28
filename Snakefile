@@ -1,4 +1,4 @@
-import os, yaml
+import os, yaml, time
 from datetime import date
 
 from river_dl.preproc_utils import prep_all_data
@@ -31,6 +31,10 @@ def asRunConfig(config, outFile):
         commit = git_hash.readline().strip()
     config['gitBranch']=branch
     config['gitCommit'] = commit
+    #and the file info for the input files
+    config['input_file_info']={}
+    for thisFile in [x for x in config.keys() if "file" in x and x!="input_file_info"]:
+        config['input_file_info'][config[thisFile]]={'file_size':os.stat(config[thisFile]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[thisFile]).st_ctime))}
     with open(outFile,'w') as f:
         yaml.dump(config, f, default_flow_style=False)
 
@@ -45,7 +49,7 @@ rule prep_io_data:
     input:
          config['sntemp_file'],
          config['obs_file'],
-         config['dist_matrix'],
+         config['dist_matrix_file'],
     output:
         "{outdir}/prepped.npz"
     run:

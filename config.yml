@@ -1,7 +1,7 @@
 # Input files
 obs_file: "data_DRB/Obs_temp_flow_drb_full_no3558"
 sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
-dist_matrix: "data_DRB/distance_matrix_drb_full_no3558.npz"
+dist_matrix_file: "data_DRB/distance_matrix_drb_full_no3558.npz"
 reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
 
@@ -9,7 +9,7 @@ reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 #x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
 
-out_dir: "output_DRB_NAtest_noGW"
+out_dir: "output_DRB_offsetTest"
 
 code_dir: "river_dl"
 

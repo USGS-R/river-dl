@@ -336,6 +336,7 @@ def prep_annual_signal_data(
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
     data['GW_val']=GW_val
+    data['GW_vars']=gwVarList
     data['GW_cols']=GW_trn.columns.values.astype('str')
     data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
     data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0)

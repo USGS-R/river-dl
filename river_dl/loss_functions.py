@@ -213,6 +213,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
     
     if type=='fft':
+        print("FFT LOSS")
         y_pred_temp = tf.squeeze(y_pred_temp)
         y_pred_mean = tf.reduce_mean(y_pred_temp, 1, keepdims=True)
         temp_demean = y_pred_temp - y_pred_mean
@@ -248,6 +249,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         # Ar_pred = the ratio of the water temp and air temp amplitudes
         Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
     elif type=="linalg":
+        print("LINALG LOSS")
         x_lm = y_true[:,:,-3:-1] #extract the sin(wt) and cos(wt)
 
         #a tensor of the sin(wt) and cos(wt) for each reach x day, the 1's are for the intercept of the linear regression

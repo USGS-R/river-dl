@@ -598,7 +598,7 @@ def prep_y_data(
         data = {
             f"y_{y_type}_trn": convert_batch_reshape(
                 y_data, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
-            )
+            ),
             f"y_{y_type}_vars": y_vars,
         }
     return data

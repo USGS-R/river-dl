@@ -69,20 +69,38 @@ rule prep_io_data:
 #        """
 
 
-# use "train_model" if wanting to use CPU or local GPU
-rule train_model_local_or_cpu:
+# Pretrain the model on process based model
+rule pre_train:
     input:
         "{outdir}/prepped.npz"
     output:
-        directory("{outdir}/trained_weights/"),
         directory("{outdir}/pretrained_weights/"),
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
-        train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']))
+        train_model(input[0], config['pt_epochs'], config['hidden_size'], loss_func=loss_function,
+                    out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_pretrain']),
+                    learning_rate=0.005, train_type = 'pre', early_stop_rounds=None)
+
+
+# Finetune/train the model on observations
+rule finetune_train:
+    input:
+        "{outdir}/prepped.npz",
+        directory("{outdir}/pretrained_weights/"),
+    output:
+        directory("{outdir}/trained_weights/"),
+        directory("{outdir}/best_val_weights/"),
+    params:
+        # getting the base path to put the training outputs in
+        # I omit the last slash (hence '[:-1]' so the split works properly
+        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+    run:
+        train_model(input[0], config['ft_epochs'], config['hidden_size'], loss_func=loss_function,
+                    out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']),
+                    learning_rate=0.01, train_type = 'finetune', early_stop_rounds=config[early_stopping])
 
 rule make_predictions:
     input:

@@ -21,7 +21,7 @@ def get_data_if_file(d):
         return np.load(d, allow_pickle=True)
 
 
-# This is a training engine that initalizes our model and contains routines for pretraining and finetuning
+# This is a training engine that initializes our model and contains routines for pretraining and finetuning
 class trainer():
     def __init__(self, model, optimizer, loss_fn, weights=None):
         self.model = model
@@ -48,7 +48,7 @@ class trainer():
         self.model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
         return self.model
 
-    def fine_tune(self, x, y, x_val, y_val, epochs, batch_size, out_dir, early_stop_rounds=None):
+    def fine_tune(self, x, y, x_val, y_val, epochs, batch_size, out_dir, early_stop_rounds=False):
         # Specify our training log
         csv_log = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
@@ -56,7 +56,7 @@ class trainer():
 
         # Set up early stopping rounds if desired, setting this to number of epochs functionally doesn't use
         # early stopping
-        if early_stop_rounds is None:
+        if ~early_stop_rounds:
             early_stop_rounds = epochs
 
         early_stop = tf.keras.callbacks.EarlyStopping(
@@ -107,7 +107,7 @@ def train_model(
     num_tasks=1,
     learning_rate = 0.01,
     train_type = 'pre',
-    early_stop_rounds = None
+    early_stop_rounds = False
 ):
     """
     train the rgcn
@@ -208,6 +208,7 @@ def train_model(
         # Log our training times
         pre_train_time = datetime.datetime.now()
         pre_train_time_elapsed = pre_train_time - start_time
+        print(f"Pretraining time: {pre_train_time_elapsed}")
         out_time_file = os.path.join(out_dir, "training_time.txt")
 
         with open(out_time_file, "w") as f:
@@ -254,6 +255,7 @@ def train_model(
         # Log our training time
         finetune_time = datetime.datetime.now()
         finetune_time_elapsed = finetune_time - start_time
+        print(f"Finetuning time: {finetune_time_elapsed}")
         out_time_file = os.path.join(out_dir, "training_time.txt")
         with open(out_time_file, "a") as f:
             f.write(

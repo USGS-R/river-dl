@@ -113,10 +113,10 @@ def calc_metrics(df):
             ).numpy(),
             "nse_logged": nse_logged(obs, pred).numpy(),
             "kge": kge(obs, pred).numpy(),
-            "rmse_logged": rmse_logged(obs, pred),
-            "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False),
-            "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True),
-            "nse_logged": nse_logged(obs, pred),
+            "rmse_logged": rmse_logged(obs, pred).numpy(),
+            "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False).numpy(),
+            "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True).numpy(),
+            "nse_logged": nse_logged(obs, pred).numpy(),
         }
 
     else:
@@ -244,7 +244,7 @@ def combined_metrics(
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
                                         group=group)
-    df_all.extend([val_metrics])
+        df_all.extend([val_metrics])
     if pred_tst:
         tst_metrics = partition_metrics(pred_file=pred_tst,
                                         obs_file=obs_file,

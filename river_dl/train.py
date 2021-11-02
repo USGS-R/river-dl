@@ -107,7 +107,8 @@ def train_model(
     num_tasks=1,
     learning_rate = 0.01,
     train_type = 'pre',
-    early_stop_rounds = False
+    early_stop_rounds = False,
+    limit_pretrain = False,
 ):
     """
     train the rgcn
@@ -195,9 +196,12 @@ def train_model(
             return
 
         # Pull out variables from the IO data
-        x_trn_pre = io_data["x_pre_trn"]
-
-        y_trn_pre = io_data["y_pre_trn"]
+        if limit_pretrain:
+            x_trn_pre = io_data["x_trn"]
+            y_trn_pre = io_data["y_pre_trn_filt"]
+        else:
+            x_trn_pre = io_data["x_pre_trn_full"]
+            y_trn_pre = io_data["y_pre_trn_full"]
 
         # Initialize our model within the training engine
         engine = trainer(model, optimizer, loss_func)

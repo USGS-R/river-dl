@@ -29,7 +29,6 @@ early_stopping: False
 
 #Choose whether to use the final weights from the end of training ('trained_weights') or the weights from the best
 # validation epoch ('best_val_weights')
-
 pred_weights: 'best_val_weights'
 
 train_start_date:
@@ -55,5 +54,5 @@ test_end_date:
 
 
 pt_epochs: 1
-ft_epochs: 20
+ft_epochs: 10
 hidden_size: 20

@@ -596,8 +596,11 @@ def prep_y_data(
             y_data, _, _ = scale(y_data, y_std, y_mean)
 
         data = {
-            f"y_{y_type}_trn": convert_batch_reshape(
+            f"y_{y_type}_trn_full": convert_batch_reshape(
                 y_data, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
+            ),
+            f"y_{y_type}_trn_filt": convert_batch_reshape(
+                y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
             f"y_{y_type}_vars": y_vars,
         }
@@ -744,7 +747,7 @@ def prep_all_data(
     # read, filter observations for finetuning
 
     x_data_dict = {
-        "x_pre_trn": convert_batch_reshape(
+        "x_pre_trn_full": convert_batch_reshape(
             x_scl,spatial_idx_name, time_idx_name, seq_len=seq_len,
             offset=trn_offset,
         ),

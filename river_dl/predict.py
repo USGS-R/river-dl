@@ -72,6 +72,8 @@ def predict_from_io_data(
     outfile,
     log_vars=False,
     num_tasks=1,
+    trn_offset = 1.0,
+    tst_val_offset = 1.0,
 ):
     """
     make predictions from trained model
@@ -85,6 +87,8 @@ def predict_from_io_data(
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
     :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
+    :param trn_offset: [str] value for the training offset
+    :param tst_val_offset: [str] value for the testing and validation offset
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -96,10 +100,10 @@ def predict_from_io_data(
         num_tasks=num_tasks,
     )
 
-    if partition != "trn":
-        keep_frac = 1
+    if partition == "trn":
+        keep_frac = trn_offset
     else:
-        keep_frac = 0.5
+        keep_frac = tst_val_offset
 
     preds = predict(
         model,

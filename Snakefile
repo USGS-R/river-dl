@@ -75,19 +75,21 @@ rule train_model_local_or_cpu:
         "{outdir}/prepped.npz"
     output:
         directory("{outdir}/trained_weights/"),
-        directory("{outdir}/pretrained_weights/"),
+        #directory("{outdir}/pretrained_weights/"),
+        "{outdir}/prepped2.npz",
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']))
+                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']),
+                    updated_io_data=output[1])
 
 rule make_predictions:
     input:
         "{outdir}/trained_weights/",
-        "{outdir}/prepped.npz"
+        "{outdir}/prepped2.npz"
     output:
         "{outdir}/{partition}_preds.feather",
     group: 'train_predict_evaluate'
@@ -132,7 +134,7 @@ rule combine_metrics:
 
 rule plot_prepped_data:
     input:
-        "{outdir}/prepped.npz",
+        "{outdir}/prepped2.npz",
     output:
         "{outdir}/{variable}_{partition}.png",
     run:

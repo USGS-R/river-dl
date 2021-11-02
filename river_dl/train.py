@@ -36,6 +36,7 @@ def train_model(
     num_tasks=1,
     learning_rate_pre=0.005,
     learning_rate_ft=0.01,
+    updated_io_data=None
 ):
     """
     train the rgcn
@@ -182,6 +183,44 @@ def train_model(
                     callbacks=[csv_log_ft],
                 )
         else:
+            if pretrain_epochs == 0:
+                print('Using PB outputs as inputs')
+                # Import the pretraining data and append it to the x vars
+                y_trn_pre = io_data["y_pre_trn"]
+                y_trn_pre = np.nan_to_num(y_trn_pre, nan = 0) # has some nans - not great solution
+                x_trn_obs = np.concatenate([x_trn_obs, y_trn_pre], 2) 
+                # Do the same for the validation and testing x vars
+                y_val_pre = io_data["y_pre_val"]
+                y_val_pre = np.nan_to_num(y_val_pre, nan = 0)
+                x_val_obs = io_data["x_val"]
+                x_val_obs = np.concatenate([x_val_obs, y_val_pre], 2)
+                y_tst_pre = io_data["y_pre_tst"]
+                y_tst_pre = np.nan_to_num(y_tst_pre, nan = 0)
+                x_tst_obs = io_data["x_tst"]
+                x_tst_obs = np.concatenate([x_tst_obs, y_tst_pre], 2)
+                # Update the saved file (so that PB outputs are there for eval; generate same file for no PB outputs too)
+                print("Saving the x data with associated pretraining output", x_trn_obs.shape, x_val_obs.shape, x_tst_obs.shape)
+                np.savez_compressed(updated_io_data, x_trn = x_trn_obs, x_val = x_val_obs, x_tst = x_tst_obs,
+                                    x_std = io_data['x_std'], x_mean = io_data['x_mean'], x_vars = io_data['x_vars'],
+                                    ids_trn = io_data['ids_trn'], times_trn = io_data['times_trn'],
+                                    ids_val = io_data['ids_val'], times_val = io_data['times_val'],
+                                    ids_tst = io_data['ids_tst'], times_tst = io_data['times_tst'], dist_matrix = io_data['dist_matrix'],
+                                    y_obs_trn = io_data['y_obs_trn'], y_obs_wgts = io_data['y_obs_wgts'],
+                                    y_obs_val = io_data['y_obs_val'], y_obs_tst = io_data['y_obs_tst'],
+                                    y_std = io_data['y_std'], y_mean = io_data['y_mean'], y_obs_vars = io_data['y_obs_vars'],
+                                    y_pre_trn = io_data['y_pre_trn'], y_pre_wgts = io_data['y_pre_wgts'],
+                                    y_pre_val = io_data['y_pre_val'], y_pre_tst = io_data['y_pre_tst'], y_pre_vars = io_data['y_pre_vars'])
+            else:
+                np.savez_compressed(updated_io_data, x_trn = io_data['x_trn'], x_val = io_data['x_val'], x_tst = io_data['x_tst'],
+                                    x_std = io_data['x_std'], x_mean = io_data['x_mean'], x_vars = io_data['x_vars'],
+                                    ids_trn = io_data['ids_trn'], times_trn = io_data['times_trn'],
+                                    ids_val = io_data['ids_val'], times_val = io_data['times_val'],
+                                    ids_tst = io_data['ids_tst'], times_tst = io_data['times_tst'], dist_matrix = io_data['dist_matrix'],
+                                    y_obs_trn = io_data['y_obs_trn'], y_obs_wgts = io_data['y_obs_wgts'],
+                                    y_obs_val = io_data['y_obs_val'], y_obs_tst = io_data['y_obs_tst'],
+                                    y_std = io_data['y_std'], y_mean = io_data['y_mean'], y_obs_vars = io_data['y_obs_vars'],
+                                    y_pre_trn = io_data['y_pre_trn'], y_pre_wgts = io_data['y_pre_wgts'],
+                                    y_pre_val = io_data['y_pre_val'], y_pre_tst = io_data['y_pre_tst'], y_pre_vars = io_data['y_pre_vars'])
             y_trn_obs = io_data["y_obs_trn"]
             model.fit(
                 x=x_trn_obs,

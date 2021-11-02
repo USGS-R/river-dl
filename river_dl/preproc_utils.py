@@ -567,26 +567,40 @@ def prep_y_data(
             y_mean, xr.Dataset
         ):
             y_trn, y_std, y_mean = scale(y_trn)
+            y_val, _, _ = scale(y_val, y_std, y_mean)
         else:
             y_trn, _, _ = scale(y_trn)
+            y_val, _, _ = scale(y_val, y_std, y_mean)
 
-    data = {
-        f"y_{y_type}_trn": convert_batch_reshape(
-            y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
-        ),
-        f"y_{y_type}_wgts": convert_batch_reshape(
-            y_wgts, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
-        ),
-        f"y_{y_type}_val": convert_batch_reshape(
-            y_val, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
-        ),
-        f"y_{y_type}_tst": convert_batch_reshape(
-            y_tst, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
-        ),
-        "y_std": y_std.to_array().values,
-        "y_mean": y_mean.to_array().values,
-        f"y_{y_type}_vars": y_vars,
-    }
+
+    if y_type == 'obs':
+        data = {
+            f"y_{y_type}_trn": convert_batch_reshape(
+                y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
+            ),
+            f"y_{y_type}_wgts": convert_batch_reshape(
+                y_wgts, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
+            ),
+            f"y_{y_type}_val": convert_batch_reshape(
+                y_val, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
+            ),
+            f"y_{y_type}_tst": convert_batch_reshape(
+                y_tst, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
+            ),
+            "y_std": y_std.to_array().values,
+            "y_mean": y_mean.to_array().values,
+            f"y_{y_type}_vars": y_vars,
+        }
+    elif y_type == 'pre':
+        if normalize_y:
+            y_data, _, _ = scale(y_data, y_std, y_mean)
+
+        data = {
+            f"y_{y_type}_trn": convert_batch_reshape(
+                y_data, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
+            )
+            f"y_{y_type}_vars": y_vars,
+        }
     return data
 
 
@@ -730,6 +744,10 @@ def prep_all_data(
     # read, filter observations for finetuning
 
     x_data_dict = {
+        "x_pre_trn": convert_batch_reshape(
+            x_scl,spatial_idx_name, time_idx_name, seq_len=seq_len,
+            offset=trn_offset,
+        ),
         "x_trn": convert_batch_reshape(
             x_trn_scl, spatial_idx_name, time_idx_name, seq_len=seq_len,
             offset=trn_offset,

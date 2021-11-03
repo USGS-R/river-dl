@@ -1,6 +1,6 @@
-import os, yaml, time
-from datetime import date
+import os
 
+from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
@@ -19,23 +19,7 @@ rule all:
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
         expand("{outdir}/asRunConfig.yml", outdir=out_dir)
-
-
-def asRunConfig(config, outFile):
-    #store some run parameters
-    config['runDate']=date.today().strftime("%m/%d/%y")
-    with open(".git/HEAD",'r') as head:
-        ref = head.readline().split(' ')[-1].strip()
-        branch = ref.split("/")[-1]
-    with open('.git/'+ref,'r') as git_hash:
-        commit = git_hash.readline().strip()
-    config['gitBranch']=branch
-    config['gitCommit'] = commit
-    #and the file info for the input files
-    config['input_file_info']={config[x]:{'file_size':os.stat(config[x]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[x]).st_ctime))} for x in config.keys() if "file" in x and x!="input_file_info"}
-    with open(outFile,'w') as f:
-        yaml.dump(config, f, default_flow_style=False)
-
+        
 
 rule as_run_config:
     output:

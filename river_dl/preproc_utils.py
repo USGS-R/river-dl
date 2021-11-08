@@ -753,7 +753,7 @@ def prep_all_data(
     # read, filter observations for finetuning
 
     x_data_dict = {
-        "x_pre_trn_full": convert_batch_reshape(
+        "x_pre_full": convert_batch_reshape(
             x_scl,spatial_idx_name, time_idx_name, seq_len=seq_len,
             offset=trn_offset,
         ),

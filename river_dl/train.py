@@ -48,7 +48,7 @@ class trainer():
         self.model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
         return self.model
 
-    def fine_tune(self, x, y, x_val, y_val, epochs, batch_size, out_dir, early_stop_rounds=False):
+    def fine_tune(self, x, y, x_val, y_val, epochs, batch_size, out_dir, early_stop_rounds=None):
         # Specify our training log
         csv_log = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
@@ -56,7 +56,7 @@ class trainer():
 
         # Set up early stopping rounds if desired, setting this to number of epochs functionally doesn't use
         # early stopping
-        if ~early_stop_rounds:
+        if not early_stop_rounds:
             early_stop_rounds = epochs
 
         early_stop = tf.keras.callbacks.EarlyStopping(
@@ -107,7 +107,7 @@ def train_model(
     num_tasks=1,
     learning_rate = 0.01,
     train_type = 'pre',
-    early_stop_rounds = False,
+    early_stop_rounds = None,
     limit_pretrain = False,
 ):
     """
@@ -200,8 +200,8 @@ def train_model(
             x_trn_pre = io_data["x_trn"]
             y_trn_pre = io_data["y_pre_trn_filt"]
         else:
-            x_trn_pre = io_data["x_pre_trn_full"]
-            y_trn_pre = io_data["y_pre_trn_full"]
+            x_trn_pre = io_data["x_pre_full"]
+            y_trn_pre = io_data["y_pre_full"]
 
         # Initialize our model within the training engine
         engine = trainer(model, optimizer, loss_func)

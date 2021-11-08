@@ -136,7 +136,7 @@ rule combine_metrics:
     input:
          config['obs_file'],
          "{outdir}/trn_preds.feather",
-         "{outdir}/tst_preds.feather"
+         "{outdir}/val_preds.feather"
     output:
          "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'

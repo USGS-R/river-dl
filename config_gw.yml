@@ -12,9 +12,9 @@ code_dir: "river_dl"
 x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
 
 y_vars_pretrain: ['seg_tave_water']
-y_vars_finetune: ['temp_c']
+#y_vars_finetune: ['temp_c']
 #y_vars_pretrain: ['seg_tave_water', 'seg_outflow']^M
-##y_vars_finetune: ['temp_c', 'discharge_cms']^M
+y_vars_finetune: ['temp_c', 'discharge_cms']
 
 
 #lambdas: [1]

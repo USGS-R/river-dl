@@ -560,9 +560,10 @@ def prep_y_data(
         y_wgts = exclude_segments(y_trn, exclude_segs=exclude_segs)
     else:
         y_wgts = initialize_weights(y_trn)
-
+    # scale y_dataset training data and get the mean and std
+    # scale the validation partition to benchmark epoch performance
     if normalize_y:
-        # scale y_dataset training data and get the mean and std
+    # check to seee if mean and std area already calculated/exist
         if not isinstance(y_std, xr.Dataset) or not isinstance(
             y_mean, xr.Dataset
         ):
@@ -575,34 +576,39 @@ def prep_y_data(
 
     if y_type == 'obs':
         data = {
-            f"y_{y_type}_trn": convert_batch_reshape(
+            "y_obs_trn": convert_batch_reshape(
                 y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
-            f"y_{y_type}_wgts": convert_batch_reshape(
+            "y_obs_wgts": convert_batch_reshape(
                 y_wgts, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
-            f"y_{y_type}_val": convert_batch_reshape(
+            "y_obs_val": convert_batch_reshape(
                 y_val, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
             ),
-            f"y_{y_type}_tst": convert_batch_reshape(
+            "y_obs_tst": convert_batch_reshape(
                 y_tst, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
             ),
             "y_std": y_std.to_array().values,
             "y_mean": y_mean.to_array().values,
-            f"y_{y_type}_vars": y_vars,
+            "y_obs_vars": y_vars,
         }
     elif y_type == 'pre':
         if normalize_y:
-            y_data, _, _ = scale(y_data, y_std, y_mean)
+            if not isinstance(y_std, xr.Dataset) or not isinstance(
+                    y_mean, xr.Dataset
+            ):
+                y_trn, y_std, y_mean = scale(y_trn)
+            else:
+                y_data, _, _ = scale(y_data, y_std, y_mean)
 
         data = {
-            f"y_{y_type}_trn_full": convert_batch_reshape(
+            "y_pre_full": convert_batch_reshape(
                 y_data, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
-            f"y_{y_type}_trn_filt": convert_batch_reshape(
+            "y_pre_trn_filt": convert_batch_reshape(
                 y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
-            f"y_{y_type}_vars": y_vars,
+            "y_pre_vars": y_vars,
         }
     return data
 

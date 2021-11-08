@@ -2,7 +2,6 @@
 obs_file: "../drb_gwnet/data/in/Obs_temp_flow_drb_Christiana_no3558"
 sntemp_file: "../drb_gwnet/data/in/sntemp_inputs_outputs_drb_Christiana_no3558"
 dist_matrix: "../drb_gwnet/data/in/distance_matrix_drb_Christiana_no3558.npz"
-# reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
 
 #### for flow modeling, seg_width should be removed from x_vars

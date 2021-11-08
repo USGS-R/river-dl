@@ -127,8 +127,8 @@ def train_model(
     :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
     :param learning_rate: [float] the learning rate
     :param train_type: [str] Either pretraining (pre) or finetuning (finetune)
-    :param early_stop_rounds [int] Number of rounds to use for early stopping
-    :return: [tf model]  finetuned model
+    :param early_stop_patience [int] Number of epochs to use for early stopping
+    :return: [tf model]  Model
     """
     if train_type not in ['pre','finetune']:
         raise ValueError("Specify train_type as either pre or finetune")

@@ -14,7 +14,6 @@ from river_dl import loss_functions as lf
 from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
 
 
-
 out_dir = config['out_dir']
 code_dir = config['code_dir']
 pred_weights = config['pred_weights']
@@ -45,8 +44,7 @@ use rule all from base_workflow as base_all with:
         ),
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
-        expand("{outdir}/config_gw.yml", outdir=out_dir),
-        #expand("{outdir}/asRunConfig.yml", outdir=out_dir)
+        expand("{outdir}/asRunConfig.yml",outdir=out_dir)
 
 rule copy_config:
     output:

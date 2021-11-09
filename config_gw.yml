@@ -2,18 +2,18 @@
 obs_file: "../drb_gwnet/data/in/Obs_temp_flow_drb_Christiana_no3558"
 sntemp_file: "../drb_gwnet/data/in/sntemp_inputs_outputs_drb_Christiana_no3558"
 dist_matrix: "../drb_gwnet/data/in/distance_matrix_drb_Christiana_no3558.npz"
-reach_attr_file: "../drb_gwnet/data/in/DRB_spatial/reach_attributes_drb.csv"
+reach_attr_file: "../drb_gwnet/data/in/reach_attributes_drb.csv"
 
-out_dir: "output_DRB_offset_1.0_gw_05_05"
+out_dir: "new_train_gw_test2"
 
 code_dir: "river_dl"
 
-#x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
+x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
+#x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
 
-y_vars_pretrain: ['seg_tave_water']
+#y_vars_pretrain: ['seg_tave_water']
 #y_vars_finetune: ['temp_c']
-#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']^M
+y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
 y_vars_finetune: ['temp_c', 'discharge_cms']
 
 
@@ -55,6 +55,6 @@ test_end_date:
   - '2021-09-30'
 
 pt_epochs: 1
-ft_epochs: 10
+ft_epochs: 1
 
 hidden_size: 20

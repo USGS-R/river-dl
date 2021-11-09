@@ -24,6 +24,13 @@ lambdas: [1]
 trn_offset: 1.0
 tst_val_offset: 1.0
 
+#Define early stopping criteria, setting this to False will turn off early stopping rounds
+early_stopping: False
+
+#Choose whether to use the final weights from the end of training ('trained_weights') or the weights from the best
+# validation epoch ('best_val_weights')
+pred_weights: 'best_val_weights'
+
 train_start_date:
   - '1984-10-01'
   - '2015-10-01'

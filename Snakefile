@@ -10,6 +10,7 @@ from river_dl import loss_functions as lf
 
 out_dir = config['out_dir']
 code_dir = config['code_dir']
+pred_weights = config['pred_weights']
 loss_function = lf.multitask_rmse(config['lambdas'])
 
 rule all:
@@ -78,24 +79,43 @@ rule prep_io_data:
 #        """
 
 
-# use "train_model" if wanting to use CPU or local GPU
-rule train_model_local_or_cpu:
+# Pretrain the model on process based model
+rule pre_train:
     input:
         "{outdir}/prepped.npz"
     output:
-        directory("{outdir}/trained_weights/"),
         directory("{outdir}/pretrained_weights/"),
+        touch("{outdir}/pretrained_weights/pretrain.done")
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
         run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
-        train_model(input[0], config['pt_epochs'], config['ft_epochs'], config['hidden_size'],
-                    loss_func_ft=loss_function, out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']))
+        train_model(input[0], config['pt_epochs'], config['hidden_size'], loss_func=loss_function,
+                    out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_pretrain']),
+                    learning_rate=0.005, train_type = 'pre', early_stop_patience=None)
+
+
+# Finetune/train the model on observations
+rule finetune_train:
+    input:
+        "{outdir}/prepped.npz",
+        "{outdir}/pretrained_weights/pretrain.done"
+    output:
+        directory("{outdir}/trained_weights/"),
+        directory("{outdir}/best_val_weights/"),
+    params:
+        # getting the base path to put the training outputs in
+        # I omit the last slash (hence '[:-1]' so the split works properly
+        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+    run:
+        train_model(input[0], config['ft_epochs'], config['hidden_size'], loss_func=loss_function,
+                    out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']),
+                    learning_rate=0.01, train_type = 'finetune', early_stop_patience=config['early_stopping'])
 
 rule make_predictions:
     input:
-        "{outdir}/trained_weights/",
+        "{outdir}/"+pred_weights+'/',
         "{outdir}/prepped.npz"
     output:
         "{outdir}/{partition}_preds.feather",
@@ -134,7 +154,7 @@ rule combine_metrics:
     run:
         combined_metrics(obs_file=input[0],
                          pred_trn=input[1],
-                         pred_val=input[2],
+                         pred_tst=input[2],
                          group=params.grp_arg,
                          outfile=output[0])
 

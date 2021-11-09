@@ -48,19 +48,18 @@ class trainer():
         self.model.save_weights(os.path.join(out_dir, "pretrained_weights/"))
         return self.model
 
-    def fine_tune(self, x, y, x_val, y_val, epochs, batch_size, out_dir, early_stop_rounds=None):
+    def fine_tune(self, x, y, x_val, y_val, epochs, batch_size, out_dir, early_stop_patience=None, use_cpu = False):
         # Specify our training log
         csv_log = tf.keras.callbacks.CSVLogger(
             os.path.join(out_dir, "finetune_log.csv")
         )
 
-        # Set up early stopping rounds if desired, setting this to number of epochs functionally doesn't use
-        # early stopping
-        if not early_stop_rounds:
-            early_stop_rounds = epochs
+        # Set up early stopping rounds if desired, setting this to the total number of epochs is the same as not using it
+        if not early_stop_patience:
+            early_stop_patience = epochs
 
         early_stop = tf.keras.callbacks.EarlyStopping(
-            monitor='val_loss', min_delta=0, patience=early_stop_rounds, restore_best_weights=False,
+            monitor='val_loss', min_delta=0, patience=early_stop_patience, restore_best_weights=False,
             verbose=1)
 
         # Save alternate weight file that saves the best validation weights
@@ -69,7 +68,7 @@ class trainer():
             save_weights_only=True, mode='min', save_freq='epoch')
 
         # Ensure that training happens on CPU if using the GW loss function
-        if y.shape[2] > 2:
+        if use_cpu:
             with tf.device('/CPU:0'):
                 self.model.fit(
                     x=x,
@@ -107,7 +106,7 @@ def train_model(
     num_tasks=1,
     learning_rate = 0.01,
     train_type = 'pre',
-    early_stop_rounds = None,
+    early_stop_patience = None,
     limit_pretrain = False,
 ):
     """
@@ -127,7 +126,8 @@ def train_model(
     :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
     :param learning_rate: [float] the learning rate
     :param train_type: [str] Either pretraining (pre) or finetuning (finetune)
-    :param early_stop_patience [int] Number of epochs to use for early stopping
+    :param early_stop_patience [int]  Number of epochs with no improvement after which training will be stopped.
+    :param limit_pretrain [bool] If true, limits pretraining to just the training partition.  If false (default), pretrains on all available data.
     :return: [tf model]  Model
     """
     if train_type not in ['pre','finetune']:
@@ -193,33 +193,32 @@ def train_model(
         if epochs == 0:
             os.makedirs(os.path.join(out_dir, "pretrained_weights/"), exist_ok = True)
             print("Dummy directory created without pretraining.  Set epochs to >0 to pretrain")
-            return
-
-        # Pull out variables from the IO data
-        if limit_pretrain:
-            x_trn_pre = io_data["x_trn"]
-            y_trn_pre = io_data["y_pre_trn_filt"]
         else:
-            x_trn_pre = io_data["x_pre_full"]
-            y_trn_pre = io_data["y_pre_full"]
+            # Pull out variables from the IO data
+            if limit_pretrain:
+                x_trn_pre = io_data["x_trn"]
+                y_trn_pre = io_data["y_pre_trn"]
+            else:
+                x_trn_pre = io_data["x_pre_full"]
+                y_trn_pre = io_data["y_pre_full"]
 
-        # Initialize our model within the training engine
-        engine = trainer(model, optimizer, loss_func)
+            # Initialize our model within the training engine
+            engine = trainer(model, optimizer, loss_func)
 
-        # Call the pretraining routine from the training engine
-        model = engine.pre_train(x_trn_pre,y_trn_pre,epochs, batch_size,out_dir)
+            # Call the pretraining routine from the training engine
+            model = engine.pre_train(x_trn_pre,y_trn_pre,epochs, batch_size,out_dir)
 
-        # Log our training times
-        pre_train_time = datetime.datetime.now()
-        pre_train_time_elapsed = pre_train_time - start_time
-        print(f"Pretraining time: {pre_train_time_elapsed}")
-        out_time_file = os.path.join(out_dir, "training_time.txt")
+            # Log our training times
+            pre_train_time = datetime.datetime.now()
+            pre_train_time_elapsed = pre_train_time - start_time
+            print(f"Pretraining time: {pre_train_time_elapsed}")
+            out_time_file = os.path.join(out_dir, "training_time.txt")
 
-        with open(out_time_file, "w") as f:
-            f.write(
-                f"elapsed time pretrain (includes building graph):\
-                     {pre_train_time_elapsed} \n"
-            )
+            with open(out_time_file, "w") as f:
+                f.write(
+                    f"elapsed time pretrain (includes building graph):\
+                         {pre_train_time_elapsed} \n"
+                )
 
     # finetune
     if train_type == 'finetune':
@@ -252,9 +251,12 @@ def train_model(
             y_val_obs = np.concatenate(
                 [io_data["y_obs_val"], io_data["GW_val_reshape"], air_val], axis=2
             )
+            # Run the finetuning within the training engine on CPU for the GW loss function
+            model = engine.fine_tune(x_trn, y_trn_obs, x_val, y_val_obs, epochs, batch_size, out_dir, early_stop_patience, use_cpu=True)
 
-        # Run the finetuning within the training engine
-        model = engine.fine_tune(x_trn,y_trn_obs,x_val,y_val_obs,epochs, batch_size, out_dir, early_stop_rounds)
+        else:
+            # Run the finetuning within the training engine on default device
+            model = engine.fine_tune(x_trn, y_trn_obs, x_val, y_val_obs, epochs, batch_size, out_dir, early_stop_patience)
 
         # Log our training time
         finetune_time = datetime.datetime.now()

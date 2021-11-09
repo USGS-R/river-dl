@@ -563,7 +563,7 @@ def prep_y_data(
     # scale y_dataset training data and get the mean and std
     # scale the validation partition to benchmark epoch performance
     if normalize_y:
-    # check to seee if mean and std area already calculated/exist
+    # check if mean and std are already calculated/exist
         if not isinstance(y_std, xr.Dataset) or not isinstance(
             y_mean, xr.Dataset
         ):
@@ -605,7 +605,7 @@ def prep_y_data(
             "y_pre_full": convert_batch_reshape(
                 y_data, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
-            "y_pre_trn_filt": convert_batch_reshape(
+            "y_pre_trn": convert_batch_reshape(
                 y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
             ),
             "y_pre_vars": y_vars,

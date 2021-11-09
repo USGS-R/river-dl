@@ -8,7 +8,7 @@ dist_matrix: "../drb_gwnet/data/in/distance_matrix_drb_Christiana_no3558.npz"
 #x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
 
-out_dir: "new_train_test"
+out_dir: "new_train_test_gw_test"
 
 code_dir: "river_dl"
 
@@ -53,5 +53,5 @@ test_end_date:
 
 
 pt_epochs: 1
-ft_epochs: 10
+ft_epochs: 5
 hidden_size: 20

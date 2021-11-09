@@ -1,9 +1,29 @@
 import pandas as pd
 import numpy as np
-import yaml
+import yaml, time, os
 import xarray as xr
 import datetime
 
+
+def asRunConfig(config, outFile):
+    """
+    function to save the as-run config settings to a text file
+    :param config: [dict] the current config dictionary
+    :param outFile: [str] the filename for the output
+    """
+    #store some run parameters
+    config['runDate']=datetime.date.today().strftime("%m/%d/%y")
+    with open(".git/HEAD",'r') as head:
+        ref = head.readline().split(' ')[-1].strip()
+        branch = ref.split("/")[-1]
+    with open('.git/'+ref,'r') as git_hash:
+        commit = git_hash.readline().strip()
+    config['gitBranch']=branch
+    config['gitCommit'] = commit
+    #and the file info for the input files
+    config['input_file_info']={config[x]:{'file_size':os.stat(config[x]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[x]).st_ctime))} for x in config.keys() if "file" in x and x!="input_file_info"}
+    with open(outFile,'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
 
 def scale(dataset, std=None, mean=None):
     """

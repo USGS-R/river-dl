@@ -118,7 +118,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     water_phi_pbm = []
     water_phi_low_pbm = []
     water_phi_high_pbm = []
-    
+   
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
@@ -336,6 +336,7 @@ def prep_annual_signal_data(
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
     data['GW_val']=GW_val
+    data['GW_vars']=gwVarList
     data['GW_cols']=GW_trn.columns.values.astype('str')
     data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
     data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0)

@@ -1,5 +1,6 @@
 import os
 
+from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
 from river_dl.postproc_utils import plot_obs
@@ -18,12 +19,20 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
+        expand("{outdir}/asRunConfig.yml", outdir=out_dir)
+        
+
+rule as_run_config:
+    output:
+        "{outdir}/asRunConfig.yml"
+    run:
+        asRunConfig(config,output[0])
 
 rule prep_io_data:
     input:
          config['sntemp_file'],
          config['obs_file'],
-         config['dist_matrix'],
+         config['dist_matrix_file'],
     output:
         "{outdir}/prepped.npz"
     run:

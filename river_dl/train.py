@@ -176,10 +176,12 @@ def train_model(
         raise ValueError(
             f"The 'model_type' provided ({model_type}) is not supported"
         )
-
+    if not seed:
+        seed = None
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
         os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
+        os.environ["TF_DETERMINISTIC_OPS"] = "1"
         tf.random.set_seed(seed)
         np.random.seed(seed)
         random.seed(seed)

@@ -13,6 +13,8 @@ out_dir: "output_DRB_offsetTest"
 
 code_dir: "river_dl"
 
+seed: None #random seed for training
+
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']
 #y_vars_pretrain: ['seg_tave_water', 'seg_outflow']

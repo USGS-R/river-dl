@@ -261,7 +261,8 @@ def prep_annual_signal_data(
     water_temp_pbm_col = 'seg_tave_water',
     water_temp_obs_col = 'temp_c',
     segs = None,
-    reach_file = None
+    reach_file = None,
+    gw_loss_type = 'fft'
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -277,6 +278,7 @@ def prep_annual_signal_data(
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
     :param reach_file: str with the file of reach attributes
+    :param gw_loss_type: str with the gw loss method (fft or linalg)
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -337,6 +339,7 @@ def prep_annual_signal_data(
     data['GW_trn']=GW_trn
     data['GW_val']=GW_val
     data['GW_vars']=gwVarList
+    data['gw_loss_type']=gw_loss_type
     data['GW_cols']=GW_trn.columns.values.astype('str')
     data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0)
     data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0)

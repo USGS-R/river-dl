@@ -192,10 +192,12 @@ def train_model(
                 # Do the same for the validation and testing x vars
                 y_val_pre = io_data["y_pre_val"]
                 y_val_pre = np.nan_to_num(y_val_pre, nan = 0)
+                y_val_pre = (y_val_pre - np.mean(y_val_pre)) / (np.std(y_val_pre) + 1e-10)
                 x_val_obs = io_data["x_val"]
                 x_val_obs = np.concatenate([x_val_obs, y_val_pre], 2)
                 y_tst_pre = io_data["y_pre_tst"]
                 y_tst_pre = np.nan_to_num(y_tst_pre, nan = 0)
+                y_tst_pre = (y_tst_pre - np.mean(y_tst_pre)) / (np.std(y_tst_pre) + 1e-10)
                 x_tst_obs = io_data["x_tst"]
                 x_tst_obs = np.concatenate([x_tst_obs, y_tst_pre], 2)
                 # Update the saved file (so that PB outputs are there for eval; generate same file for no PB outputs too)

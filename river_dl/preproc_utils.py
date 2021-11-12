@@ -1,9 +1,29 @@
 import pandas as pd
 import numpy as np
-import yaml
+import time, os
 import xarray as xr
 import datetime
 
+
+def asRunConfig(config, outFile):
+    """
+    function to save the as-run config settings to a text file
+    :param config: [dict] the current config dictionary
+    :param outFile: [str] the filename for the output
+    """
+    #store some run parameters
+    config['runDate']=datetime.date.today().strftime("%m/%d/%y")
+    with open(".git/HEAD",'r') as head:
+        ref = head.readline().split(' ')[-1].strip()
+        branch = ref.split("/")[-1]
+    with open('.git/'+ref,'r') as git_hash:
+        commit = git_hash.readline().strip()
+    config['gitBranch']=branch
+    config['gitCommit'] = commit
+    #and the file info for the input files
+    config['input_file_info']={config[x]:{'file_size':os.stat(config[x]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[x]).st_ctime))} for x in config.keys() if "file" in x and x!="input_file_info"}
+    with open(outFile,'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
 
 def scale(dataset, std=None, mean=None):
     """
@@ -85,6 +105,8 @@ def separate_trn_tst(
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
     """
+    print('train_start_date', train_start_date)
+    print('train_end_date', train_end_date)
     train = sel_partition_data(
         dataset, time_idx_name, train_start_date, train_end_date
     )
@@ -315,9 +337,16 @@ def filter_reduce_dates(df, start_date, end_date, reduce_between=False):
     df_filt = df.copy()
     df_filt = df_filt.reset_index()
     if reduce_between:
-        df_filt = df_filt[
-            (df_filt["date"] > start_date) & (df_filt["date"] < end_date)
-        ]
+        for i in range(len(start_date)): # assumes more than 1
+            temp_indicator = ((df_filt['date'] >= start_date[i]) &
+                              (df_filt['date'] <= end_date[i]))
+            if i == 0:
+                cumulative_or_list = temp_indicator
+            else:
+                cumulative_or_list = np.logical_or(cumulative_or_list, temp_indicator)
+        df_filt = df_filt[np.logical_not(cumulative_or_list)] # logical_not because the dates I identified
+                                                              # (and wanted to keep) were getting set to nan
+    # Ignoring this part, making above work as I expected it to
     else:
         df_filt = df_filt[
             (df_filt["date"] < start_date) | (df_filt["date"] > end_date)
@@ -326,7 +355,7 @@ def filter_reduce_dates(df, start_date, end_date, reduce_between=False):
 
 
 def reduce_training_data_continuous(
-    data_file,
+    data,
     reduce_start="1980-10-01",
     reduce_end="2004-09-30",
     train_start=None,
@@ -361,8 +390,8 @@ def reduce_training_data_continuous(
     :return: [xarray dataset] updated weights (nan where reduced)
     """
     # read in an convert to dataframe
-    ds = xr.open_zarr(data_file)
-    df = ds.to_dataframe()
+    #ds = xr.open_zarr(data_file)
+    df = data.to_dataframe()
     idx = pd.IndexSlice
     df_red = df.copy()
     df_red = df_red.loc[idx[train_start:train_end, :]]
@@ -540,16 +569,9 @@ def prep_y_data(
 
     y_data = read_obs(y_data_file, y_vars, x_data)
 
-    y_trn, y_val, y_tst = separate_trn_tst(
-        y_data,
-        time_idx_name,
-        train_start_date,
-        train_end_date,
-        val_start_date,
-        val_end_date,
-        test_start_date,
-        test_end_date,
-    )
+    y_trn = reduce_training_data_continuous(y_data, train_start_date, train_end_date)
+    y_val = reduce_training_data_continuous(y_data, val_start_date, val_end_date)
+    y_tst = reduce_training_data_continuous(y_data, test_start_date, test_end_date)
 
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)
@@ -589,6 +611,111 @@ def prep_y_data(
     }
     return data
 
+def prep_PB_y_data(
+    y_data_file,
+    y_vars,
+    x_data,
+    train_start_date,
+    train_end_date,
+    val_start_date,
+    val_end_date,
+    test_start_date,
+    test_end_date,
+    spatial_idx_name="seg_id_nat",
+    time_idx_name="date",
+    seq_len=365,
+    log_vars=None,
+    exclude_file=None,
+    normalize_y=True,
+    y_type="obs",
+    y_std=None,
+    y_mean=None,
+    trn_offset = 1.0,
+    tst_val_offset = 1.0
+):
+    """
+    prepare y_dataset data
+
+    :param y_data_file: [str] temperature observations file
+    :param y_vars: [str or list of str] target variable(s)
+    :param x_data: [xr.Dataset] xarray dataset used to match spatial and
+    temporal domain
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
+    :param train_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    train period (can have multiple discontinuous periods)
+    :param train_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end train
+    period (can have multiple discontinuous periods)
+    :param val_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    validation period (can have multiple discontinuous periods)
+    :param val_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end
+    validation period (can have multiple discontinuous periods)
+    :param test_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
+    test period (can have multiple discontinuous periods)
+    :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
+    period (can have multiple discontinuous periods)
+    :param seq_len: [int] length of sequences (e.g., 365)
+    :param log_vars: [list-like] which variables_to_log (if any) to take log of
+    :param exclude_file: [str] path to exclude file
+    :param normalize_y: [bool] whether or not to normalize the y_dataset values
+    :param y_type: [str] "obs" if observations or "pre" if pretraining
+    :param y_std: [array-like] standard deviations of y_dataset variables_to_log
+    :param y_mean: [array-like] means of y_dataset variables_to_log
+    :param trn_offset: [str] value for the training offset
+    :param tst_val_offset: [str] value for the testing and validation offset
+    :returns: training and testing data along with the means and standard
+    deviations of the training input and output data
+    """
+    # I assume that if `y_vars` is a string only one variable has been passed
+    # so I put that in a list which is what the rest of the functions expect
+    if isinstance(y_vars, str):
+        y_vars = [y_vars]
+
+    y_data = read_obs(y_data_file, y_vars, x_data)
+
+    y_trn = y_data
+    y_val = y_data
+    y_tst = y_data
+
+    if log_vars:
+        y_trn = log_variables(y_trn, log_vars)
+
+    # filter pretrain/finetune y_dataset
+    if exclude_file:
+        exclude_segs = read_exclude_segs_file(exclude_file)
+        y_wgts = exclude_segments(y_trn, exclude_segs=exclude_segs)
+    else:
+        y_wgts = initialize_weights(y_trn)
+
+    if normalize_y:
+        # scale y_dataset training data and get the mean and std
+        if not isinstance(y_std, xr.Dataset) or not isinstance(
+            y_mean, xr.Dataset
+        ):
+            y_trn, y_std, y_mean = scale(y_trn)
+        else:
+            y_trn, _, _ = scale(y_trn)
+
+    data = {
+        f"y_{y_type}_trn": convert_batch_reshape(
+            y_trn, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
+        ),
+        f"y_{y_type}_wgts": convert_batch_reshape(
+            y_wgts, spatial_idx_name, time_idx_name, offset=trn_offset, seq_len=seq_len
+        ),
+        f"y_{y_type}_val": convert_batch_reshape(
+            y_val, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
+        ),
+        f"y_{y_type}_tst": convert_batch_reshape(
+            y_tst, spatial_idx_name, time_idx_name, offset=tst_val_offset, seq_len=seq_len
+        ),
+        "y_std": y_std.to_array().values,
+        "y_mean": y_mean.to_array().values,
+        f"y_{y_type}_vars": y_vars,
+    }
+    return data
 
 def prep_all_data(
     x_data_file,
@@ -710,16 +837,9 @@ def prep_all_data(
         x_data = prep_catch_props(x_data, catch_prop_file)
     # make sure we don't have any weird or missing input values
     check_if_finite(x_data)
-    x_trn, x_val, x_tst = separate_trn_tst(
-        x_data,
-        time_idx_name,
-        train_start_date,
-        train_end_date,
-        val_start_date,
-        val_end_date,
-        test_start_date,
-        test_end_date,
-    )
+    x_trn = x_data
+    x_val = x_data
+    x_tst = x_data
 
     x_scl, x_std, x_mean = scale(x_data)
 
@@ -834,7 +954,7 @@ def prep_all_data(
         # if there is a y_data_file and a pretrain file, use the observation
         # mean and standard deviation to do the scaling/centering
         if pretrain_file:
-            y_pre_data = prep_y_data(
+            y_pre_data = prep_PB_y_data(
                 y_data_file=pretrain_file,
                 y_vars=y_vars_pretrain,
                 x_data=x_data,
@@ -859,7 +979,7 @@ def prep_all_data(
     # if there is no observation file, use the pretrain mean and standard dev
     # to do the scaling/centering
     elif pretrain_file and not y_obs_data:
-        y_pre_data = prep_y_data(
+        y_pre_data = prep_PB_y_data(
             y_data_file=pretrain_file,
             y_vars=y_vars_pretrain,
             x_data=x_data,

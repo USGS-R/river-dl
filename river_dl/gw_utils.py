@@ -328,12 +328,12 @@ def prep_annual_signal_data(
     GW_trn_scale['delPhi_obs'] = (GW_trn['delPhi_obs']-np.nanmean(GW_trn['delPhi_obs']))/np.nanstd(GW_trn['delPhi_obs'])
     
     GW_val_scale = deepcopy(GW_val)
-    GW_val_scale['Ar_obs'] = (GW_val_scale['Ar_obs']-np.nanmean(GW_val_scale['Ar_obs']))/np.nanstd(GW_val_scale['Ar_obs'])
-    GW_val_scale['delPhi_obs'] = (GW_val_scale['delPhi_obs']-np.nanmean(GW_val_scale['delPhi_obs']))/np.nanstd(GW_val_scale['delPhi_obs'])
+    GW_val_scale['Ar_obs'] = (GW_val_scale['Ar_obs']-np.nanmean(GW_trn['Ar_obs']))/np.nanstd(GW_trn['Ar_obs'])
+    GW_val_scale['delPhi_obs'] = (GW_val_scale['delPhi_obs']-np.nanmean(GW_trn['delPhi_obs']))/np.nanstd(GW_trn['delPhi_obs'])
     
     GW_tst_scale = deepcopy(GW_tst)
-    GW_tst_scale['Ar_obs'] = (GW_tst_scale['Ar_obs']-np.nanmean(GW_tst_scale['Ar_obs']))/np.nanstd(GW_tst_scale['Ar_obs'])
-    GW_tst_scale['delPhi_obs'] = (GW_tst_scale['delPhi_obs']-np.nanmean(GW_tst_scale['delPhi_obs']))/np.nanstd(GW_tst_scale['delPhi_obs'])
+    GW_tst_scale['Ar_obs'] = (GW_tst_scale['Ar_obs']-np.nanmean(GW_trn['Ar_obs']))/np.nanstd(GW_trn['Ar_obs'])
+    GW_tst_scale['delPhi_obs'] = (GW_tst_scale['delPhi_obs']-np.nanmean(GW_trn['delPhi_obs']))/np.nanstd(GW_trn['delPhi_obs'])
     
     #add the GW data to the y_dataset dataset
     preppedData = np.load(io_data_file)

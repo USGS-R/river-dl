@@ -4,7 +4,7 @@ sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
 dist_matrix_file: "data_DRB/distance_matrix_drb_full_no3558.npz"
 reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
-out_dir: "output_test"
+out_dir: "output_test_fft"
 
 code_dir: "river_dl"
 

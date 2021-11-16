@@ -4,7 +4,7 @@ sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
 dist_matrix_file: "data_DRB/distance_matrix_drb_full_no3558.npz"
 reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
-out_dir: "output_DRB_gw_type_test_linalg"
+out_dir: "output_test"
 
 code_dir: "river_dl"
 
@@ -16,15 +16,13 @@ y_vars_finetune: ['temp_c']
 #y_vars_pretrain: ['seg_tave_water', 'seg_outflow']^M
 ##y_vars_finetune: ['temp_c', 'discharge_cms']^M
 
+seed: False #random seed for training False==No seed, otherwise specify the seed
 
 lambdas: [1]
 #lambdas: [1,0]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
 lambdas_gw: [0, 0]
-
-#gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
-gw_loss_type: 'linalg'
 
 trn_offset: 1.0
 tst_val_offset: 1.0

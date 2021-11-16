@@ -224,7 +224,8 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
             [tf.reshape(tf.range(tf.shape(Phiw)[0]), (-1, 1)),
              tf.reshape(tf.cast(phiIndex, tf.int32), (tf.shape(phiIndex)[0], 1))],
             axis=-1)
-        Phiw_out = tf.squeeze(tf.gather_nd(Phiw, idx))
+        #Phiw_out = tf.squeeze(tf.gather_nd(Phiw, idx))
+        Phiw_out=Phiw[:,1]
 
         Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
 
@@ -239,7 +240,8 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
             [tf.reshape(tf.range(tf.shape(Phia)[0]), (-1, 1)),
              tf.reshape(tf.cast(phiIndex_air, tf.int32), (tf.shape(phiIndex_air)[0], 1))],
             axis=-1)
-        Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
+        #Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
+        Phia_out=Phia[:,1]
 
         Aa = tf.reduce_max(tf.abs(fft_tf_air), 1) / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
 

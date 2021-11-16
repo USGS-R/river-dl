@@ -91,10 +91,11 @@ rule prep_ann_temp:
 #        lamb2=config['lamb2'],
 #        lamb3=config['lamb3'],
 #        loss = config['loss_type'],
+#        seed = config['seed']
 #    shell:
 #        """
 #        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s 135"
+#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s {params.seed}"
 #        """
 
 #get the GW loss parameters
@@ -123,7 +124,7 @@ rule finetune_train:
     run:
         train_model(input[0],config['ft_epochs'],config['hidden_size'],loss_func=get_gw_loss(input[0]),
             out_dir=params.run_dir,model_type='rgcn',num_tasks=len(config['y_vars_finetune']),
-            learning_rate=0.01,train_type='finetune',early_stop_patience=config['early_stopping'])
+            learning_rate=0.01,train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
 
                  
 rule compile_pred_GW_stats:

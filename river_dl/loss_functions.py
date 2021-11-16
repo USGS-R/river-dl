@@ -99,6 +99,7 @@ def multitask_loss(lambdas, loss_func):
     """
 
     def combine_loss(y_true, y_pred):
+        tf.debugging.assert_none_equal(tf.cast(tf.math.count_nonzero(~tf.math.is_nan(y_pred)), tf.int32),0,message="OH NO!! - Predicted temps are all NAN")
         losses = []
         n_vars = y_pred.shape[-1]
         for var_id in range(n_vars):
@@ -207,10 +208,15 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     # assumes the first two columns of data are the observed flow and temperature, and the remaining
     # ones (extracted here) are the data for gw analysis
     y_true = data[:, :, num_task:]
+    y_true_temp = data[:, :, int(temp_index):(int(temp_index) + 1)] 
 
     y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
     # unscale the predicted temps prior to calculating the amplitude and phase
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
+    y_true_temp = y_true_temp * temp_sd + temp_mean
+    
+    Ar_obs = y_true[:, 0, 0]
+    delPhi_obs = y_true[:, 0, 1]
     
     if type=='fft':
         print("FFT LOSS")
@@ -229,6 +235,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
 
         Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
 
+        #get the air signal properties
         y_true_air = y_true[:, :, -1]
         y_true_air_mean = tf.reduce_mean(y_true_air, 1, keepdims=True)
         air_demean = y_true_air - y_true_air_mean
@@ -244,12 +251,37 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         Phia_out=Phia[:,1]
 
         Aa = tf.reduce_max(tf.abs(fft_tf_air), 1) / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
+        
+        #and the observed water temp properties
+        y_true_temp = tf.squeeze(y_true_temp)
+        y_true_temp_mean = tf.reduce_mean(y_true_temp, 1, keepdims=True)
+        true_temp_demean = y_true_temp - y_true_temp_mean
+        fft_tf_true_temp = tf.signal.rfft(true_temp_demean)
+        Phiw_obs1 = tf.math.angle(fft_tf_true_temp)
+
+        phiIndex_true_temp = tf.argmax(tf.abs(fft_tf_true_temp), 1)
+        ida = tf.stack(
+            [tf.reshape(tf.range(tf.shape(Phia)[0]), (-1, 1)),
+             tf.reshape(tf.cast(phiIndex_true_temp, tf.int32), (tf.shape(phiIndex_true_temp)[0], 1))],
+            axis=-1)
+        #Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
+        Phiw_obs=Phiw_obs1[:,1]
+
+        Aw_obs = tf.reduce_max(tf.abs(fft_tf_true_temp), 1) / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
 
         # calculate and scale predicted values
         # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_pred = ((Phiw_out - Phia_out) * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        delPhi_pred = tf.cond(tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out),lambda: tf.subtract(Phiw_out, Phia_out),lambda: tf.subtract(Phia_out, Phiw_out))
+        #delPhi_pred = (Phiw_out - Phia_out) if tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out) else (Phia_out-Phiw_out)
+        delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        
+        delPhi_obs_update = tf.cond(tf.reduce_mean(Phiw_obs)>tf.reduce_mean(Phia_out),lambda: tf.subtract(Phiw_obs, Phia_out),lambda: tf.subtract(Phia_out, Phiw_obs))
+        #delPhi_pred = (Phiw_out - Phia_out) if tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out) else (Phia_out-Phiw_out)
+        delPhi_obs_update = (delPhi_obs_update * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        
         # Ar_pred = the ratio of the water temp and air temp amplitudes
         Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
+        Ar_obs_update = (Aw_obs/Aa - gw_mean[0]) / gw_std[0]
     elif type=="linalg":
         print("LINALG LOSS")
         x_lm = y_true[:,:,-3:-1] #extract the sin(wt) and cos(wt)
@@ -277,11 +309,34 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         #Phi = (3/2)* pi - atan (b/a) - in radians
         Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
         
+        #calculate the air properties
+        y_true_air = y_true[:, :, -1:]
+        a_b_air = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_true_air)
+        A_air = tf.math.sqrt(a_b_air[:,1,0]**2+a_b_air[:,2,0]**2)
+        Phi_air = 3*m.pi/2-tf.math.atan(a_b_air[:,2,0]/a_b_air[:,1,0])
+        
+        #calculate the observed temp properties
+        a_b_obs = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_true_temp)
+        Aw_obs = tf.math.sqrt(a_b_obs[:,1,0]**2+a_b_obs[:,2,0]**2)
+        Phiw_obs = 3*m.pi/2-tf.math.atan(a_b_obs[:,2,0]/a_b_obs[:,1,0])
+        
         #calculate and scale predicted values
         #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_pred = ((Phiw-y_true[:,0,2])*365/(2*m.pi)-gw_mean[1])/gw_std[1]
+        delPhi_pred = tf.cond(tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air),lambda: tf.subtract(Phiw, Phi_air),lambda: tf.subtract(Phi_air, Phiw))
+        #delPhi_pred = (Phiw - Phi_air) if tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air) else (Phi_air-Phiw)
+        delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
+        delPhi_obs_update = tf.cond(tf.reduce_mean(Phiw_obs)>tf.reduce_mean(Phi_air),lambda: tf.subtract(Phiw_obs, Phi_air),lambda: tf.subtract(Phi_air, Phiw_obs))
+        #delPhi_pred = (Phiw - Phi_air) if tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air) else (Phi_air-Phiw)
+        delPhi_obs_update = (delPhi_obs_update * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        #delPhi_pred = ((Phiw-Phi_air)*365/(2*m.pi)-gw_mean[1])/gw_std[1]
         #Ar_pred = the ratio of the water temp and air temp amplitudes
-        Ar_pred = (Aw/y_true[:,0,3]-gw_mean[0])/gw_std[0]
-    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
+        Ar_pred = (Aw/A_air-gw_mean[0])/gw_std[0]
+        Ar_obs_update = (Aw_obs/A_air-gw_mean[0])/gw_std[0]
+
+    delPhi_obs = tf.where(tf.math.is_finite(delPhi_obs_update),delPhi_obs_update,delPhi_obs)
+    Ar_obs = tf.where(tf.math.is_finite(Ar_obs_update),Ar_obs_update,Ar_obs)
+    
+    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred
 
 

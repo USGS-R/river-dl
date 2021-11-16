@@ -55,6 +55,6 @@ test_end_date:
   - '2021-09-30'
 
 
-pt_epochs: 1
+pt_epochs: 200
 ft_epochs: 100
 hidden_size: 20

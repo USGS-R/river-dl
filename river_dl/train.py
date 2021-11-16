@@ -177,8 +177,6 @@ def train_model(
             f"The 'model_type' provided ({model_type}) is not supported"
         )
 
-    print("SEED TEST")
-
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
         os.environ["TF_CUDNN_DETERMINISTIC"] = "1"
@@ -186,8 +184,6 @@ def train_model(
         tf.random.set_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
-        print(seed)
-
 
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
 

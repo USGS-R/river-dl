@@ -341,7 +341,7 @@ def prep_annual_signal_data(
 
     data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList)
     data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList)
-    data['GW_val_reshape']=make_GW_dataset(GW_val,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList)
+    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList)
 
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn

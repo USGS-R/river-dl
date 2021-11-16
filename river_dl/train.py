@@ -177,8 +177,7 @@ def train_model(
             f"The 'model_type' provided ({model_type}) is not supported"
         )
 
-    if seed==-9999:
-        seed = None
+    print("SEED TEST")
 
     if seed:
         os.environ["PYTHONHASHSEED"] = str(seed)
@@ -187,6 +186,7 @@ def train_model(
         tf.random.set_seed(seed)
         np.random.seed(seed)
         random.seed(seed)
+        print(seed)
 
 
     optimizer = tf.optimizers.Adam(learning_rate=learning_rate)

@@ -34,7 +34,12 @@ class RGCN(layers.Layer):
         )
 
         ### set up the weights ###
-        w_initializer = tf.initializers.glorot_normal(seed=rand_seed)
+        #w_initializer = tf.initializers.glorot_normal(seed=rand_seed)
+        #testing using the prior initializer to repeat prior results
+        w_initializer = tf.random_normal_initializer(
+            stddev=0.02, seed=rand_seed
+            )
+
 
         # was Wg1
         self.W_graph_h = self.add_weight(

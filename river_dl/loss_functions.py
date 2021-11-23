@@ -341,6 +341,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     delPhi_obs = tf.where(tf.math.is_finite(delPhi_obs_update),delPhi_obs_update,delPhi_obs)
     Ar_obs = tf.where(tf.math.is_finite(Ar_obs_update),Ar_obs_update,Ar_obs)
     
-    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred
+    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
 
 

@@ -272,7 +272,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         # calculate and scale predicted values
         # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
         delPhi_pred = (Phiw_out - Phia_out)
-        #delPhi_pred = tf.cond(tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out),lambda: tf.subtract(Phiw_out, Phia_out),lambda: tf.subtract(Phia_out, Phiw_out))
+        delPhi_pred = tf.cond(tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out),lambda: tf.subtract(Phiw_out, Phia_out),lambda: tf.subtract(Phia_out, Phiw_out))
         #delPhi_pred = (Phiw_out - Phia_out) if tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out) else (Phia_out-Phiw_out)
         delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
         
@@ -325,7 +325,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         #calculate and scale predicted values
         #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
         delPhi_pred = Phiw - Phi_air
-        #delPhi_pred = tf.cond(tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air),lambda: tf.subtract(Phiw, Phi_air),lambda: tf.subtract(Phi_air, Phiw))
+        delPhi_pred = tf.cond(tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air),lambda: tf.subtract(Phiw, Phi_air),lambda: tf.subtract(Phi_air, Phiw))
         #delPhi_pred = (Phiw - Phi_air) if tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air) else (Phi_air-Phiw)
         delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
         #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days

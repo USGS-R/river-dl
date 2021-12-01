@@ -1,22 +1,14 @@
 # Input files
-obs_file: "data_DRB/Obs_temp_flow_drb_full_no3558"
-sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
-dist_matrix_file: "data_DRB/distance_matrix_drb_full_no3558.npz"
-reach_attr_file: "data_DRB/reach_attributes_drb.csv"
+obs_file: "river_dl/tests/test_data/obs_temp_flow"
+sntemp_file: "river_dl/tests/test_data/test_data"
 
 
 #### for flow modeling, seg_width should be removed from x_vars
-#x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-#x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
-x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet']
+x_vars: ['seg_ccov', 'seg_rain', 'seg_slope', 'seg_tave_air']
 
 out_dir: "output_DRB_shortVarList"
 
-code_dir: "river_dl"
-
-seed: 1234 #random seed for training False==No seed, otherwise specify the seed
-dropout: 0
-recurrent_dropout: 0.3
+seed: False #random seed for training False==No seed, otherwise specify the seed
 
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']
@@ -30,32 +22,28 @@ trn_offset: 1.0
 tst_val_offset: 1.0
 
 #Define early stopping criteria, setting this to False will turn off early stopping rounds
-early_stopping: False
-
-#Choose whether to use the final weights from the end of training ('trained_weights') or the weights from the best
-# validation epoch ('best_val_weights')
-pred_weights: 'best_val_weights'
+early_stopping: 1
 
 train_start_date:
-  - '1984-10-01'
-  - '2015-10-01'
+  - '2003-09-15'
 train_end_date:
-  - '2006-09-30'
-  - '2020-09-30'
-test_start_date:
-  - '1979-10-01'
-  - '2010-10-01'
-  - '2020-10-01'
-test_end_date:
-  - '1984-09-30'
-  - '2015-09-30'
-  - '2021-09-30'
+  - '2005-09-14'
 val_start_date:
-  - '2006-10-01'
+  - '2005-09-14'
 val_end_date:
-  - '2010-09-30'
+  - '2006-09-14'
+test_start_date:
+  - '1980-10-01'
+test_end_date:
+  - '1985-09-30'
 
 
-pt_epochs: 200
-ft_epochs: 100
+pt_epochs: 5
+ft_epochs: 5
 hidden_size: 20
+
+dropout: 0.2
+recurrent_dropout: 0.2
+pretrain_learning_rate: 0.005
+finetune_learning_rate: 0.01
+

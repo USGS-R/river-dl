@@ -271,12 +271,12 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
 
         # calculate and scale predicted values
         # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_pred = (Phiw_out - Phia_out)
+        delPhi_pred = (Phia_out-Phiw_out)
         #delPhi_pred = tf.cond(tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out),lambda: tf.subtract(Phiw_out, Phia_out),lambda: tf.subtract(Phia_out, Phiw_out))
         #delPhi_pred = (Phiw_out - Phia_out) if tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out) else (Phia_out-Phiw_out)
         delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
         
-        delPhi_obs_update = Phiw_obs - Phia_out
+        delPhi_obs_update = Phia_out - Phiw_obs
         #delPhi_obs_update = tf.cond(tf.reduce_mean(Phiw_obs)>tf.reduce_mean(Phia_out),lambda: tf.subtract(Phiw_obs, Phia_out),lambda: tf.subtract(Phia_out, Phiw_obs))
         #delPhi_pred = (Phiw_out - Phia_out) if tf.reduce_mean(Phiw_out)>tf.reduce_mean(Phia_out) else (Phia_out-Phiw_out)
         delPhi_obs_update = (delPhi_obs_update * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
@@ -308,28 +308,28 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         #A = sqrt (a^2 + b^2)
         Aw = tf.math.sqrt(a_b[:,1,0]**2+a_b[:,2,0]**2)
         #Phiw = phase of the water temp sinusoid (radians)
-        #Phi = (3/2)* pi - atan (b/a) - in radians
-        Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
+        #Phi = atan (b/a) - in radians
+        Phiw = tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
         
         #calculate the air properties
         y_true_air = y_true[:, :, -1:]
         a_b_air = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_true_air)
         A_air = tf.math.sqrt(a_b_air[:,1,0]**2+a_b_air[:,2,0]**2)
-        Phi_air = 3*m.pi/2-tf.math.atan(a_b_air[:,2,0]/a_b_air[:,1,0])
+        Phi_air = tf.math.atan(a_b_air[:,2,0]/a_b_air[:,1,0])
         
         #calculate the observed temp properties
         a_b_obs = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_true_temp)
         Aw_obs = tf.math.sqrt(a_b_obs[:,1,0]**2+a_b_obs[:,2,0]**2)
-        Phiw_obs = 3*m.pi/2-tf.math.atan(a_b_obs[:,2,0]/a_b_obs[:,1,0])
+        Phiw_obs = tf.math.atan(a_b_obs[:,2,0]/a_b_obs[:,1,0])
         
         #calculate and scale predicted values
         #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_pred = Phiw - Phi_air
+        delPhi_pred = Phi_air-Phiw
         #delPhi_pred = tf.cond(tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air),lambda: tf.subtract(Phiw, Phi_air),lambda: tf.subtract(Phi_air, Phiw))
         #delPhi_pred = (Phiw - Phi_air) if tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air) else (Phi_air-Phiw)
         delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
         #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_obs_update = Phiw_obs - Phi_air
+        delPhi_obs_update = Phi_air-Phiw_obs
         #delPhi_obs_update = tf.cond(tf.reduce_mean(Phiw_obs)>tf.reduce_mean(Phi_air),lambda: tf.subtract(Phiw_obs, Phi_air),lambda: tf.subtract(Phi_air, Phiw_obs))
         #delPhi_pred = (Phiw - Phi_air) if tf.reduce_mean(Phiw)>tf.reduce_mean(Phi_air) else (Phi_air-Phiw)
         delPhi_obs_update = (delPhi_obs_update * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]

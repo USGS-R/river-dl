@@ -32,7 +32,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     #A = sqrt (a^2 + b^2)
     
     #Phi = phase of the temp sinusoid (radians)
-    #Phi = (3/2)* pi - atan (b/a) - in radians
+    #Phi = atan (b/a) - in radians
     
     #convert the date to decimal years
     date_decimal = make_decimal_date(Date)
@@ -70,8 +70,8 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
             amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
             amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
 
-            phi = 3*math.pi/2-math.atan(results.params[2]/results.params[1])
-            phiRange = [3*math.pi/2-math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
+            phi =math.atan(results.params[2]/results.params[1])
+            phiRange = [math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
             phi_low = np.min(phiRange)
             phi_high = np.max(phiRange)
 
@@ -207,13 +207,13 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
         water_phi_high_obs.append(phi_high)
 
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
-    delPhi_obs = [(water_phi_obs[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
+    delPhi_obs = [(air_phi[x]-water_phi_obs[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     
     Ar_low_obs = [water_amp_low_obs[x]/air_amp_high[x] for x in range(len(water_amp_obs))]
     Ar_high_obs = [water_amp_high_obs[x]/air_amp_low[x] for x in range(len(water_amp_obs))]
     
-    delPhi_low_obs = [(water_phi_low_obs[x]-air_phi_high[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
-    delPhi_high_obs = [(water_phi_high_obs[x]-air_phi_low[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
+    delPhi_low_obs = [(air_phi_high[x]-water_phi_low_obs[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
+    delPhi_high_obs = [(air_phi_low[x]-water_phi_high_obs[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
     
     ########################################################
     #these thresholds were set based on analysis in Hare, D.K., Helton, A.M., Johnson, Z.C., Lane, J.W., and Briggs, M.A.,
@@ -241,7 +241,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     
     
     Ar_pbm = [water_amp_pbm[x]/air_amp[x] for x in range(len(water_amp_pbm))]
-    delPhi_pbm = [(water_phi_pbm[x]-air_phi[x])*365/(2*math.pi) for x in range(len(water_amp_pbm))]
+    delPhi_pbm = [(air_phi[x]-water_phi_pbm[x])*365/(2*math.pi) for x in range(len(water_amp_pbm))]
     
     tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'].values, 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_pbm':water_amp_pbm,'water_phi_pbm':water_phi_pbm,'Ar_pbm':Ar_pbm,'delPhi_pbm':delPhi_pbm})
     return tempDF
@@ -407,7 +407,7 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     obsDF = pd.DataFrame(gw_obs[obs_col],columns=gw_obs['GW_cols'])
     obsDF = obsDF.merge(pred)
     obsDF['Ar_pred']=obsDF['water_amp_pred']/obsDF['air_amp']
-    obsDF['delPhi_pred'] = (obsDF['water_phi_pred']-obsDF['air_phi'])*365/(2*math.pi)
+    obsDF['delPhi_pred'] = (obsDF['air_phi']-obsDF['water_phi_pred'])*365/(2*math.pi)
     return obsDF
 
 def make_GW_dataset (GW_data,x_data,varList):

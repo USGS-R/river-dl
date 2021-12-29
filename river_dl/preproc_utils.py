@@ -174,11 +174,13 @@ def join_catch_properties(x_data_ts, catch_props):
     return xr.merge([x_data_ts, ds_catch], join="left")
 
 
-def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
+def prep_catch_props(x_data_ts, catch_prop_file, spatial_idx_name, replace_nan_with_mean=True):
     """
     read catch property file and join with ts data
     :param x_data_ts: [xr dataset] timeseries x-data
     :param catch_prop_file: [str] the feather file of catchment attributes
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
     :param replace_nan_with_mean: [bool] if true, any nan will be replaced with
     the mean of that variable
     :return: [xr dataset] merged datasets
@@ -189,7 +191,7 @@ def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
         df_catch_props = df_catch_props.apply(
             lambda x: x.fillna(x.mean()), axis=0
         )
-    ds_catch_props = df_catch_props.set_index("seg_id_nat").to_xarray()
+    ds_catch_props = df_catch_props.set_index(spatial_idx_name).to_xarray()
     return join_catch_properties(x_data_ts, ds_catch_props)
 
 
@@ -756,7 +758,7 @@ def prep_all_data(
     x_data = x_data[x_vars]
 
     if catch_prop_file:
-        x_data = prep_catch_props(x_data, catch_prop_file)
+        x_data = prep_catch_props(x_data, catch_prop_file, spatial_idx_name)
     # make sure we don't have any weird or missing input values
     check_if_finite(x_data)
     x_trn, x_val, x_tst = separate_trn_tst(

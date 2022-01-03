@@ -207,10 +207,15 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     # assumes the first two columns of data are the observed flow and temperature, and the remaining
     # ones (extracted here) are the data for gw analysis
     y_true = data[:, :, num_task:]
+    y_true_temp = data[:, :, int(temp_index):(int(temp_index) + 1)] 
 
     y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
     # unscale the predicted temps prior to calculating the amplitude and phase
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
+    y_true_temp = y_true_temp * temp_sd + temp_mean
+    
+    Ar_obs = y_true[:, 0, 0]
+    delPhi_obs = y_true[:, 0, 1]
     
     if type=='fft':
         print("FFT LOSS")
@@ -229,6 +234,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
 
         Aw = tf.reduce_max(tf.abs(fft_tf), 1) / fft_tf.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
 
+        #get the air signal properties
         y_true_air = y_true[:, :, -1]
         y_true_air_mean = tf.reduce_mean(y_true_air, 1, keepdims=True)
         air_demean = y_true_air - y_true_air_mean
@@ -244,12 +250,15 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         Phia_out=Phia[:,1]
 
         Aa = tf.reduce_max(tf.abs(fft_tf_air), 1) / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
-
+        
         # calculate and scale predicted values
         # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_pred = ((Phiw_out - Phia_out) * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        delPhi_pred = (Phia_out-Phiw_out)
+        delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        
         # Ar_pred = the ratio of the water temp and air temp amplitudes
         Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
+        
     elif type=="linalg":
         print("LINALG LOSS")
         x_lm = y_true[:,:,-3:-1] #extract the sin(wt) and cos(wt)
@@ -274,14 +283,23 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         #A = sqrt (a^2 + b^2)
         Aw = tf.math.sqrt(a_b[:,1,0]**2+a_b[:,2,0]**2)
         #Phiw = phase of the water temp sinusoid (radians)
-        #Phi = (3/2)* pi - atan (b/a) - in radians
-        Phiw = 3*m.pi/2-tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
+        #Phi = atan (b/a) - in radians
+        Phiw = tf.math.atan(a_b[:,2,0]/a_b[:,1,0])
+        
+        #calculate the air properties
+        y_true_air = y_true[:, :, -1:]
+        a_b_air = tf.einsum('bij,bik->bjk',X_mat_inv_dot,y_true_air)
+        A_air = tf.math.sqrt(a_b_air[:,1,0]**2+a_b_air[:,2,0]**2)
+        Phi_air = tf.math.atan(a_b_air[:,2,0]/a_b_air[:,1,0])
         
         #calculate and scale predicted values
         #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
-        delPhi_pred = ((Phiw-y_true[:,0,2])*365/(2*m.pi)-gw_mean[1])/gw_std[1]
+        delPhi_pred = Phi_air-Phiw
+        delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        
         #Ar_pred = the ratio of the water temp and air temp amplitudes
-        Ar_pred = (Aw/y_true[:,0,3]-gw_mean[0])/gw_std[0]
-    return y_true[:, 0, 0], Ar_pred, y_true[:, 0, 1], delPhi_pred
+        Ar_pred = (Aw/A_air-gw_mean[0])/gw_std[0]
+
+    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred
 
 

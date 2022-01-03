@@ -7,13 +7,14 @@ reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
 #### for flow modeling, seg_width should be removed from x_vars
 #x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
+#x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
+x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet']
 
-out_dir: "output_test"
+out_dir: "output_DRB_shortVarList"
 
 code_dir: "river_dl"
 
-seed: False #random seed for training False==No seed, otherwise specify the seed
+seed: 1234 #random seed for training False==No seed, otherwise specify the seed
 
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']

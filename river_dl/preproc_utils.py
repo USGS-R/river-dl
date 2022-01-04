@@ -129,17 +129,6 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
     :return: [numpy array] batched data with dims [nbatches, nseg, seq_len
     (batch_size), nfeat]
     """
-    '''
-    combined = []
-    for i in range(int(1 / offset)):
-        start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1] + 1, step=seq_len)
-        split = np.split(data_array, indices_or_sections=idx, axis=1)
-        # add all but the first and last batch since they will be smaller
-        combined.extend([s for s in split if s.shape[1] == seq_len])
-    combined = np.asarray(combined)
-    #else:
-    '''
     if offset>1:
         period = offset
     else:

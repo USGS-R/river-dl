@@ -123,11 +123,13 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
     :param data_array: [numpy array] array of training data with dims [nseg,
     ndates, nfeat]
     :param seq_len: [int] length of sequences (e.g., 365)
-    :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
-    the first batch will be 0-365 and the second will be 182-547)
+    :param offset: [float] How to offset the batches. Values < 1 are taken as fractions, (e.g., 0.5 means that
+    the first batch will be 0-365 and the second will be 182-547), values > 1 are used as a constant number of
+    observations to offset by.
     :return: [numpy array] batched data with dims [nbatches, nseg, seq_len
     (batch_size), nfeat]
     """
+    '''
     combined = []
     for i in range(int(1 / offset)):
         start = int(i * offset * seq_len)
@@ -135,6 +137,20 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
         split = np.split(data_array, indices_or_sections=idx, axis=1)
         # add all but the first and last batch since they will be smaller
         combined.extend([s for s in split if s.shape[1] == seq_len])
+    combined = np.asarray(combined)
+    #else:
+    '''
+    if offset>1:
+        period = offset
+    else:
+        period = int(offset*seq_len)
+    num_batches = int(data_array.shape[1]//period)
+    combined=[]
+    for i in range(num_batches+1):
+        idx = int(period*i)
+        batch = data_array[:,idx-seq_len:idx,...]
+        combined.append(batch)
+    combined = [b for b in combined if b.shape[1]==seq_len]
     combined = np.asarray(combined)
     return combined
 

@@ -115,6 +115,10 @@ class RGCN(layers.Layer):
                 )
             )
 
+            ## Update dropout masks
+            self.lstm.reset_dropout_mask()
+            self.lstm.reset_recurrent_dropout_mask()
+
             seq, state = self.lstm(
                 inputs[:, t, :], states=[hidden_state_prev, cell_state_prev]
             )

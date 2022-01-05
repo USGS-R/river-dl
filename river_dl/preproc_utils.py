@@ -87,8 +87,9 @@ def separate_trn_tst(
 ):
     """
     separate the train data from the test data according to the start and end
-    dates. This assumes your training data is in one continuous block and all
-    the dates that are not in the training are in the testing.
+    dates. This assumes your training data is in one continuous block. Be aware, if your train/test/val partitions are
+    discontinuous (composed of multiple periods), you'll end up with sequences starting in one period and ending in
+    another.
     :param dataset: [xr dataset] input or output data with dims
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
@@ -133,11 +134,11 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
         period = offset
     else:
         period = int(offset*seq_len)
-    num_batches = int(data_array.shape[1]//period)
+    num_batches = data_array.shape[1]//period
     combined=[]
     for i in range(num_batches+1):
         idx = int(period*i)
-        batch = data_array[:,idx-seq_len:idx,...]
+        batch = data_array[:,idx:idx+seq_len,...]
         combined.append(batch)
     combined = [b for b in combined if b.shape[1]==seq_len]
     combined = np.asarray(combined)

@@ -108,6 +108,7 @@ def train_model(
     train_type = 'pre',
     early_stop_patience = None,
     limit_pretrain = False,
+    keep_portion = None
 ):
     """
     train the rgcn
@@ -128,6 +129,7 @@ def train_model(
     :param train_type: [str] Either pretraining (pre) or finetuning (finetune)
     :param early_stop_patience [int]  Number of epochs with no improvement after which training will be stopped.
     :param limit_pretrain [bool] If true, limits pretraining to just the training partition.  If false (default), pretrains on all available data.
+    :param keep_portion [float] Mask out observed sequence leading up to the keep portion if specified.
     :return: [tf model]  Model
     """
     if train_type not in ['pre','finetune']:
@@ -203,6 +205,16 @@ def train_model(
                 x_trn_pre = io_data["x_pre_full"]
                 y_trn_pre = io_data["y_pre_full"]
 
+            # If keep portion is specified, mask the sequence outside that portion to
+            # force the loss function focus on only the keep portion.
+            if keep_portion:
+                if keep_portion > 1:
+                    period = keep_portion
+                else:
+                    period = int(keep_portion * y_trn_obs.shape[1])
+                y_trn_pre[:, :-period, ...] = np.nan
+                y_val_pre[:, :-period, ...] = np.nan
+
             # Initialize our model within the training engine
             engine = trainer(model, optimizer, loss_func)
 
@@ -239,6 +251,17 @@ def train_model(
         x_trn = io_data["x_trn"]
         y_val_obs = io_data['y_obs_val']
         x_val = io_data['x_val']
+
+        # If keep portion is specified, mask the sequence outside that portion to
+        # force the loss function focus on only the keep portion.
+        if keep_portion:
+            if keep_portion > 1:
+                period = keep_portion
+            else:
+                period = int(keep_portion * y_trn_obs.shape[1])
+            y_trn_obs[:,:-period,...] = np.nan
+            y_val_obs[:,:-period,...] = np.nan
+
 
         if "GW_trn_reshape" in io_data.files:
             temp_air_index = np.where(io_data['x_vars'] == 'seg_tave_air')[0]

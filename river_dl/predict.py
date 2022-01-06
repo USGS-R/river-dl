@@ -87,8 +87,8 @@ def predict_from_io_data(
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
     :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
-    :param trn_offset: [str] value for the training offset
-    :param tst_val_offset: [str] value for the testing and validation offset
+    :param trn_offset: [float] value for the training offset
+    :param tst_val_offset: [float] value for the testing and validation offset
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
@@ -101,9 +101,9 @@ def predict_from_io_data(
     )
 
     if partition == "trn":
-        keep_frac = trn_offset
+        keep_portion = trn_offset
     else:
-        keep_frac = tst_val_offset
+        keep_portion = tst_val_offset
 
     preds = predict(
         model,
@@ -113,7 +113,7 @@ def predict_from_io_data(
         io_data["y_std"],
         io_data["y_mean"],
         io_data["y_obs_vars"],
-        keep_last_frac=keep_frac,
+        keep_last_portion=keep_portion,
         outfile=outfile,
         log_vars=log_vars,
     )
@@ -128,7 +128,7 @@ def predict(
     y_stds,
     y_means,
     y_vars,
-    keep_last_frac=1.0,
+    keep_last_portion=1.0,
     outfile=None,
     log_vars=False,
 ):
@@ -139,9 +139,11 @@ def predict(
     :param pred_ids: [np array] the ids of the segments (same shape as x_data)
     :param pred_dates: [np array] the dates of the segments (same shape as
     x_data)
-    :param keep_last_frac: [float] fraction of the predictions to keep starting
+    :param keep_last_portion: [float] fraction of the predictions to keep starting
     from the *end* of the predictions (0-1). (1 means you keep all of the
-    predictions, .75 means you keep the final three quarters of the predictions)
+    predictions, .75 means you keep the final three quarters of the predictions). Alternatively, if
+    keep_last_portion is > 1 it's taken as an absolute number of predictions to retain from the end of the
+    prediction sequence.
     :param y_stds:[np array] the standard deviation of the y_dataset data
     :param y_means:[np array] the means of the y_dataset data
     :param y_vars:[np array] the variable names of the y_dataset data
@@ -154,7 +156,10 @@ def predict(
     y_pred = model.predict(x_data, batch_size=num_segs)
 
     # keep only specified part of predictions
-    frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_frac))
+    if keep_last_portion>1:
+        frac_seq_len = int(y_pred.shape[1] - keep_last_portion)
+    else:
+        frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_portion))
     y_pred = y_pred[:, frac_seq_len:, :]
     pred_ids = pred_ids[:, frac_seq_len:, :]
     pred_dates = pred_dates[:, frac_seq_len:, :]
@@ -238,14 +243,17 @@ def predict_one_date_range(
     prep
     :param keep_last_frac: [float] fraction of the predictions to keep starting
     from the *end* of the predictions (0-1). (1 means you keep all of the
-    predictions, .75 means you keep the final three quarters of the predictions)
+    predictions, .75 means you keep the final three quarters of the predictions).
+    Values greater than 1 are taken as a constant number of predictions to keep from the
+    end of the sequence.
     :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
-    the first batch will be 0-365 and the second will be 182-547)
+    the first batch will be 0-365 and the second will be 182-547). Values greater than
+    1 are taken as a constant number of observations to offset by.
     :param swap_halves_of_first_seq: [bool] whether or not to make an
     *additional* sequence from the first sequence. The additional sequence will
     be the first sequence with the first and last halves swapped. The last half
     of the the first sequence serves as a stand-in spin-up period for ths first
-    half predictions. This option makes most sense only when keep_last_frac=0.5.
+    half predictions. This option makes most sense only when keep_last_portion=0.5.
     :return: [pd dataframe] the predictions
     """
     ds_x_scaled = ds_x_scaled[train_io_data["x_cols"]]
@@ -288,7 +296,7 @@ def predict_one_date_range(
         train_io_data["y_std"],
         train_io_data["y_mean"],
         train_io_data["y_obs_vars"],
-        keep_last_frac=keep_last_frac,
+        keep_last_portion=keep_last_frac,
         log_vars=log_vars,
     )
     return predictions

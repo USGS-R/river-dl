@@ -145,7 +145,8 @@ rule combine_metrics:
     input:
          config['obs_file'],
          "{outdir}/trn_preds.feather",
-         "{outdir}/val_preds.feather"
+         "{outdir}/val_preds.feather",
+         "{outdir}/tst_preds.feather"
     output:
          "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'
@@ -154,7 +155,8 @@ rule combine_metrics:
     run:
         combined_metrics(obs_file=input[0],
                          pred_trn=input[1],
-                         pred_tst=input[2],
+                         pred_val=input[2],
+                         pred_tst=input[3],
                          group=params.grp_arg,
                          outfile=output[0])
 

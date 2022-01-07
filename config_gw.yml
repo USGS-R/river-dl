@@ -26,7 +26,7 @@ lambdas: [1]
 lambdas_gw: [0, 0]
 
 #gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
-gw_loss_type: 'fft'
+gw_loss_type: 'linalg'
 
 trn_offset: 1.0 #values other than 1 have not been implemented / tested for the GW loss
 tst_val_offset: 1.0
@@ -42,22 +42,20 @@ train_start_date:
   - '1984-10-01'
   - '2015-10-01'
 train_end_date:
-  - '2010-09-30'
+  - '2006-09-30'
   - '2020-09-30'
-val_start_date:
+test_start_date:
   - '1979-10-01'
   - '2010-10-01'
   - '2020-10-01'
-val_end_date:
+test_end_date:
   - '1984-09-30'
   - '2015-09-30'
   - '2021-09-30'
-test_start_date:
-  - '1980-10-01'
-  - '2020-10-01'
-test_end_date:
-  - '1985-09-30'
-  - '2021-09-30'
+val_start_date:
+  - '2006-10-01'
+val_end_date:
+  - '2010-09-30'
 
 pt_epochs: 200 
 ft_epochs: 100

@@ -209,12 +209,11 @@ def train_model(
             # force the loss function focus on only the keep portion.
             if keep_portion:
                 if keep_portion > 1:
-                    period = keep_portion
+                    period = int(keep_portion)
                 else:
-                    period = int(keep_portion * y_trn_obs.shape[1])
+                    period = int(keep_portion * y_trn_pre.shape[1])
                 y_trn_pre[:, :-period, ...] = np.nan
-                y_val_pre[:, :-period, ...] = np.nan
-
+                
             # Initialize our model within the training engine
             engine = trainer(model, optimizer, loss_func)
 
@@ -256,7 +255,7 @@ def train_model(
         # force the loss function focus on only the keep portion.
         if keep_portion:
             if keep_portion > 1:
-                period = keep_portion
+                period = int(keep_portion)
             else:
                 period = int(keep_portion * y_trn_obs.shape[1])
             y_trn_obs[:,:-period,...] = np.nan

@@ -131,7 +131,7 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
     (batch_size), nfeat]
     """
     if offset>1:
-        period = offset
+        period = int(offset)
     else:
         period = int(offset*seq_len)
     num_batches = data_array.shape[1]//period

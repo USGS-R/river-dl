@@ -73,7 +73,9 @@ rule prep_ann_temp:
                   test_end_date=config['test_end_date'], 
                   out_file=output[0],
                   reach_file= config['reach_attr_file'],
-                  gw_loss_type=config['gw_loss_type'])
+                  gw_loss_type=config['gw_loss_type'],
+                  trn_offset = config['trn_offset'],
+                  tst_val_offset = config['tst_val_offset'])
 
 # use "train" if wanting to use GPU on HPC
 #rule train:

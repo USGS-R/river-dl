@@ -28,7 +28,7 @@ lambdas_gw: [0.5, 0.5]
 #gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
 gw_loss_type: 'fft'
 
-trn_offset: 0.5 #values other than 1 have not been implemented / tested for the GW loss
+trn_offset: 0.5 
 tst_val_offset: 0.5
 
 #Define early stopping criteria, setting this to False will turn off early stopping rounds

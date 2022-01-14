@@ -4,7 +4,7 @@ sntemp_file: "data_DRB/sntemp_inputs_outputs_drb_full_no3558"
 dist_matrix_file: "data_DRB/distance_matrix_drb_full_no3558.npz"
 reach_attr_file: "data_DRB/reach_attributes_drb.csv"
 
-out_dir: "output_DRB_offsetTest2"
+out_dir: "output_DRB_offsetTest"
 
 code_dir: "river_dl"
 
@@ -32,7 +32,7 @@ trn_offset: 0.5
 tst_val_offset: 0.5
 
 #Define early stopping criteria, setting this to False will turn off early stopping rounds
-early_stopping: False
+early_stopping: 20 
 
 #Choose whether to use the final weights from the end of training ('trained_weights') or the weights from the best
 # validation epoch ('best_val_weights')

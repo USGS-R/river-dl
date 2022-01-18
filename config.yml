@@ -15,6 +15,8 @@ out_dir: "output_DRB_shortVarList"
 code_dir: "river_dl"
 
 seed: 1234 #random seed for training False==No seed, otherwise specify the seed
+dropout: 0
+recurrent_dropout: 0.3
 
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']

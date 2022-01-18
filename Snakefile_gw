@@ -127,7 +127,7 @@ rule finetune_train:
     run:
         train_model(input[0],config['ft_epochs'],config['hidden_size'],loss_func=get_gw_loss(input[0]),
             out_dir=params.run_dir,model_type='rgcn',num_tasks=len(config['y_vars_finetune']),
-            learning_rate=0.01,recurrent_dropout=0.3,train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
+            learning_rate=0.01, dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'],train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
 
                  
 rule compile_pred_GW_stats:

@@ -281,8 +281,8 @@ def prep_annual_signal_data(
     :param air_temp_col: str with the column name of the air temperatures in degrees C
     :param reach_file: str with the file of reach attributes
     :param gw_loss_type: str with the gw loss method (fft or linalg)
-    :param trn_offset: [str] value for the training offset
-    :param tst_val_offset: [str] value for the testing and validation offset
+    :param trn_offset: [float] value for the training offset
+    :param tst_val_offset: [float] value for the testing and validation offset
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -420,6 +420,7 @@ def make_GW_dataset (GW_data,x_data,varList, offset=1):
     :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
     :param x_data: [str] observation dataset
     :param varList: [str] variables_to_log to keep in the final dataset
+    :param offset: [float] offset for the dataset
     :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
     """
     #make a dataframe with all combinations of segment and date and then join the annual temperature signal properties dataframe to it

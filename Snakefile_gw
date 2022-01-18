@@ -73,7 +73,9 @@ rule prep_ann_temp:
                   test_end_date=config['test_end_date'], 
                   out_file=output[0],
                   reach_file= config['reach_attr_file'],
-                  gw_loss_type=config['gw_loss_type'])
+                  gw_loss_type=config['gw_loss_type'],
+                  trn_offset = config['trn_offset'],
+                  tst_val_offset = config['tst_val_offset'])
 
 # use "train" if wanting to use GPU on HPC
 #rule train:
@@ -125,7 +127,7 @@ rule finetune_train:
     run:
         train_model(input[0],config['ft_epochs'],config['hidden_size'],loss_func=get_gw_loss(input[0]),
             out_dir=params.run_dir,model_type='rgcn',num_tasks=len(config['y_vars_finetune']),
-            learning_rate=0.01,train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
+            learning_rate=0.01, dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'],train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
 
                  
 rule compile_pred_GW_stats:

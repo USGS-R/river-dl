@@ -93,7 +93,7 @@ rule pre_train:
     run:
         train_model(input[0], config['pt_epochs'], config['hidden_size'], loss_func=loss_function,
                     out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_pretrain']),
-                    learning_rate=0.005, train_type = 'pre', early_stop_patience=None, seed = config['seed'])
+                    learning_rate=0.005, train_type = 'pre', dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'], early_stop_patience=None, seed = config['seed'])
 
 
 # Finetune/train the model on observations
@@ -111,7 +111,7 @@ rule finetune_train:
     run:
         train_model(input[0], config['ft_epochs'], config['hidden_size'], loss_func=loss_function,
                     out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']),
-                    learning_rate=0.01, train_type = 'finetune', early_stop_patience=config['early_stopping'], seed = config['seed'])
+                    learning_rate=0.01, dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'], train_type = 'finetune', early_stop_patience=config['early_stopping'], seed = config['seed'])
 
 rule make_predictions:
     input:
@@ -145,7 +145,8 @@ rule combine_metrics:
     input:
          config['obs_file'],
          "{outdir}/trn_preds.feather",
-         "{outdir}/val_preds.feather"
+         "{outdir}/val_preds.feather",
+         "{outdir}/tst_preds.feather"
     output:
          "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'
@@ -154,7 +155,8 @@ rule combine_metrics:
     run:
         combined_metrics(obs_file=input[0],
                          pred_trn=input[1],
-                         pred_tst=input[2],
+                         pred_val=input[2],
+                         pred_tst=input[3],
                          group=params.grp_arg,
                          outfile=output[0])
 

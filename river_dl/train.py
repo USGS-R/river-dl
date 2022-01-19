@@ -82,7 +82,7 @@ def train_model(
         csv_log = tf.keras.callbacks.CSVLogger(log_file)
         callbacks.append(csv_log)
 
-    print(best_val_weight_dir)
+    # Save alternate weight file that saves the best validation weights
     if best_val_weight_dir:
         best_val = tf.keras.callbacks.ModelCheckpoint(
             best_val_weight_dir, monitor='val_loss', verbose=0, save_best_only=True,
@@ -130,6 +130,5 @@ def train_model(
     if weight_dir:
         model.save_weights(weight_dir)
 
-    # Save alternate weight file that saves the best validation weights
 
     return model

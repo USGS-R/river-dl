@@ -5,18 +5,19 @@ import xarray as xr
 import datetime
 
 
-def asRunConfig(config, outFile):
+def asRunConfig(config, code_dir, outFile):
     """
     function to save the as-run config settings to a text file
     :param config: [dict] the current config dictionary
+    :param code_dir: [str] path to river-dl directory
     :param outFile: [str] the filename for the output
     """
     #store some run parameters
     config['runDate']=datetime.date.today().strftime("%m/%d/%y")
-    with open(".git/HEAD",'r') as head:
+    with open(os.path.join(code_dir,".git/HEAD"),'r') as head:
         ref = head.readline().split(' ')[-1].strip()
         branch = ref.split("/")[-1]
-    with open('.git/'+ref,'r') as git_hash:
+    with open(os.path.join(code_dir,'.git/', ref),'r') as git_hash:
         commit = git_hash.readline().strip()
     config['gitBranch']=branch
     config['gitCommit'] = commit

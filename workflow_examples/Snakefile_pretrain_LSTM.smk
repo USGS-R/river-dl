@@ -14,7 +14,7 @@ from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl import loss_functions as lf
-from river_dl.RGCN import RGCNModel
+from river_dl.rnns import LSTMModel
 
 out_dir = config['out_dir']
 loss_function = lf.multitask_rmse(config['lambdas'])
@@ -51,6 +51,8 @@ rule prep_io_data:
                   x_vars=config['x_vars'],
                   y_vars_pretrain=config['y_vars_pretrain'],
                   y_vars_finetune=config['y_vars_finetune'],
+                  spatial_idx_name='segs_test',
+                  time_idx_name='times_test',
                   catch_prop_file=None,
                   exclude_file=None,
                   train_start_date=config['train_start_date'],
@@ -103,12 +105,11 @@ rule pre_train:
 
         optimizer = tf.optimizers.Adam(learning_rate=config['pretrain_learning_rate']) 
 
-        model = RGCNModel(
+        model = LSTMModel(
             config['hidden_size'],
             recurrent_dropout=config['recurrent_dropout'],
             dropout=config['dropout'],
             num_tasks=len(config['y_vars_pretrain']),
-            A= data["dist_matrix"]
         )
 
         model.compile(optimizer=optimizer, loss=loss_function)
@@ -139,12 +140,11 @@ rule finetune_train:
         data = np.load(input[0])
         optimizer = tf.optimizers.Adam(learning_rate=config['finetune_learning_rate']) 
 
-        model = RGCNModel(
+        model = LSTMModel(
             config['hidden_size'],
             recurrent_dropout=config['recurrent_dropout'],
             dropout=config['dropout'],
             num_tasks=len(config['y_vars_pretrain']),
-            A= data["dist_matrix"]
         )
 
         model.compile(optimizer=optimizer, loss=loss_function)
@@ -174,13 +174,11 @@ rule make_predictions:
         "{outdir}/{partition}_preds.feather",
     group: 'train_predict_evaluate'
     run:
-        data = np.load(input[1])
-        model = RGCNModel(
+        model = LSTMModel(
             config['hidden_size'],
             recurrent_dropout=config['recurrent_dropout'],
             dropout=config['dropout'],
             num_tasks=len(config['y_vars_pretrain']),
-            A= data["dist_matrix"]
         )
         weight_dir = input[0] + '/'
         model.load_weights(weight_dir)
@@ -189,6 +187,8 @@ rule make_predictions:
                              partition=wildcards.partition,
                              outfile=output[0],
                              trn_offset = config['trn_offset'],
+                             spatial_idx_name='segs_test',
+                             time_idx_name='times_test',
                              tst_val_offset = config['tst_val_offset'])
 
 
@@ -217,6 +217,8 @@ rule combine_metrics:
         combined_metrics(obs_file=input[0],
                          pred_trn=input[1],
                          pred_val=input[2],
+                         spatial_idx_name='segs_test',
+                         time_idx_name='times_test',
                          group=params.grp_arg,
                          outfile=output[0])
 

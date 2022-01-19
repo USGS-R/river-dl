@@ -2,6 +2,11 @@ import os
 import tensorflow as tf
 import numpy as np
 
+code_dir = '..'
+# if using river_dl installed with pip this is not needed
+import sys
+sys.path.insert(1, code_dir)
+
 from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
@@ -27,7 +32,7 @@ rule as_run_config:
     output:
         "{outdir}/asRunConfig.yml"
     run:
-        asRunConfig(config,output[0])
+        asRunConfig(config, code_dir, output[0])
 
 rule prep_io_data:
     input:
@@ -38,11 +43,9 @@ rule prep_io_data:
     run:
         prep_all_data(
                   x_data_file=input[0],
-                  pretrain_file=input[0],
                   y_data_file=input[1],
                   x_vars=config['x_vars'],
-                  y_vars_pretrain=config['y_vars_pretrain'],
-                  y_vars_finetune=config['y_vars_finetune'],
+                  y_vars_finetune=config['y_vars'],
                   spatial_idx_name='segs_test',
                   time_idx_name='times_test',
                   catch_prop_file=None,
@@ -84,63 +87,33 @@ model = LSTMModel(
     config['hidden_size'],
     recurrent_dropout=config['recurrent_dropout'],
     dropout=config['dropout'],
-    num_tasks=len(config['y_vars_pretrain'])
+    num_tasks=len(config['y_vars'])
 )
 
-# Pretrain the model on process based model
-rule pre_train:
-    input:
-        "{outdir}/prepped.npz"
-    output:
-        directory("{outdir}/pretrained_weights/"),
-        "{outdir}/pretrain_log.csv",
-        "{outdir}/pretrain_time.txt",
-    params:
-        # getting the base path to put the training outputs in
-        # I omit the last slash (hence '[:-1]' so the split works properly
-        weight_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-    run:
-        optimizer = tf.optimizers.Adam(learning_rate=config['pretrain_learning_rate']) 
-        model.compile(optimizer=optimizer, loss=loss_function)
-        data = np.load(input[0])
-        train_model(model,
-                    x_trn = data['x_pre_full'],
-                    y_trn = data['y_pre_full'],
-                    epochs = config['pt_epochs'],
-                    batch_size = 2,
-                    # I need to add a trailing slash here. Otherwise the wgts
-                    # get saved in the "outdir"
-                    weight_dir = output[0] + "/",
-                    log_file = output[1],
-                    time_file = output[2])
 
-
-# Finetune/train the model on observations
-rule finetune_train:
+# train the model on observations
+rule train_model:
     input:
         "{outdir}/prepped.npz",
-        "{outdir}/pretrained_weights/"
     output:
-        directory("{outdir}/finetune_weights/"),
-        directory("{outdir}/best_val_weights/"),
+        directory("{outdir}/trained_weights/"),
         "{outdir}/finetune_log.csv",
         "{outdir}/finetune_time.txt",
     run:
         optimizer = tf.optimizers.Adam(learning_rate=config['finetune_learning_rate']) 
         model.compile(optimizer=optimizer, loss=loss_function)
         data = np.load(input[0])
-        model.load_weights(input[1] + "/")
         train_model(model,
                     x_trn = data['x_trn'],
                     y_trn = data['y_obs_trn'],
-                    epochs = config['pt_epochs'],
+                    epochs = config['epochs'],
                     batch_size = 2,
+                    seed = config['seed'],
                     x_val = data['x_val'],
                     y_val = data['y_obs_val'],
                     # I need to add a trailing slash here. Otherwise the wgts
                     # get saved in the "outdir"
                     weight_dir = output[0] + "/",
-                    best_val_weight_dir = output[1] + "/",
                     log_file = output[1],
                     time_file = output[2],
                     early_stop_patience=config['early_stopping'])
@@ -148,7 +121,7 @@ rule finetune_train:
 
 rule make_predictions:
     input:
-        "{outdir}/finetune_weights/",
+        "{outdir}/trained_weights/",
         "{outdir}/prepped.npz"
     output:
         "{outdir}/{partition}_preds.feather",

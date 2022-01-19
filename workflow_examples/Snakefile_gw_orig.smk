@@ -1,10 +1,9 @@
+# this is an example snakefile for utilizing the groundwater loss function
+# to use this snakefile, type:
+# snakemake -s Snakefile_gw --configfile config_gw.yml -j1
+
 import os
 import numpy as np
-
-code_dir = config['code_dir']
-# if using river_dl installed with pip this is not needed
-import sys
-sys.path.insert(1, code_dir)
 
 from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
@@ -15,13 +14,14 @@ from river_dl import loss_functions as lf
 from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
 
 
-out_dir = config['out_dir'] 
+out_dir = config['out_dir']
+code_dir = config['code_dir']
 pred_weights = config['pred_weights']
 loss_function = lf.multitask_rmse(config['lambdas'])
 
 
 module base_workflow:
-    snakefile: "Snakefile_rgcn.smk"
+    snakefile: "Snakefile"
     config: config
 
 use rule * from base_workflow as base_*
@@ -73,9 +73,7 @@ rule prep_ann_temp:
                   test_end_date=config['test_end_date'], 
                   out_file=output[0],
                   reach_file= config['reach_attr_file'],
-                  gw_loss_type=config['gw_loss_type'],
-                  trn_offset = config['trn_offset'],
-                  tst_val_offset = config['tst_val_offset'])
+                  gw_loss_type=config['gw_loss_type'])
 
 # use "train" if wanting to use GPU on HPC
 #rule train:
@@ -116,37 +114,18 @@ def get_gw_loss(input_data, temp_var="temp_c"):
 rule finetune_train:
     input:
         "{outdir}/prepped_withGW.npz",
+        "{outdir}/pretrained_weights/pretrain.done"
     output:
         directory("{outdir}/trained_weights/"),
         directory("{outdir}/best_val_weights/"),
+    params:
+        # getting the base path to put the training outputs in
+        # I omit the last slash (hence '[:-1]' so the split works properly
+        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
-        data = np.load(input[0])
-        temp_air_index = np.where(io_data['x_vars'] == 'seg_tave_air')[0]
-        air_unscaled = io_data['x_trn'][:, :, temp_air_index] * io_data['x_std'][temp_air_index] + \
-                       io_data['x_mean'][temp_air_index]
-        y_trn_obs = np.concatenate(
-            [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
-        )
-        air_val = io_data['x_val'][:, :, temp_air_index] * io_data['x_std'][temp_air_index] + io_data['x_mean'][
-            temp_air_index]
-        y_val_obs = np.concatenate(
-            [io_data["y_obs_val"], io_data["GW_val_reshape"], air_val], axis=2
-        )
-            # Run the finetuning within the training engine on CPU for the GW loss function
-        train_model(model,
-                    x_trn = data['x_trn'],
-                    y_trn = y_trn_obs,
-                    epochs = config['pt_epochs'],
-                    batch_size = 2,
-                    x_val = data['x_val'],
-                    y_val = y_val_obs,
-                    # I need to add a trailing slash here. Otherwise the wgts
-                    # get saved in the "outdir"
-                    weight_dir = output[0] + "/",
-                    best_val_weight_dir = output[1] + "/",
-                    log_file = output[1],
-                    time_file = output[2],
-                    early_stop_patience=config['early_stopping'])
+        train_model(input[0],config['ft_epochs'],config['hidden_size'],loss_func=get_gw_loss(input[0]),
+            out_dir=params.run_dir,model_type='rgcn',num_tasks=len(config['y_vars_finetune']),
+            learning_rate=0.01,train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
 
                  
 rule compile_pred_GW_stats:

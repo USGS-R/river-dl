@@ -1,28 +1,24 @@
 # Input files
-obs_file: "river_dl/tests/test_data/obs_temp_flow"
-sntemp_file: "river_dl/tests/test_data/test_data"
+obs_file: "../river_dl/tests/test_data/obs_temp_flow"
+sntemp_file: "../river_dl/tests/test_data/test_data"
 
 
 #### for flow modeling, seg_width should be removed from x_vars
 x_vars: ['seg_ccov', 'seg_rain', 'seg_slope', 'seg_tave_air']
 
-out_dir: "output_DRB_shortVarList"
+out_dir: "../output_test_basic"
 
 seed: False #random seed for training False==No seed, otherwise specify the seed
 
-y_vars_pretrain: ['seg_tave_water']
-y_vars_finetune: ['temp_c']
-#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
-#y_vars_finetune: ['temp_c', 'discharge_cms']
+y_vars: ['temp_c']
 
 lambdas: [1]
-#lambdas: [1,0]
 
 trn_offset: 1.0
 tst_val_offset: 1.0
 
 #Define early stopping criteria, setting this to False will turn off early stopping rounds
-early_stopping: 1
+early_stopping: False
 
 train_start_date:
   - '2003-09-15'
@@ -38,8 +34,7 @@ test_end_date:
   - '1985-09-30'
 
 
-pt_epochs: 5
-ft_epochs: 5
+epochs: 5
 hidden_size: 20
 
 dropout: 0.2

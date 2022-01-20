@@ -1,7 +1,6 @@
 import numpy as np
 import torch
-from gwn. model import gwnet
-from gwn.util import rmse
+from river_dl.GraphWaveNet import gwnet
 import torch.utils.data
 import torch.optim as optim
 import pandas as pd
@@ -53,7 +52,6 @@ def train_loop(dataloader, model, loss_function, optimizer, device = 'cpu'):
     train_loss=[]
     with tqdm(dataloader, unit="batch") as tepoch:
         for x, y in tepoch: #enumerate(dataloader):
-            t1 = time.time()
             trainx = x.to(device)
             trainy = y.to(device)
             optimizer.zero_grad()
@@ -91,7 +89,8 @@ def train_torch(model,
                 x_val = None,
                 y_val = None,
                 shuffle = False,
-                out_dir = None):
+                weights_file = None,
+                log_file= None):
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -139,11 +138,10 @@ def train_torch(model,
             s1 = time.time()
             model.eval()
             epoch_val_loss = val_loop(val_loader, model, loss_function, device)
-            train_log.append({'split': 'val', 'epoch': i, 'loss': epoch_val_loss, 'time': time.time() - s1}, ignore_index=True)
 
             if epoch_val_loss < best_loss:
                 if out_dir:
-                    torch.save(model.state_dict(), os.path.join(out_dir, "weights_best_val.pth"))
+                    torch.save(model.state_dict(), weights_file)
                 best_loss = epoch_val_loss
                 epochs_since_best = 0
             else:
@@ -151,15 +149,37 @@ def train_torch(model,
             if epochs_since_best > early_stopping_patience:
                 print(f"Early Stopping at Epoch {i}")
                 break
-            val_time.append(s1-time.time())
+            train_log.append({'split': 'val', 'epoch': i, 'loss': epoch_val_loss, 'time': time.time() - s1},
+                             ignore_index=True)
+            val_time.append(time.time()-s1)
 
-        if out_dir:
-            torch.save(model.state_dict(), os.path.join(out_dir, "weights_final.pth"))
-            train_log.to_csv(os.path.join(out_dir, 'train_log.csv'), index=False)
-
+    train_log.to_csv(log_file, index=False)
+    if x_val is None:
+        torch.save(model.state_dict(), weights_file)
     print("Average Training Time: {:.4f} secs/epoch".format(np.mean(train_time)))
     print("Average Validation (Inference) Time: {:.4f} secs/epoch".format(np.mean(val_time)))
     return model
+
+
+def rmse_masked(y_true, y_pred):
+    num_y_true = torch.count_nonzero(~torch.isnan(y_true))
+    if num_y_true > 0:
+        zero_or_error = torch.where(
+            torch.isnan(y_true), torch.zeros_like(y_true), y_pred - y_true
+        )
+        sum_squared_errors = torch.sum(torch.square(zero_or_error))
+        rmse_loss = torch.sqrt(sum_squared_errors / num_y_true)
+    else:
+        rmse_loss = 0.0
+    return rmse_loss
+
+
+def rmse_weighted(y_true, y_pred): # weighted by covariance matrix from DA; weights are concatonated onto y_true and need to separate out within function
+    raise(NotImplementedError)
+    return rmse_loss
+
+
+'''
 
 device = 'cpu'
 data = np.load('../river-dl/output_test/0.75_180/prepped.npz')
@@ -179,7 +199,7 @@ opt = optim.Adam(model.parameters(), lr=lrate, weight_decay=wdecay)
 scheduler = optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda epoch: 0.97 ** epoch)
 lfunc = rmse
 
-'''
+
 trained = train_torch(model,
                       lfunc,
                       opt,
@@ -190,7 +210,7 @@ trained = train_torch(model,
                       20,
                       data['x_val'][:10,...],
                       data['y_obs_val'][:10,...])
-'''
+
 train_data = []
 for i in range(len(data['x_trn'])):
     train_data.append([torch.from_numpy(data['x_trn'][i]).float(),
@@ -252,3 +272,4 @@ plt.xscale('log')
 plt.show()
 
 lr_log[np.argmin(diff)]
+'''

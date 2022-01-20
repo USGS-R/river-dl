@@ -1,18 +1,21 @@
-name: rgcn
+name: gwn_integration
 channels:
+    - pytorch
     - conda-forge
     - defaults
     - bioconda
 dependencies:
-    - dask
-    - ipython
+    - pytorch
+    - torchvision
+    - torchaudio
+    #- cudatoolkit=11.3
+    - pip
+    - jupyterlab
     - matplotlib
     - pandas
     - pyarrow
     - scikit-learn
     - snakemake
-    - tensorflow = 2.1.0
-    - tensorflow-gpu = 2.1.0
-    - tensorflow-estimator = 2.1.0
     - xarray
     - zarr
+    - tqdm

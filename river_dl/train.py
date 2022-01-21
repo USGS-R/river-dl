@@ -20,11 +20,11 @@ def train_model(
     seed=None,
     early_stop_patience = None,
     limit_pretrain = False,
-    keep_portion = None
+    keep_portion = None,
     use_cpu=False
 ):
     """
-    train the rgcn
+    train the model
     :param model: [compiled TF model] a TF model compiled with a loss function 
     and an optimizer
     :param epochs: [int] number of train epochs
@@ -35,7 +35,6 @@ def train_model(
     :param log_file: [str] path to file where training log will be saved
     :param time_file: [str] path to file where training time will be written
     :param seed: [int] random seed
-    :return: [tf model]  Model
     :param early_stop_patience [int] Number of epochs with no improvement after
     which training will be stopped. Default is none meaning that training will
     continue for all specified epochs
@@ -83,11 +82,13 @@ def train_model(
         callbacks.append(csv_log)
 
     # Save alternate weight file that saves the best validation weights
-    if best_val_weight_dir:
+    if best_val_weight_dir and isinstance(x_val, np.ndarray):
         best_val = tf.keras.callbacks.ModelCheckpoint(
             best_val_weight_dir, monitor='val_loss', verbose=0, save_best_only=True,
             save_weights_only=True, mode='min', save_freq='epoch')
         callbacks.append(best_val)
+    elif best_val_weight_dir and not isinstance(x_val, np.ndarray):
+        raise ValueError("best_val_weight_dir requires validation data")
 
 
     if isinstance(x_val, np.ndarray) and isinstance(y_val, np.ndarray):

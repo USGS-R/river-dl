@@ -1,6 +1,6 @@
 ## Intro
-The Snakefiles and associated config files in this directory are meant to provide examples of Snakemake workflows that use river-dl functionality. Hopefully these can serve as examples, but also hopefully you are thinking about what works best for _your_ follow or depart from these examples accordingly:
-- You will need to modify some things if you want to use these workflows for your own purposes. See "What might change when you make your own workflow" section below for more details on what and where you might modify.
+The Snakefiles and associated config files in this directory are meant to provide examples of Snakemake workflows that use river-dl functionality. Hopefully these can serve as examples, but also we hope you are thinking about what works best for _your_ needs and that you follow or depart from these examples accordingly. Some things to consider:
+- If you want to use these workflows for your own purposes, you will need to modify some things. See ["What might change when you make your own workflow"](#what-might-change-when-you-make-your-own-workflow) section below for more details on what you might modify and where those modifications might take place.
 - There are _many_ ways that snakemake could be used with river-dl to execute these workflows. If you want to learn more about the basics of snakemake, we recommend checking out their [tutorial](https://snakemake.readthedocs.io/en/stable/tutorial/tutorial.html) and their [comprehensive docs](https://snakemake.readthedocs.io/en/stable/).
 - There are also many ways that river-dl can be used _without_ snakemake. For example, you could simply use a Python file to call different river-dl functions. This option generally trades robustness and scalability for expediency.
 

@@ -21,6 +21,12 @@ Assuming you have `snakemake` installed, you would run the "basic" workflow with
 snakemake -s Snakefile_basic.smk --configfile config.yml -j1
 ```
 
+## Train a model on a GPU
+To train a model using GPU, this line can be added to the `run` part of your training rule before the actual code that trains the model:
+```python
+os.system("module load analytics cuda10.1/toolkit/10.1.105"
+```
+
 ## Links
 Snakemake docs: [https://snakemake.readthedocs.io/en/stable/](https://snakemake.readthedocs.io/en/stable/)
 

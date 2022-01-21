@@ -62,27 +62,6 @@ rule prep_io_data:
                   tst_val_offset = config['tst_val_offset'])
 
 
-# use "train" if wanting to use GPU on HPC
-# rule train:
-#    input:
-#        "{outdir}/prepped.npz"
-#    output:
-#        directory("{outdir}/trained_model/"),
-#        directory("{outdir}/pretrained_model/"),
-#    params:
-#        # getting the base path to put the training outputs in
-#        # I omit the last slash (hence '[:-1]' so the split works properly
-#        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#        pt_epochs=config['pt_epochs'],
-#        ft_epochs=config['ft_epochs'],
-#        lamb=config['lamb'],
-#    shell:
-#        """
-#        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jsadler/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lambdas {params.lamb} --loss_func multitask_rmse --model rgcn -s 135"
-#        """
-
-
 model = LSTMModel(
     config['hidden_size'],
     recurrent_dropout=config['recurrent_dropout'],

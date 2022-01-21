@@ -77,29 +77,6 @@ rule prep_ann_temp:
                   trn_offset = config['trn_offset'],
                   tst_val_offset = config['tst_val_offset'])
 
-# use "train" if wanting to use GPU on HPC
-#rule train:
-#    input:
-#        "{outdir}/prepped_withGW.npz"
-#    output:
-#        directory("{outdir}/trained_weights/"),
-#        directory("{outdir}/pretrained_weights/"),
-#    params:
-#        # getting the base path to put the training outputs in
-#        # I omit the last slash (hence '[:-1]' so the split works properly
-#        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#        pt_epochs=config['pt_epochs'],
-#        ft_epochs=config['ft_epochs'],
-#        lamb=config['lamb'],
-#        lamb2=config['lamb2'],
-#        lamb3=config['lamb3'],
-#        loss = config['loss_type'],
-#        seed = config['seed']
-#    shell:
-#        """
-#        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s {params.seed}"
-#        """
 
 #get the GW loss parameters
 def get_gw_loss(input_data, temp_var="temp_c"):

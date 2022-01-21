@@ -52,7 +52,7 @@ If you want to build from one of the example workflows, you will _need_ to chang
 
 
 ### Changes that are made `Snakefile` 
-**Things you will most likely _need_ to change (or at least make sure it's what you want): **
+**Things you will most likely _need_ to change (or at least make sure it's what you want):**
 - the deep learning `model` you are wanting to train/evaluate. This is defined and compiled (with the optimizer and loss function) in the Snakefile. For example, this happens on line 65 of `Snakefile_basic.smk`:
 ```python
 model = LSTMModel(

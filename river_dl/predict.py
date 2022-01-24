@@ -4,18 +4,13 @@ import xarray as xr
 import datetime
 from numpy.lib.npyio import NpzFile
 
-from river_dl.RGCN import RGCNModel
 from river_dl.postproc_utils import prepped_array_to_df
 from river_dl.preproc_utils import (
     scale,
     convert_batch_reshape,
     coord_as_reshaped_array,
 )
-from river_dl.rnns import LSTMModel, GRUModel
-<<<<<<< HEAD
-from river_dl.train import get_data_if_file
 from river_dl.gwn_integration_utils import predict_torch
-=======
 
 
 def get_data_if_file(d):
@@ -28,7 +23,6 @@ def get_data_if_file(d):
         return d
     else:
         return np.load(d, allow_pickle=True)
->>>>>>> origin/main
 
 
 def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
@@ -64,7 +58,8 @@ def predict_from_io_data(
     trn_offset = 1.0,
     tst_val_offset = 1.0,
     spatial_idx_name="seg_id_nat",
-    time_idx_name="date"
+    time_idx_name="date",
+    torch_model = False,
 ):
     """
     make predictions from trained model
@@ -96,7 +91,8 @@ def predict_from_io_data(
         outfile=outfile,
         log_vars=log_vars,
         spatial_idx_name=spatial_idx_name,
-        time_idx_name=time_idx_name
+        time_idx_name=time_idx_name,
+        torch_model=torch_model,
     )
     return preds
 
@@ -113,7 +109,8 @@ def predict(
     outfile=None,
     log_vars=False,
     spatial_idx_name="seg_id_nat",
-    time_idx_name="date"
+    time_idx_name="date",
+    torch_model = False,
 ):
     """
     use trained model to make predictions
@@ -138,19 +135,23 @@ def predict(
     """
     num_segs = len(np.unique(pred_ids))
 
-    y_pred = model.predict(x_data, batch_size=num_segs)
-
-    if torch_model = True:
-        y_pred = predict_torch(x_data, model, batch_size=5,)
+    if torch_model:
+        y_pred = predict_torch(x_data, model, batch_size=5)
+        if len(y_pred.shape) > 3:
+            y_pred=y_pred.transpose(1,3)
+            pred_ids = np.transpose(pred_ids,(0,3,2,1))
+            pred_dates=np.transpose(pred_dates,(0,3,2,1))
+    else:
+        y_pred = model.predict(x_data, batch_size=num_segs)
 
     # keep only specified part of predictions
     if keep_last_portion>1:
         frac_seq_len = int(y_pred.shape[1] - keep_last_portion)
     else:
         frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_portion))
-    y_pred = y_pred[:, frac_seq_len:, :]
-    pred_ids = pred_ids[:, frac_seq_len:, :]
-    pred_dates = pred_dates[:, frac_seq_len:, :]
+    y_pred = y_pred[:, frac_seq_len:,...]
+    pred_ids = pred_ids[:, frac_seq_len:,...]
+    pred_dates = pred_dates[:, frac_seq_len:,...]
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars, spatial_idx_name, time_idx_name)
 

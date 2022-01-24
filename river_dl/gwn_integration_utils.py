@@ -36,6 +36,7 @@ def reshape_for_gwn(cat_data, keep_portion=None):
         shapes_rdl = cat_data[i].shape
         reshaped = cat_data[i].reshape(int(shapes_rdl[0] / n_segs), n_segs, shapes_rdl[1], shapes_rdl[2])
         reshaped = np.moveaxis(reshaped,3,1)
+        #reshaped = np.transpose(reshaped,(0,3,2,1))
         cat_reshaped[i] = reshaped
 
     for file in set(cat_data.files) - set(files):

@@ -5,6 +5,7 @@ from river_dl.preproc_utils import prep_all_data
 from river_dl.gwn_integration_utils import reshape_for_gwn
 from river_dl.gwn_integration_utils import train_torch
 from river_dl.gwn_integration_utils import rmse_masked
+from river_dl.evaluate import combined_metrics
 import numpy as np
 import torch
 import torch.optim as optim
@@ -13,8 +14,7 @@ import torch.optim as optim
 #from river_dl.evaluate import combined_metrics
 #from river_dl.postproc_utils import plot_obs
 from river_dl.GraphWaveNet import gwnet
-
-#from river_dl.predict import predict_from_io_data
+from river_dl.predict import predict_from_io_data
 #from river_dl.train import train_model
 #from river_dl import loss_functions as lf
 
@@ -24,10 +24,10 @@ rule all:
     input:
         f"{out_dir}/finetuned_weights.pth",
         f"{out_dir}/finetune_log.csv",
-        #expand("{outdir}/{metric_type}_metrics.csv",
-        #    outdir=out_dir,
-        #    metric_type=['overall', 'month', 'reach', 'month_reach'],
-        #),
+        expand("{outdir}/{metric_type}_metrics.csv",
+            outdir=out_dir,
+            metric_type=['overall', 'month', 'reach', 'month_reach'],
+        ),
         expand("{outdir}/asRunConfig.yml",outdir=out_dir)
 
 
@@ -35,7 +35,7 @@ rule as_run_config:
     output:
         "{outdir}/asRunConfig.yml"
     run:
-        asRunConfig(config,output[0])
+        asRunConfig(config,'',output[0])
 
 rule copy_snakefile:
     output:
@@ -90,7 +90,7 @@ rule pre_train:
         weight_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
         data = np.load(input[0])
-        data = reshape_for_gwn(data, keep_portion=config['trn_offset'])
+        data = reshape_for_gwn(data,keep_portion=config['trn_offset'])
         adj_mx = data['dist_matrix']
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         supports = [torch.tensor(adj_mx).to(device).float()]
@@ -99,7 +99,7 @@ rule pre_train:
         num_nodes = adj_mx.shape[0]
         lrate = 0.001
         wdecay = 0.0001
-        model = gwnet(device, num_nodes,supports=supports,aptinit=supports[
+        model = gwnet(device,num_nodes,supports=supports,aptinit=supports[
             0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=2)
         opt = optim.Adam(model.parameters(),lr=lrate,weight_decay=wdecay)
         scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
@@ -137,11 +137,12 @@ rule finetune_train:
         num_nodes = adj_mx.shape[0]
         lrate = 0.001
         wdecay = 0.0001
-        model = gwnet(device, num_nodes,supports=supports,aptinit=supports[
+        model = gwnet(device,num_nodes,supports=supports,aptinit=supports[
             0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=2)
-        model.load_state_dict(torch.load(input[1]))
         opt = optim.Adam(model.parameters(),lr=lrate,weight_decay=wdecay)
         scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
+
+        model.load_state_dict(torch.load(input[1]))
 
         train_torch(model,
             loss_function=rmse_masked,
@@ -164,16 +165,33 @@ rule make_predictions:
         "{outdir}/{partition}_preds.feather",
     group: 'train_predict_evaluate'
     run:
-        model_dir = input[0] + '/'
-        predict_from_io_data(model_type='rgcn',model_weights_dir=model_dir,
-            hidden_size=config['hidden_size'],io_data=input[1],
-            partition=wildcards.partition,outfile=output[0],
-            num_tasks=len(config['y_vars_finetune']),
+        data = np.load(input[1])
+        data = reshape_for_gwn(data,keep_portion=config['trn_offset'])
+        adj_mx = data['dist_matrix']
+        device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        supports = [torch.tensor(adj_mx).to(device).float()]
+        in_dim = len(data['x_vars'])
+        out_dim = data['y_obs_trn'].shape[3]
+        num_nodes = adj_mx.shape[0]
+        lrate = 0.001
+        wdecay = 0.0001
+        model = gwnet(device,num_nodes,supports=supports,aptinit=supports[
+            0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=2)
+        opt = optim.Adam(model.parameters(),lr=lrate,weight_decay=wdecay)
+        scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
+
+        model.load_state_dict(torch.load(input[0]))
+
+        predict_from_io_data(model,
+            data,
+            wildcards.partition,
+            outfile=output[0],
             trn_offset=config['trn_offset'],
             tst_val_offset=config['tst_val_offset'],
+            torch_model=True,
             )
 
-'''
+
 def get_grp_arg(wildcards):
     if wildcards.metric_type == 'overall':
         return None
@@ -213,4 +231,3 @@ rule plot_prepped_data:
     run:
         plot_obs(input[0],wildcards.variable,output[0],
             partition=wildcards.partition)
-'''

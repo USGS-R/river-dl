@@ -1,9 +1,10 @@
-# this is an example snakefile for utilizing the groundwater loss function
-# to use this snakefile, type:
-# snakemake -s Snakefile_gw --configfile config_gw.yml -j1
-
 import os
 import numpy as np
+
+code_dir = config['code_dir']
+# if using river_dl installed with pip this is not needed
+import sys
+sys.path.insert(1, code_dir)
 
 from river_dl.preproc_utils import prep_all_data
 from river_dl.evaluate import combined_metrics
@@ -14,14 +15,13 @@ from river_dl import loss_functions as lf
 from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
 
 
-out_dir = config['out_dir']
-code_dir = config['code_dir']
+out_dir = config['out_dir'] 
 pred_weights = config['pred_weights']
 loss_function = lf.multitask_rmse(config['lambdas'])
 
 
 module base_workflow:
-    snakefile: "Snakefile"
+    snakefile: "Snakefile_rgcn.smk"
     config: config
 
 use rule * from base_workflow as base_*
@@ -77,29 +77,6 @@ rule prep_ann_temp:
                   trn_offset = config['trn_offset'],
                   tst_val_offset = config['tst_val_offset'])
 
-# use "train" if wanting to use GPU on HPC
-#rule train:
-#    input:
-#        "{outdir}/prepped_withGW.npz"
-#    output:
-#        directory("{outdir}/trained_weights/"),
-#        directory("{outdir}/pretrained_weights/"),
-#    params:
-#        # getting the base path to put the training outputs in
-#        # I omit the last slash (hence '[:-1]' so the split works properly
-#        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#        pt_epochs=config['pt_epochs'],
-#        ft_epochs=config['ft_epochs'],
-#        lamb=config['lamb'],
-#        lamb2=config['lamb2'],
-#        lamb3=config['lamb3'],
-#        loss = config['loss_type'],
-#        seed = config['seed']
-#    shell:
-#        """
-#        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jbarclay/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lamb {params.lamb} --lamb2 {params.lamb2} --lamb3 {params.lamb3} --model rgcn --loss {params.loss} -s {params.seed}"
-#        """
 
 #get the GW loss parameters
 def get_gw_loss(input_data, temp_var="temp_c"):
@@ -116,18 +93,37 @@ def get_gw_loss(input_data, temp_var="temp_c"):
 rule finetune_train:
     input:
         "{outdir}/prepped_withGW.npz",
-        "{outdir}/pretrained_weights/pretrain.done"
     output:
         directory("{outdir}/trained_weights/"),
         directory("{outdir}/best_val_weights/"),
-    params:
-        # getting the base path to put the training outputs in
-        # I omit the last slash (hence '[:-1]' so the split works properly
-        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
-        train_model(input[0],config['ft_epochs'],config['hidden_size'],loss_func=get_gw_loss(input[0]),
-            out_dir=params.run_dir,model_type='rgcn',num_tasks=len(config['y_vars_finetune']),
-            learning_rate=0.01, dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'],train_type='finetune',early_stop_patience=config['early_stopping'], seed = config['seed'])
+        data = np.load(input[0])
+        temp_air_index = np.where(io_data['x_vars'] == 'seg_tave_air')[0]
+        air_unscaled = io_data['x_trn'][:, :, temp_air_index] * io_data['x_std'][temp_air_index] + \
+                       io_data['x_mean'][temp_air_index]
+        y_trn_obs = np.concatenate(
+            [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
+        )
+        air_val = io_data['x_val'][:, :, temp_air_index] * io_data['x_std'][temp_air_index] + io_data['x_mean'][
+            temp_air_index]
+        y_val_obs = np.concatenate(
+            [io_data["y_obs_val"], io_data["GW_val_reshape"], air_val], axis=2
+        )
+            # Run the finetuning within the training engine on CPU for the GW loss function
+        train_model(model,
+                    x_trn = data['x_trn'],
+                    y_trn = y_trn_obs,
+                    epochs = config['pt_epochs'],
+                    batch_size = 2,
+                    x_val = data['x_val'],
+                    y_val = y_val_obs,
+                    # I need to add a trailing slash here. Otherwise the wgts
+                    # get saved in the "outdir"
+                    weight_dir = output[0] + "/",
+                    best_val_weight_dir = output[1] + "/",
+                    log_file = output[1],
+                    time_file = output[2],
+                    early_stop_patience=config['early_stopping'])
 
                  
 rule compile_pred_GW_stats:

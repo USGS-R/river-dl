@@ -106,7 +106,7 @@ def plot_ts(pred_file, obs_file, variable, out_file):
     plt.savefig(out_file)
 
 
-def prepped_array_to_df(data_array, dates, ids, col_names):
+def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg_id_nat', time_idx_name='date'):
     """
     convert prepped x or y_dataset data in numpy array to pandas df
     (reshape and make into pandas DFs)
@@ -117,15 +117,11 @@ def prepped_array_to_df(data_array, dates, ids, col_names):
     :return:[pd dataframe] df with cols
     ['date', 'seg_id_nat', 'temp_c', 'discharge_cms]
     """
-    data_array = np.reshape(
-        data_array,
-        [data_array.shape[0] * data_array.shape[1], data_array.shape[2]],
-    )
-
-    dates = np.reshape(dates, [dates.shape[0] * dates.shape[1], dates.shape[2]])
-    ids = np.reshape(ids, [ids.shape[0] * ids.shape[1], ids.shape[2]])
+    data_array = data_array.flatten()
+    dates = dates.flatten()
+    ids = ids.flatten()
     df_preds = pd.DataFrame(data_array, columns=col_names)
-    df_dates = pd.DataFrame(dates, columns=["date"])
-    df_ids = pd.DataFrame(ids, columns=["seg_id_nat"])
+    df_dates = pd.DataFrame(dates, columns=[time_idx_name])
+    df_ids = pd.DataFrame(ids, columns=[spatial_idx_name])
     df = pd.concat([df_dates, df_ids, df_preds], axis=1)
     return df

@@ -48,15 +48,15 @@ def reshape_for_gwn(cat_data, keep_portion=None):
     return cat_reshaped
 
 ## Generic PyTorch Training Routine
-def train_loop(dataloader, model, loss_function, optimizer, device = 'cpu'):
+def train_loop(epoch_index, dataloader, model, loss_function, optimizer, device = 'cpu'):
     train_loss=[]
-    with tqdm(dataloader, unit="batch") as tepoch:
+    with tqdm(dataloader, ncols=100, desc= f"Epoch {epoch_index+1}", unit="batch") as tepoch:
         for x, y in tepoch: #enumerate(dataloader):
             trainx = x.to(device)
             trainy = y.to(device)
             optimizer.zero_grad()
             output = model(trainx)
-            loss = loss_function(output, trainy)
+            loss = loss_function(trainy, output)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 3)
             optimizer.step()
@@ -71,7 +71,7 @@ def val_loop(dataloader, model, loss_function, device = 'cpu'):
         testx = x.to(device)
         testy = y.to(device)
         output = model(testx)
-        loss = loss_function(output, testy)
+        loss = loss_function(testy, output)
         val_loss.append(loss.item())
     mval_loss = np.mean(val_loss)
     print(f"Valid loss: {mval_loss:.2f}")
@@ -126,10 +126,10 @@ def train_torch(model,
 
         #Train
         t1 = time.time()
-        print(f"Epoch: {i + 1}")
+        #print(f"Epoch: {i + 1}")
 
         model.train()
-        epoch_loss = train_loop(train_loader, model, loss_function, optimizer, device)
+        epoch_loss = train_loop(i, train_loader, model, loss_function, optimizer, device)
         train_time.append(time.time() - t1)
         train_log.append({'split':'train','epoch':i,'loss':epoch_loss,'time':time.time()-t1}, ignore_index=True)
 
@@ -140,8 +140,7 @@ def train_torch(model,
             epoch_val_loss = val_loop(val_loader, model, loss_function, device)
 
             if epoch_val_loss < best_loss:
-                if out_dir:
-                    torch.save(model.state_dict(), weights_file)
+                torch.save(model.state_dict(), weights_file)
                 best_loss = epoch_val_loss
                 epochs_since_best = 0
             else:
@@ -156,8 +155,10 @@ def train_torch(model,
     train_log.to_csv(log_file, index=False)
     if x_val is None:
         torch.save(model.state_dict(), weights_file)
-    print("Average Training Time: {:.4f} secs/epoch".format(np.mean(train_time)))
-    print("Average Validation (Inference) Time: {:.4f} secs/epoch".format(np.mean(val_time)))
+        print("Average Training Time: {:.4f} secs/epoch".format(np.mean(train_time)))
+    else:
+        print("Average Training Time: {:.4f} secs/epoch".format(np.mean(train_time)))
+        print("Average Validation (Inference) Time: {:.4f} secs/epoch".format(np.mean(val_time)))
     return model
 
 
@@ -174,9 +175,23 @@ def rmse_masked(y_true, y_pred):
     return rmse_loss
 
 
-def rmse_weighted(y_true, y_pred): # weighted by covariance matrix from DA; weights are concatonated onto y_true and need to separate out within function
-    raise(NotImplementedError)
-    return rmse_loss
+def predict_torch(x_data, model, batch_size, device='cpu'):
+    data = []
+    for i in range(len(x_data)):
+        data.append(torch.from_numpy(x_data[i]).float())
+
+    dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, pin_memory=True)
+    model.to(device)
+    model.eval()
+    predicted = []
+    for iter, x in enumerate(dataloader):
+        trainx = x.to(device)
+        with torch.no_grad():
+            output = model(trainx)
+        predicted.append(output)
+    predicted = torch.cat(predicted, dim=0)
+    return predicted
+
 
 
 '''

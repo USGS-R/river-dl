@@ -100,7 +100,7 @@ rule pre_train:
         lrate = 0.001
         wdecay = 0.0001
         model = gwnet(device, num_nodes,supports=supports,aptinit=supports[
-            0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=1)
+            0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=2)
         opt = optim.Adam(model.parameters(),lr=lrate,weight_decay=wdecay)
         scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
 
@@ -138,8 +138,8 @@ rule finetune_train:
         lrate = 0.001
         wdecay = 0.0001
         model = gwnet(device, num_nodes,supports=supports,aptinit=supports[
-            0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=1)
-        model.load_state_dict(input[1])
+            0],in_dim=in_dim,out_dim=out_dim,layers=5,kernel_size=7,blocks=2)
+        model.load_state_dict(torch.load(input[1]))
         opt = optim.Adam(model.parameters(),lr=lrate,weight_decay=wdecay)
         scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
 
@@ -149,13 +149,13 @@ rule finetune_train:
             x_train=data['x_trn'],
             y_train=data['y_obs_trn'],
             x_val=data['x_val'],
-            y_val=data['y_val'],
+            y_val=data['y_obs_val'],
             max_epochs=config['pt_epochs'],
             early_stopping_patience=config['early_stopping'],
             batch_size = config['batch_size'],
             weights_file=output[0],
             log_file=output[1])
-'''
+
 rule make_predictions:
     input:
         "{outdir}/finetuned_weights.pth",
@@ -170,9 +170,10 @@ rule make_predictions:
             partition=wildcards.partition,outfile=output[0],
             num_tasks=len(config['y_vars_finetune']),
             trn_offset=config['trn_offset'],
-            tst_val_offset=config['tst_val_offset'])
+            tst_val_offset=config['tst_val_offset'],
+            )
 
-
+'''
 def get_grp_arg(wildcards):
     if wildcards.metric_type == 'overall':
         return None

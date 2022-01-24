@@ -12,6 +12,7 @@ from river_dl.preproc_utils import (
 )
 from river_dl.rnns import LSTMModel, GRUModel
 from river_dl.train import get_data_if_file
+from river_dl.gwn_integration_utils import predict_torch
 
 
 def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
@@ -74,6 +75,7 @@ def predict_from_io_data(
     num_tasks=1,
     trn_offset = 1.0,
     tst_val_offset = 1.0,
+    torch_model = False,
 ):
     """
     make predictions from trained model
@@ -116,6 +118,7 @@ def predict_from_io_data(
         keep_last_portion=keep_portion,
         outfile=outfile,
         log_vars=log_vars,
+        torch_model=True,
     )
     return preds
 
@@ -131,6 +134,7 @@ def predict(
     keep_last_portion=1.0,
     outfile=None,
     log_vars=False,
+    torch_model = False,
 ):
     """
     use trained model to make predictions
@@ -150,10 +154,15 @@ def predict(
     :param outfile: [str] the file where the output data should be stored
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
+    :para torch_model: [bool] toggle for pytorch predictions.
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
+
     y_pred = model.predict(x_data, batch_size=num_segs)
+
+    if torch_model = True:
+        y_pred = predict_torch(x_data, model, batch_size=5,)
 
     # keep only specified part of predictions
     if keep_last_portion>1:

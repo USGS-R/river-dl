@@ -136,11 +136,15 @@ def predict(
     num_segs = len(np.unique(pred_ids))
 
     if torch_model:
-        y_pred = predict_torch(x_data, model, batch_size=5)
-        if len(y_pred.shape) > 3:
+        if len(y_pred.shape) > 3: #Catch for dealing with GraphWaveNet vs RGCN
+            y_pred = predict_torch(x_data, model, batch_size=5)
             y_pred=y_pred.transpose(1,3)
             pred_ids = np.transpose(pred_ids,(0,3,2,1))
             pred_dates=np.transpose(pred_dates,(0,3,2,1))
+
+        y_pred = predict_torch(x_data, model, batch_size=num_segs)
+
+
     else:
         y_pred = model.predict(x_data, batch_size=num_segs)
 

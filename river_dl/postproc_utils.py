@@ -55,7 +55,7 @@ def fmt_preds_obs(pred_data,
 
     if {time_idx_name, spatial_idx_name}.issubset(pred_data.columns):
         pred_data.set_index([time_idx_name, spatial_idx_name], inplace=True)
-    obs = xr.open_zarr(obs_file).to_dataframe()
+    obs = xr.open_zarr(obs_file,consolidated=False).to_dataframe()
     variables_data = {}
 
     for var_name in pred_data.columns:

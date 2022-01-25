@@ -243,7 +243,7 @@ def partition_metrics(
         metrics["variable"] = data_var
         metrics["partition"] = partition
         var_metrics_list.append(metrics)
-        var_metrics = pd.concat(var_metrics_list)
+        var_metrics = pd.concat(var_metrics_list).round(6)
     if outfile:
         var_metrics.to_csv(outfile, header=True, index=False)
     return var_metrics

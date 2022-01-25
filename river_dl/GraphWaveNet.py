@@ -4,6 +4,8 @@ from torch.nn import BatchNorm2d, Conv1d, Conv2d, ModuleList, Parameter
 import torch.nn.functional as F
 
 
+# Original code: https://github.com/sshleifer/Graph-WaveNet
+# Papers https://arxiv.org/abs/1906.00121 and https://arxiv.org/abs/1912.07390
 def nconv(x, A):
     """Multiply x by adjacency matrix along source node axis"""
     return torch.einsum('ncvl,vw->ncwl', (x, A)).contiguous()

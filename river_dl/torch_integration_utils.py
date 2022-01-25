@@ -1,15 +1,18 @@
 import numpy as np
 import torch
-from river_dl.GraphWaveNet import gwnet
 import torch.utils.data
-import torch.optim as optim
 import pandas as pd
 import time
-import os
 from tqdm import tqdm
 
 
 def reshape_for_gwn(cat_data, keep_portion=None):
+    """
+    Helper function to reshape input data for GraphWaveNet Model
+    @param cat_data: dictionary or path to .npz file
+    @param keep_portion: [float]  If < 1, fraction of prediction sequence to keep, if >1, absolute length to keep
+    @return: [dict] reformatted data
+    """
     if isinstance(cat_data, str):
         cat_data = np.load(cat_data)
     n_segs = len(np.unique(cat_data['ids_trn']))
@@ -50,6 +53,15 @@ def reshape_for_gwn(cat_data, keep_portion=None):
 
 ## Generic PyTorch Training Routine
 def train_loop(epoch_index, dataloader, model, loss_function, optimizer, device = 'cpu'):
+    """
+    @param epoch_index: [int] Epoch number
+    @param dataloader: [object] torch dataloader with train and val data
+    @param model: [object] initialized torch model
+    @param loss_function: loss function
+    @param optimizer: [object] Chosen optimizer
+    @param device: [str] cpu or gpu
+    @return: [float] epoch loss
+    """
     train_loss=[]
     with tqdm(dataloader, ncols=100, desc= f"Epoch {epoch_index+1}", unit="batch") as tepoch:
         for x, y in tepoch: #enumerate(dataloader):
@@ -67,6 +79,13 @@ def train_loop(epoch_index, dataloader, model, loss_function, optimizer, device 
     return mean_loss
 
 def val_loop(dataloader, model, loss_function, device = 'cpu'):
+    """
+    @param dataloader: [object] torch dataloader with train and val data
+    @param model: [object] initialized torch model
+    @param loss_function: loss function
+    @param device: [str] cpu or gpu
+    @return: [float] epoch validation loss
+    """
     val_loss = []
     for iter, (x, y) in enumerate(dataloader):
         testx = x.to(device)
@@ -92,6 +111,18 @@ def train_torch(model,
                 shuffle = False,
                 weights_file = None,
                 log_file= None):
+    """
+    @param model: [objetct] initialized torch model
+    @param loss_function: loss function
+    @param optimizer: [object] chosen optimizer
+    @param batch_size: [int]
+    @param max_epochs: [maximum number of epochs to run for]
+    @param early_stopping_patience: [int] number of epochs without improvement in validation loss to run before stopping training
+    @param shuffle: [bool] Shuffle training batches
+    @param weights_file: [str] path save trained model weights
+    @param log_file: [str] path to save training log to
+    @return: [object] trained model
+    """
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -177,6 +208,12 @@ def rmse_masked(y_true, y_pred):
 
 
 def predict_torch(x_data, model, batch_size, device='cpu'):
+    """
+    @param model: [object] initialized torch model
+    @param batch_size: [int]
+    @param device: [str] gpu or cpu
+    @return: [tensor] predicted values
+    """
     data = []
     for i in range(len(x_data)):
         data.append(torch.from_numpy(x_data[i]).float())
@@ -192,100 +229,3 @@ def predict_torch(x_data, model, batch_size, device='cpu'):
         predicted.append(output)
     predicted = torch.cat(predicted, dim=0)
     return predicted
-
-
-
-'''
-
-device = 'cpu'
-data = np.load('../river-dl/output_test/0.75_180/prepped.npz')
-data = reshape_for_gwn(data)
-
-adj_mx = data['dist_matrix']
-
-supports = [torch.tensor(adj_mx).to(device).float()]
-in_dim = len(data['x_vars'])
-out_dim = data['y_obs_trn'].shape[3]
-num_nodes = adj_mx.shape[0]
-lrate = 0.0001
-wdecay = 0.0001
-
-model = gwnet('cpu',num_nodes, supports=supports, aptinit=supports[0], in_dim=in_dim, out_dim = out_dim, layers=5,kernel_size=7,blocks=1)
-opt = optim.Adam(model.parameters(), lr=lrate, weight_decay=wdecay)
-scheduler = optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda epoch: 0.97 ** epoch)
-lfunc = rmse
-
-
-trained = train_torch(model,
-                      lfunc,
-                      opt,
-                      data['x_trn'][:10,...],
-                      data['y_obs_trn'][:10,...],
-                      5,
-                      2,
-                      20,
-                      data['x_val'][:10,...],
-                      data['y_obs_val'][:10,...])
-
-train_data = []
-for i in range(len(data['x_trn'])):
-    train_data.append([torch.from_numpy(data['x_trn'][i]).float(),
-                       torch.from_numpy(data['y_obs_trn'][i]).float()])
-
-
-
-
-
-### Cyclic learning rate:
-## https://arxiv.org/abs/1506.01186
-
-
-model = gwnet('cpu',num_nodes, supports=supports, aptinit=supports[0], in_dim=in_dim, out_dim = out_dim, layers=5,kernel_size=7,blocks=1)
-opt = optim.Adam(model.parameters(), lr=lrate, weight_decay=0)
-scheduler = optim.lr_scheduler.LambdaLR(opt, lr_lambda=lambda epoch: 0.97 ** epoch)
-lfunc = rmse
-
-train_loader = torch.utils.data.DataLoader(train_data, batch_size=2, shuffle=True, pin_memory=True)
-
-def train_loop_lr(dataloader, model, loss_function, optimizer, device = 'cpu'):
-    train_loss=[]
-    lr = 0.000001
-    lr_log = []
-    #with tqdm(dataloader, unit="batch") as tepoch:
-    for iter, (x, y) in enumerate(dataloader):
-        print(f"lr: {lr:.5f}")
-        trainx = x.to(device)
-        trainy = y.to(device)
-        optimizer.zero_grad()
-        output = model(trainx)
-        loss = loss_function(output, trainy)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 3)
-        optimizer.step()
-        train_loss.append(loss.item())
-        for g in optimizer.param_groups:
-            g['lr'] = lr*1.5
-        lr *= 1.5
-        lr_log.append(lr)
-        print(f"loss = {loss.item():.4f}")
-        if loss.item() > 50:
-            break
-    return lr_log, train_loss
-
-
-lr_log, loss_log = train_loop_lr(train_loader,model, lfunc, opt)
-iter = np.arange(len(lr_log))
-diff = np.gradient(loss_log)
-import matplotlib.pyplot as plt
-
-plt.plot(np.log10(lr_log),loss_log)
-plt.ylim(0,2)
-plt.show()
-
-plt.plot(lr_log, diff)
-plt.ylim(-.2,.2)
-plt.xscale('log')
-plt.show()
-
-lr_log[np.argmin(diff)]
-'''

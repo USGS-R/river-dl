@@ -1,4 +1,4 @@
-name: gwn_integration
+name: rdl_torch_tf
 channels:
     - pytorch
     - conda-forge
@@ -19,3 +19,7 @@ dependencies:
     - xarray
     - zarr
     - tqdm
+    - pip:
+          #- tensorflow
+          - tensorflow-gpu
+

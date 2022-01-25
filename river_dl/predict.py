@@ -10,7 +10,8 @@ from river_dl.preproc_utils import (
     convert_batch_reshape,
     coord_as_reshaped_array,
 )
-from river_dl.gwn_integration_utils import predict_torch
+
+from river_dl.torch_integration_utils import predict_torch
 
 
 def get_data_if_file(d):
@@ -136,14 +137,13 @@ def predict(
     num_segs = len(np.unique(pred_ids))
 
     if torch_model:
-        if len(y_pred.shape) > 3: #Catch for dealing with GraphWaveNet vs RGCN
+        if len(x_data.shape) > 3: #Catch for dealing with different GraphWaveNet vs RGCN output, consider changing to bool argument
             y_pred = predict_torch(x_data, model, batch_size=5)
             y_pred=y_pred.transpose(1,3)
             pred_ids = np.transpose(pred_ids,(0,3,2,1))
             pred_dates=np.transpose(pred_dates,(0,3,2,1))
-
-        y_pred = predict_torch(x_data, model, batch_size=num_segs)
-
+        else:
+            y_pred = predict_torch(x_data, model, batch_size=num_segs)
 
     else:
         y_pred = model.predict(x_data, batch_size=num_segs)

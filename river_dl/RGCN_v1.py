@@ -4,7 +4,15 @@ import torch.nn as nn
 # RGCN - paper version
 class RGCN_v1(nn.Module):
     # Built off of https://towardsdatascience.com/building-a-lstm-by-hand-on-pytorch-59c02a4ec091
-    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout = 0, dropout = 0):
+    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout = 0, dropout = 0, DA=False):
+        """
+        @param input_dim: [int] number input feature
+        @param hidden_dim: [int] hidden size
+        @param adj_matrix: Distance matrix for graph convolution
+        @param recur_dropout: [float]
+        @param dropout: [float]
+        @param DA: [bool] If true, returns h and c states as well as predictions
+        """
         super().__init__()
         
         # New stuff
@@ -24,6 +32,7 @@ class RGCN_v1(nn.Module):
         self.recur_dropout = nn.Dropout(recur_dropout)
         
         self.dense = nn.Linear(hidden_dim, 1)
+        self.DA = DA
     
     def init_weights(self):
         for p in self.parameters():
@@ -60,4 +69,7 @@ class RGCN_v1(nn.Module):
             hidden_seq.append(h_t.unsqueeze(1))
         hidden_seq = torch.cat(hidden_seq, dim= 1)
         out = self.dense(hidden_seq)
-        return out, (h_t, c_t)
+        if self.DA:
+            return out, (h_t, c_t)
+        else:
+            return out

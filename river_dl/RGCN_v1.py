@@ -4,7 +4,7 @@ import torch.nn as nn
 # RGCN - paper version
 class RGCN_v1(nn.Module):
     # Built off of https://towardsdatascience.com/building-a-lstm-by-hand-on-pytorch-59c02a4ec091
-    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout = 0, dropout = 0, DA=False):
+    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout = 0, dropout = 0, DA=False, device='cpu'):
         """
         @param input_dim: [int] number input feature
         @param hidden_dim: [int] hidden size
@@ -16,7 +16,7 @@ class RGCN_v1(nn.Module):
         super().__init__()
         
         # New stuff
-        self.A = torch.from_numpy(adj_matrix).float() # provided at initialization
+        self.A = torch.from_numpy(adj_matrix).float().to(device) # provided at initialization
         # parameters for mapping graph/spatial data
         self.weight_q = nn.Parameter(torch.Tensor(hidden_dim, hidden_dim))
         self.bias_q = nn.Parameter(torch.Tensor(hidden_dim))

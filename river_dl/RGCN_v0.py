@@ -5,11 +5,11 @@ import torch.nn as nn
 # RGCN - river-dl version
 class RGCN_v0(nn.Module):
     # Built off of https://towardsdatascience.com/building-a-lstm-by-hand-on-pytorch-59c02a4ec091
-    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout = 0, dropout = 0):
+    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout = 0, dropout = 0, DA=False, device='cpu'):
         super().__init__()
         
         # New stuff
-        self.A = torch.from_numpy(adj_matrix).float()
+        self.A = torch.from_numpy(adj_matrix).float().to(device)
         
         self.W_graph_h = nn.Parameter(torch.Tensor(hidden_dim, hidden_dim))
         self.b_graph_h = nn.Parameter(torch.Tensor(hidden_dim))
@@ -37,6 +37,7 @@ class RGCN_v0(nn.Module):
         self.recur_dropout = nn.Dropout(recur_dropout)
         
         self.dense = nn.Linear(hidden_dim, 1)
+        self.DA = DA
     
     def init_weights(self):
         for p in self.parameters():
@@ -80,4 +81,7 @@ class RGCN_v0(nn.Module):
             hidden_seq.append(h_t.unsqueeze(1))
         hidden_seq = torch.cat(hidden_seq, dim= 1)
         out = self.dense(hidden_seq)
-        return out, (h_t, c_t)
+        if self.DA:
+            return out, (h_t, c_t)
+        else:
+            return out

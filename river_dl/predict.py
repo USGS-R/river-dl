@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 import datetime
 from numpy.lib.npyio import NpzFile
-
+from river_dl.torch_integration_utils import predict_torch
 from river_dl.postproc_utils import prepped_array_to_df
 from river_dl.preproc_utils import (
     scale,
@@ -11,7 +11,6 @@ from river_dl.preproc_utils import (
     coord_as_reshaped_array,
 )
 
-from river_dl.torch_integration_utils import predict_torch
 
 
 def get_data_if_file(d):

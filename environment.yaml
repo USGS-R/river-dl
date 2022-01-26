@@ -8,7 +8,7 @@ dependencies:
     - pytorch
     - torchvision
     - torchaudio
-    #- cudatoolkit=11.3
+    - cudatoolkit=11.3
     - pip
     - jupyterlab
     - matplotlib
@@ -20,6 +20,4 @@ dependencies:
     - zarr
     - tqdm
     - pip:
-          #- tensorflow
-          - tensorflow-gpu
-
+          - tensorflow # or tensorflow-gpu

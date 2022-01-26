@@ -211,7 +211,7 @@ def predict_torch(x_data, model, batch_size, device='cpu'):
     """
     @param model: [object] initialized torch model
     @param batch_size: [int]
-    @param device: [str] gpu or cpu
+    @param device: [str] cuda or cpu
     @return: [tensor] predicted values
     """
     data = []
@@ -225,7 +225,7 @@ def predict_torch(x_data, model, batch_size, device='cpu'):
     for iter, x in enumerate(dataloader):
         trainx = x.to(device)
         with torch.no_grad():
-            output = model(trainx)
+            output = model(trainx.to(device))
         predicted.append(output)
     predicted = torch.cat(predicted, dim=0)
     return predicted

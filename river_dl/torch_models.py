@@ -13,8 +13,8 @@ class RGCN_v0(nn.Module):
         @param input_dim: [int] number input feature
         @param hidden_dim: [int] hidden size
         @param adj_matrix: Distance matrix for graph convolution
-        @param recur_dropout: [float]
-        @param dropout: [float]
+        @param recur_dropout: [float] fraction of the units to drop from the cell update vector. See: https://arxiv.org/abs/1603.05118
+        @param dropout: [float] fraction of the units to drop from the input
         @param return_states: [bool] If true, returns h and c states as well as predictions
         """
         super().__init__()
@@ -107,8 +107,8 @@ class RGCN_v1(nn.Module):
         @param input_dim: [int] number input feature
         @param hidden_dim: [int] hidden size
         @param adj_matrix: Distance matrix for graph convolution
-        @param recur_dropout: [float]
-        @param dropout: [float]
+        @param recur_dropout: [float] fraction of the units to drop from the cell update vector. See: https://arxiv.org/abs/1603.05118
+        @param dropout: [float] fraction of the units to drop from the input
         @param return_states: [bool] If true, returns h and c states as well as predictions
         """
         super().__init__()

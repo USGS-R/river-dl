@@ -14,7 +14,7 @@ from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl import loss_functions as lf
-from river_dl.RGCN import RGCNModel
+from river_dl.tf_models import RGCNModel
 
 out_dir = config['out_dir']
 loss_function = lf.multitask_rmse(config['lambdas'])
@@ -80,8 +80,8 @@ rule pre_train:
     run:
         data = np.load(input[0])
 
-        optimizer = tf.optimizers.Adam(learning_rate=config['pretrain_learning_rate']) 
-
+        optimizer = tf.optimizers.Adam(learning_rate=config['pretrain_learning_rate'])
+        num_segs = len(np.unique(data['ids_trn']))
         model = RGCNModel(
             config['hidden_size'],
             recurrent_dropout=config['recurrent_dropout'],
@@ -95,7 +95,7 @@ rule pre_train:
                     x_trn = data['x_pre_full'],
                     y_trn = data['y_pre_full'],
                     epochs = config['pt_epochs'],
-                    batch_size = 2,
+                    batch_size = num_segs,
                     seed=config['seed'],
                     # I need to add a trailing slash here. Otherwise the wgts
                     # get saved in the "outdir"
@@ -116,8 +116,8 @@ rule finetune_train:
         "{outdir}/finetune_time.txt",
     run:
         data = np.load(input[0])
-        optimizer = tf.optimizers.Adam(learning_rate=config['finetune_learning_rate']) 
-
+        optimizer = tf.optimizers.Adam(learning_rate=config['finetune_learning_rate'])
+        num_segs = len(np.unique(data['ids_trn']))
         model = RGCNModel(
             config['hidden_size'],
             recurrent_dropout=config['recurrent_dropout'],
@@ -132,7 +132,7 @@ rule finetune_train:
                     x_trn = data['x_trn'],
                     y_trn = data['y_obs_trn'],
                     epochs = config['pt_epochs'],
-                    batch_size = 2,
+                    batch_size = num_segs,
                     seed=config['seed'],
                     x_val = data['x_val'],
                     y_val = data['y_obs_val'],

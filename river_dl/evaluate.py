@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 from scipy.stats import pearsonr
 from river_dl.postproc_utils import fmt_preds_obs
-#from river_dl.loss_functions import rmse, nse, kge
 
 
 def filter_negative_preds(y_true, y_pred):
@@ -25,11 +24,14 @@ def filter_negative_preds(y_true, y_pred):
     y_pred = np.where(y_pred < 0, np.nan, y_pred)
     return y_true, y_pred
 
-def nse_eval(y_true, y_pred):
+def filter_nan_preds(y_true,y_pred):
     y_pred = y_pred[~np.isnan(y_true)]
     y_true = y_true[~np.isnan(y_true)]
+    return(y_true, y_pred)
 
-    mean = np.nanmean(y_true)
+def nse_eval(y_true, y_pred):
+    y_true, y_pred = filter_nan_preds(y_true,y_pred)
+    mean = np.mean(y_true)
     deviation = y_true - mean
     error = y_pred-y_true
     numerator = np.sum(np.square(error))
@@ -38,16 +40,14 @@ def nse_eval(y_true, y_pred):
 
 
 def rmse_eval(y_true, y_pred):
-    y_pred = y_pred[~np.isnan(y_true)]
-    y_true = y_true[~np.isnan(y_true)]
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     n = len(y_true)
     sum_squared_error = np.sum(np.square(y_pred-y_true))
     rmse = np.sqrt(sum_squared_error/n)
     return rmse
 
 def bias_eval(y_true,y_pred):
-    y_pred = y_pred[~np.isnan(y_true)]
-    y_true = y_true[~np.isnan(y_true)]
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     bias = np.mean(y_pred-y_true)
     return bias
 
@@ -58,6 +58,7 @@ def rmse_logged(y_true, y_pred):
     :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the rmse of the logged data
     """
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
     return rmse_eval(np.log(y_true), np.log(y_pred))
 
@@ -69,19 +70,18 @@ def nse_logged(y_true, y_pred):
     :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the nse of the logged data
     """
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
     return nse_eval(np.log(y_true), np.log(y_pred))
 
 
 def kge_eval(y_true, y_pred):
-    y_pred = y_pred[~np.isnan(y_true)]
-    y_true = y_true[~np.isnan(y_true)]
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     r, _ = pearsonr(y_pred, y_true)
     mean_true = np.mean(y_true)
     mean_pred = np.mean(y_pred)
     std_true = np.std(y_true)
     std_pred = np.std(y_pred)
-
     r_component = np.square(r - 1)
     std_component = np.square((std_pred / std_true) - 1)
     bias_component = np.square((mean_pred / mean_true) - 1)
@@ -134,8 +134,7 @@ def calc_metrics(df):
     """
     obs = df["obs"].values
     pred = df["pred"].values
-    pred = pred[~np.isnan(obs)]
-    obs = obs[~np.isnan(obs)]
+
     if len(obs) > 10:
         metrics = {
             "rmse": rmse_eval(obs, pred),
@@ -175,10 +174,17 @@ def calc_metrics(df):
             "rmse_top10": np.nan,
             "rmse_bot10": np.nan,
             "rmse_logged": np.nan,
+            "mean_bias": np.nan,
+            "mean_bias_top10": np.nan,
+            "mean_bias_bot10": np.nan,
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
             "kge": np.nan,
+            "rmse_logged": np.nan,
+            "nse_top10": np.nan,
+            "nse_bot10": np.nan,
+            "nse_logged": np.nan,
         }
     return pd.Series(metrics)
 

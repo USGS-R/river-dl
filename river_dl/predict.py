@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 import datetime
 from numpy.lib.npyio import NpzFile
-from river_dl.torch_integration_utils import predict_torch
+from river_dl.torch_utils import predict_torch
 from river_dl.postproc_utils import prepped_array_to_df
 from river_dl.preproc_utils import (
     scale,
@@ -59,7 +59,6 @@ def predict_from_io_data(
     tst_val_offset = 1.0,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
-    torch_model = False,
 ):
     """
     make predictions from trained model
@@ -92,7 +91,6 @@ def predict_from_io_data(
         log_vars=log_vars,
         spatial_idx_name=spatial_idx_name,
         time_idx_name=time_idx_name,
-        torch_model=torch_model,
     )
     return preds
 
@@ -110,7 +108,6 @@ def predict(
     log_vars=False,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
-    torch_model = False,
 ):
     """
     use trained model to make predictions
@@ -130,12 +127,11 @@ def predict(
     :param outfile: [str] the file where the output data should be stored
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
-    :para torch_model: [bool] toggle for pytorch predictions.
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
 
-    if torch_model:
+    if issubclass(type(model), torch.nn.Module):
         if len(x_data.shape) > 3: #Catch for dealing with different GraphWaveNet vs RGCN output, consider changing to bool argument
             y_pred = predict_torch(x_data, model, batch_size=5)
             y_pred=y_pred.transpose(1,3)
@@ -143,10 +139,10 @@ def predict(
             pred_dates=np.transpose(pred_dates,(0,3,2,1))
         else:
             y_pred = predict_torch(x_data, model, batch_size=num_segs)
-
-    else:
+    elif issubclass(type(model), tf.keras.Model):
         y_pred = model.predict(x_data, batch_size=num_segs)
-
+    else:
+        raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
     # keep only specified part of predictions
     if keep_last_portion>1:
         frac_seq_len = int(y_pred.shape[1] - keep_last_portion)

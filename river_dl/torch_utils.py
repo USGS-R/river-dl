@@ -110,7 +110,8 @@ def train_torch(model,
                 y_val = None,
                 shuffle = False,
                 weights_file = None,
-                log_file= None):
+                log_file= None,
+                device = 'cpu'):
     """
     @param model: [objetct] initialized torch model
     @param loss_function: loss function
@@ -123,8 +124,6 @@ def train_torch(model,
     @param log_file: [str] path to save training log to
     @return: [object] trained model
     """
-
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     print(f"Training on {device}")
     print("start training...",flush=True)

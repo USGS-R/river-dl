@@ -134,6 +134,7 @@ def calc_metrics(df):
     """
     obs = df["obs"].values
     pred = df["pred"].values
+    obs, pred = filter_nan_preds(obs, pred)
 
     if len(obs) > 10:
         metrics = {

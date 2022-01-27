@@ -14,10 +14,11 @@ run the entire process with a variety of models and end-goals.
 ### To run the Snakemake workflow locally:
 
 1. Install the dependencies in the `environment.yaml` file. With conda you can do this with `conda env create -f environment.yaml`
-2. Install the local `river-dl` package by `pip install path/to/river-dl/` (_optional_)
-3. Edit the river-dl run configuration (including paths for I/O data) in the appropriate `config.yml`
+2. Activate your conda environment `source activate rdl_torch_tf`
+3. Install the local `river-dl` package by `pip install path/to/river-dl/` (_optional_)
+4. Edit the river-dl run configuration (including paths for I/O data) in the appropriate `config.yml`
 from the [workflow_examples](workflow_examples) folder.
-4. Run Snakemake with `snakemake --configfile config.yml -s Snakemake --cores <n>`
+5. Run Snakemake with `snakemake --configfile config.yml -s Snakemake --cores <n>`
 
 ### To run the Snakemake Workflow on TallGrass
 1. Request a GPU allocation and start an interactive shell
@@ -29,8 +30,12 @@ from the [workflow_examples](workflow_examples) folder.
         
         module load cuda11.3/toolkit/11.3.0 
         export LD_LIBRARY_PATH=/cm/shared/apps/nvidia/TensorRT-6.0.1.5/lib:/cm/shared/apps/nvidia/cudnn_8.0.5/lib64:$LD_LIBRARY_PATH
-3. Follow steps 1-4 above as you would to run the workflow locally (note, you may need to change `tensorflow`
+3. Follow steps 1-5 above as you would to run the workflow locally (note, you may need to change `tensorflow`
 to `tensoflow-gpu` in the `environment.yml`). 
+
+_After building your environment, you may want to make sure the recommended versions of PyTorch and CUDA were installed
+according to the [PyTorch documentation](https://pytorch.org/). You can see the installed versions
+by calling `conda list` within your activated environment._
 
 ### The data
 The data used to run this model currently are specific to the Delaware River Basin but will soon be made more generic.

@@ -1,4 +1,11 @@
 import os
+import tensorflow as tf
+import numpy as np
+
+code_dir = config['code_dir']
+# if using river_dl installed with pip this is not needed
+import sys
+sys.path.insert(1, code_dir)
 
 from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
@@ -7,11 +14,11 @@ from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl import loss_functions as lf
+from river_dl.tf_models import RGCNModel
 
 out_dir = config['out_dir']
-code_dir = config['code_dir']
-pred_weights = config['pred_weights']
 loss_function = lf.multitask_rmse(config['lambdas'])
+pred_weights = config['pred_weights']
 
 rule all:
     input:
@@ -19,20 +26,20 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
-        expand("{outdir}/asRunConfig.yml", outdir=out_dir)
+        expand("{outdir}/asRunConfig.yml",  outdir=out_dir)
         
 
 rule as_run_config:
     output:
         "{outdir}/asRunConfig.yml"
     run:
-        asRunConfig(config,output[0])
+        asRunConfig(config, code_dir, output[0])
 
 rule prep_io_data:
     input:
          config['sntemp_file'],
          config['obs_file'],
-         config['dist_matrix_file'],
+         config['dist_matrix_file']
     output:
         "{outdir}/prepped.npz"
     run:
@@ -58,60 +65,85 @@ rule prep_io_data:
                   tst_val_offset = config['tst_val_offset'])
 
 
-# use "train" if wanting to use GPU on HPC
-# rule train:
-#    input:
-#        "{outdir}/prepped.npz"
-#    output:
-#        directory("{outdir}/trained_model/"),
-#        directory("{outdir}/pretrained_model/"),
-#    params:
-#        # getting the base path to put the training outputs in
-#        # I omit the last slash (hence '[:-1]' so the split works properly
-#        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
-#        pt_epochs=config['pt_epochs'],
-#        ft_epochs=config['ft_epochs'],
-#        lamb=config['lamb'],
-#    shell:
-#        """
-#        module load analytics cuda10.1/toolkit/10.1.105 
-#        run_training -e /home/jsadler/.conda/envs/rgcn --no-node-list "python {code_dir}/train_model_cli.py -o {params.run_dir} -i {input[0]} -p {params.pt_epochs} -f {params.ft_epochs} --lambdas {params.lamb} --loss_func multitask_rmse --model rgcn -s 135"
-#        """
-
-
 # Pretrain the model on process based model
 rule pre_train:
     input:
         "{outdir}/prepped.npz"
     output:
         directory("{outdir}/pretrained_weights/"),
-        touch("{outdir}/pretrained_weights/pretrain.done")
+        "{outdir}/pretrain_log.csv",
+        "{outdir}/pretrain_time.txt",
     params:
         # getting the base path to put the training outputs in
         # I omit the last slash (hence '[:-1]' so the split works properly
-        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+        weight_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
     run:
-        train_model(input[0], config['pt_epochs'], config['hidden_size'], loss_func=loss_function,
-                    out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_pretrain']),
-                    learning_rate=0.005, train_type = 'pre', dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'], early_stop_patience=None, seed = config['seed'])
+        data = np.load(input[0])
+
+        optimizer = tf.optimizers.Adam(learning_rate=config['pretrain_learning_rate'])
+        num_segs = len(np.unique(data['ids_trn']))
+        model = RGCNModel(
+            config['hidden_size'],
+            recurrent_dropout=config['recurrent_dropout'],
+            dropout=config['dropout'],
+            num_tasks=len(config['y_vars_pretrain']),
+            A= data["dist_matrix"]
+        )
+
+        model.compile(optimizer=optimizer, loss=loss_function)
+        train_model(model,
+                    x_trn = data['x_pre_full'],
+                    y_trn = data['y_pre_full'],
+                    epochs = config['pt_epochs'],
+                    batch_size = num_segs,
+                    seed=config['seed'],
+                    # I need to add a trailing slash here. Otherwise the wgts
+                    # get saved in the "outdir"
+                    weight_dir = output[0] + "/",
+                    log_file = output[1],
+                    time_file = output[2])
 
 
 # Finetune/train the model on observations
 rule finetune_train:
     input:
         "{outdir}/prepped.npz",
-        "{outdir}/pretrained_weights/pretrain.done"
+        "{outdir}/pretrained_weights/"
     output:
-        directory("{outdir}/trained_weights/"),
+        directory("{outdir}/finetune_weights/"),
         directory("{outdir}/best_val_weights/"),
-    params:
-        # getting the base path to put the training outputs in
-        # I omit the last slash (hence '[:-1]' so the split works properly
-        run_dir=lambda wildcards, output: os.path.split(output[0][:-1])[0],
+        "{outdir}/finetune_log.csv",
+        "{outdir}/finetune_time.txt",
     run:
-        train_model(input[0], config['ft_epochs'], config['hidden_size'], loss_func=loss_function,
-                    out_dir=params.run_dir, model_type='rgcn', num_tasks=len(config['y_vars_finetune']),
-                    learning_rate=0.01, dropout = config['dropout'], recurrent_dropout=config['recurrent_dropout'], train_type = 'finetune', early_stop_patience=config['early_stopping'], seed = config['seed'])
+        data = np.load(input[0])
+        optimizer = tf.optimizers.Adam(learning_rate=config['finetune_learning_rate'])
+        num_segs = len(np.unique(data['ids_trn']))
+        model = RGCNModel(
+            config['hidden_size'],
+            recurrent_dropout=config['recurrent_dropout'],
+            dropout=config['dropout'],
+            num_tasks=len(config['y_vars_pretrain']),
+            A= data["dist_matrix"]
+        )
+
+        model.compile(optimizer=optimizer, loss=loss_function)
+        model.load_weights(input[1] + "/")
+        train_model(model,
+                    x_trn = data['x_trn'],
+                    y_trn = data['y_obs_trn'],
+                    epochs = config['pt_epochs'],
+                    batch_size = num_segs,
+                    seed=config['seed'],
+                    x_val = data['x_val'],
+                    y_val = data['y_obs_val'],
+                    # I need to add a trailing slash here. Otherwise the wgts
+                    # get saved in the "outdir"
+                    weight_dir = output[0] + "/",
+                    best_val_weight_dir = output[1] + "/",
+                    log_file = output[2],
+                    time_file = output[3],
+                    early_stop_patience=config['early_stopping'])
+
 
 rule make_predictions:
     input:
@@ -121,11 +153,20 @@ rule make_predictions:
         "{outdir}/{partition}_preds.feather",
     group: 'train_predict_evaluate'
     run:
-        model_dir = input[0] + '/'
-        predict_from_io_data(model_type='rgcn', model_weights_dir=model_dir,
-                             hidden_size=config['hidden_size'], io_data=input[1],
-                             partition=wildcards.partition, outfile=output[0],
-                             num_tasks=len(config['y_vars_finetune']),
+        data = np.load(input[1])
+        model = RGCNModel(
+            config['hidden_size'],
+            recurrent_dropout=config['recurrent_dropout'],
+            dropout=config['dropout'],
+            num_tasks=len(config['y_vars_pretrain']),
+            A= data["dist_matrix"]
+        )
+        weight_dir = input[0] + '/'
+        model.load_weights(weight_dir)
+        predict_from_io_data(model=model, 
+                             io_data=input[1],
+                             partition=wildcards.partition,
+                             outfile=output[0],
                              trn_offset = config['trn_offset'],
                              tst_val_offset = config['tst_val_offset'])
 
@@ -145,8 +186,7 @@ rule combine_metrics:
     input:
          config['obs_file'],
          "{outdir}/trn_preds.feather",
-         "{outdir}/val_preds.feather",
-         "{outdir}/tst_preds.feather"
+         "{outdir}/val_preds.feather"
     output:
          "{outdir}/{metric_type}_metrics.csv"
     group: 'train_predict_evaluate'
@@ -156,7 +196,6 @@ rule combine_metrics:
         combined_metrics(obs_file=input[0],
                          pred_trn=input[1],
                          pred_val=input[2],
-                         pred_tst=input[3],
                          group=params.grp_arg,
                          outfile=output[0])
 

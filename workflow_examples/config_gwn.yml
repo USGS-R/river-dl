@@ -1,0 +1,42 @@
+# Input files
+obs_file: "../data_DRB/Obs_temp_flow_drb_Christiana_no3558"
+sntemp_file: "../data_DRB/sntemp_inputs_outputs_drb_Christiana_no3558"
+dist_matrix_file: "../data_DRB/distance_matrix_drb_Christiana_no3558.npz"
+
+#### for flow modeling, seg_width should be removed from x_vars
+x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet']
+
+out_dir: "output_gwn_test"
+
+dropout: 0.3
+batch_size: 5
+y_vars_pretrain: ['seg_tave_water']
+y_vars_finetune: ['temp_c']
+
+trn_offset: 15
+tst_val_offset: 15
+
+#Define early stopping criteria, setting this to False will turn off early stopping rounds
+early_stopping: 20
+
+train_start_date:
+  - '1985-10-01'
+  - '2015-10-01'
+train_end_date:
+  - '2006-09-30'
+  - '2020-09-30'
+test_start_date:
+  - '1979-10-01'
+  - '2010-10-01'
+  - '2020-10-01'
+test_end_date:
+  - '1984-09-30'
+  - '2015-09-30'
+  - '2021-09-30'
+val_start_date:
+  - '2006-10-01'
+val_end_date:
+  - '2010-09-30'
+
+pt_epochs: 5
+ft_epochs: 5

@@ -2,16 +2,27 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import datetime
-
-from river_dl.RGCN import RGCNModel
+import torch
+import tensorflow as tf
+from numpy.lib.npyio import NpzFile
+from river_dl.torch_utils import predict_torch
 from river_dl.postproc_utils import prepped_array_to_df
 from river_dl.preproc_utils import (
     scale,
     convert_batch_reshape,
     coord_as_reshaped_array,
 )
-from river_dl.rnns import LSTMModel, GRUModel
-from river_dl.train import get_data_if_file
+
+def get_data_if_file(d):
+    """
+    rudimentary check if data .npz file is already loaded. if not, load it
+    :param d:
+    :return:
+    """
+    if isinstance(d, NpzFile) or isinstance(d, dict):
+        return d
+    else:
+        return np.load(d, allow_pickle=True)
 
 
 def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
@@ -36,70 +47,32 @@ def unscale_output(y_scl, y_std, y_mean, y_vars, log_vars=None):
     return y_unscaled
 
 
-def load_model_from_weights(
-    model_type, model_weights_dir, hidden_size, dist_matrix=None, num_tasks=1,
-):
-    """
-    load a TF model from the model weights directory
-    :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
-    :param model_weights_dir: [str] directory to saved model weights
-    :param hidden_size: [int] the number of hidden units in model
-    :param dist_matrix: [np array] the distance matrix if using 'rgcn'
-    :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
-    :return: TF model
-    """
-    if model_type == "rgcn":
-        model = RGCNModel(hidden_size, A=dist_matrix, num_tasks=num_tasks)
-    elif model_type.startswith("lstm"):
-        model = LSTMModel(hidden_size, num_tasks=num_tasks)
-    elif model_type == "gru":
-        model = GRUModel(hidden_size, num_tasks=num_tasks)
-    else:
-        raise ValueError(
-            f'model_type must be "lstm", "gru" or "rgcn", (not {model_type})'
-        )
-
-    model.load_weights(model_weights_dir)
-    return model
 
 
 def predict_from_io_data(
-    model_type,
-    model_weights_dir,
-    hidden_size,
+    model,
     io_data,
     partition,
     outfile,
     log_vars=False,
-    num_tasks=1,
     trn_offset = 1.0,
     tst_val_offset = 1.0,
+    spatial_idx_name="seg_id_nat",
+    time_idx_name="date",
 ):
     """
     make predictions from trained model
-    :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
-    :param model_weights_dir: [str] directory to saved model weights
     :param io_data: [str] directory to prepped data file
-    :param hidden_size: [int] the number of hidden units in model
     :param partition: [str] must be 'trn' or 'tst'; whether you want to predict
     for the train or the dev period
     :param outfile: [str] the file where the output data should be stored
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
     prep
-    :param num_tasks: [int] number of tasks (variables_to_log to be predicted)
-    :param trn_offset: [float] value for the training offset
-    :param tst_val_offset: [float] value for the testing and validation offset
+    :param trn_offset: [str] value for the training offset
+    :param tst_val_offset: [str] value for the testing and validation offset
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
-    model = load_model_from_weights(
-        model_type,
-        model_weights_dir,
-        hidden_size,
-        io_data.get("dist_matrix"),
-        num_tasks=num_tasks,
-    )
-
     if partition == "trn":
         keep_portion = trn_offset
     else:
@@ -116,6 +89,8 @@ def predict_from_io_data(
         keep_last_portion=keep_portion,
         outfile=outfile,
         log_vars=log_vars,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name,
     )
     return preds
 
@@ -131,10 +106,12 @@ def predict(
     keep_last_portion=1.0,
     outfile=None,
     log_vars=False,
+    spatial_idx_name="seg_id_nat",
+    time_idx_name="date",
 ):
     """
     use trained model to make predictions
-    :param model: the trained TF model
+    :param model: [tf model] trained TF model to use for predictions
     :param x_data: [np array] numpy array of scaled and centered x_data
     :param pred_ids: [np array] the ids of the segments (same shape as x_data)
     :param pred_dates: [np array] the dates of the segments (same shape as
@@ -153,18 +130,29 @@ def predict(
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
-    y_pred = model.predict(x_data, batch_size=num_segs)
 
+    if issubclass(type(model), torch.nn.Module):
+        if len(x_data.shape) > 3: #Catch for dealing with different GraphWaveNet vs RGCN output, consider changing to bool argument
+            y_pred = predict_torch(x_data, model, batch_size=5)
+            y_pred=y_pred.transpose(1,3)
+            pred_ids = np.transpose(pred_ids,(0,3,2,1))
+            pred_dates=np.transpose(pred_dates,(0,3,2,1))
+        else:
+            y_pred = predict_torch(x_data, model, batch_size=num_segs)
+    elif issubclass(type(model), tf.keras.Model):
+        y_pred = model.predict(x_data, batch_size=num_segs)
+    else:
+        raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
     # keep only specified part of predictions
     if keep_last_portion>1:
         frac_seq_len = int(y_pred.shape[1] - keep_last_portion)
     else:
         frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_portion))
-    y_pred = y_pred[:, frac_seq_len:, :]
-    pred_ids = pred_ids[:, frac_seq_len:, :]
-    pred_dates = pred_dates[:, frac_seq_len:, :]
+    y_pred = y_pred[:, frac_seq_len:,...]
+    pred_ids = pred_ids[:, frac_seq_len:,...]
+    pred_dates = pred_dates[:, frac_seq_len:,...]
 
-    y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars,)
+    y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars, spatial_idx_name, time_idx_name)
 
     y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, log_vars,)
 
@@ -298,6 +286,8 @@ def predict_one_date_range(
         train_io_data["y_obs_vars"],
         keep_last_portion=keep_last_frac,
         log_vars=log_vars,
+        spatial_idx_name=spatial_idx_name,
+        time_idx_name=time_idx_name
     )
     return predictions
 
@@ -307,15 +297,11 @@ def predict_from_arbitrary_data(
     pred_start_date,
     pred_end_date,
     train_io_data,
-    model_weights_dir,
-    model_type,
-    hidden_size,
+    model,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
-    dist_matrix=None,
     log_vars=None,
-    num_tasks=1,
 ):
     """
     make predictions given raw data that is potentially independent from the
@@ -329,17 +315,12 @@ def predict_from_arbitrary_data(
     that was used to train the model. This file must contain the variables_to_log
     names, the standard deviations, and the means of the X and Y variables_to_log. Only
     in with this information can the model be used properly
-    :param model_weights_dir: [str] path to the directory where the TF model
-    weights are stored
-    :param model_type: [str] model to use either 'rgcn', 'lstm', or 'gru'
-    :param hidden_size: [int] the number of hidden units in model
+    :param model: [tf model] model to use for predictions
     :param spatial_idx_name: [str] name of column that is used for spatial
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
     :param seq_len: [int] length of input sequences given to model
-    :param dist_matrix: [np array] the distance matrix if using 'rgcn'. if not
-    provided, will look for it in the "train_io_data" file.
     :param flow_in_temp: [bool] whether the flow should be an input into temp
     for the rgcn model
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
@@ -347,22 +328,6 @@ def predict_from_arbitrary_data(
     :return: [pd dataframe] the predictions
     """
     train_io_data = get_data_if_file(train_io_data)
-
-    if model_type == "rgcn":
-        if not dist_matrix:
-            dist_matrix = train_io_data.get("dist_matrix")
-        if not isinstance(dist_matrix, np.ndarray):
-            raise ValueError(
-                "model type is 'rgcn', but there is no" "distance matrix"
-            )
-
-    model = load_model_from_weights(
-        model_type,
-        model_weights_dir,
-        hidden_size,
-        dist_matrix,
-        num_tasks=num_tasks,
-    )
 
     ds = xr.open_zarr(raw_data_file)
 

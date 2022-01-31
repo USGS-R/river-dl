@@ -156,7 +156,7 @@ def read_obs(obs_file, y_vars, x_data):
     :param obs_file: [list] filenames of observation file
     :return: [xr dataset] the observations in the same time
     """
-    ds = xr.open_zarr(obs_file)
+    ds = xr.open_zarr(obs_file, consolidated=False)
     obs = xr.merge([x_data, ds], join="left")
     obs = obs[y_vars]
     return obs
@@ -750,7 +750,7 @@ def prep_all_data(
     if pretrain_file and not y_vars_pretrain:
         raise ValueError("included pretrain file but no pretrain vars")
 
-    x_data = xr.open_zarr(x_data_file)
+    x_data = xr.open_zarr(x_data_file,consolidated=False)
     x_data = x_data.sortby([spatial_idx_name, time_idx_name])
 
     if segs:

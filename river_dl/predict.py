@@ -2,17 +2,16 @@ import pandas as pd
 import numpy as np
 import xarray as xr
 import datetime
+import torch
+import tensorflow as tf
 from numpy.lib.npyio import NpzFile
-
-from river_dl.RGCN import RGCNModel
+from river_dl.torch_utils import predict_torch
 from river_dl.postproc_utils import prepped_array_to_df
 from river_dl.preproc_utils import (
     scale,
     convert_batch_reshape,
     coord_as_reshaped_array,
 )
-from river_dl.rnns import LSTMModel, GRUModel
-
 
 def get_data_if_file(d):
     """
@@ -59,7 +58,7 @@ def predict_from_io_data(
     trn_offset = 1.0,
     tst_val_offset = 1.0,
     spatial_idx_name="seg_id_nat",
-    time_idx_name="date"
+    time_idx_name="date",
 ):
     """
     make predictions from trained model
@@ -91,7 +90,7 @@ def predict_from_io_data(
         outfile=outfile,
         log_vars=log_vars,
         spatial_idx_name=spatial_idx_name,
-        time_idx_name=time_idx_name
+        time_idx_name=time_idx_name,
     )
     return preds
 
@@ -108,7 +107,7 @@ def predict(
     outfile=None,
     log_vars=False,
     spatial_idx_name="seg_id_nat",
-    time_idx_name="date"
+    time_idx_name="date",
 ):
     """
     use trained model to make predictions
@@ -131,16 +130,27 @@ def predict(
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
-    y_pred = model.predict(x_data, batch_size=num_segs)
 
+    if issubclass(type(model), torch.nn.Module):
+        if len(x_data.shape) > 3: #Catch for dealing with different GraphWaveNet vs RGCN output, consider changing to bool argument
+            y_pred = predict_torch(x_data, model, batch_size=5)
+            y_pred=y_pred.transpose(1,3)
+            pred_ids = np.transpose(pred_ids,(0,3,2,1))
+            pred_dates=np.transpose(pred_dates,(0,3,2,1))
+        else:
+            y_pred = predict_torch(x_data, model, batch_size=num_segs)
+    elif issubclass(type(model), tf.keras.Model):
+        y_pred = model.predict(x_data, batch_size=num_segs)
+    else:
+        raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
     # keep only specified part of predictions
     if keep_last_portion>1:
         frac_seq_len = int(y_pred.shape[1] - keep_last_portion)
     else:
         frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_portion))
-    y_pred = y_pred[:, frac_seq_len:, :]
-    pred_ids = pred_ids[:, frac_seq_len:, :]
-    pred_dates = pred_dates[:, frac_seq_len:, :]
+    y_pred = y_pred[:, frac_seq_len:,...]
+    pred_ids = pred_ids[:, frac_seq_len:,...]
+    pred_dates = pred_dates[:, frac_seq_len:,...]
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars, spatial_idx_name, time_idx_name)
 

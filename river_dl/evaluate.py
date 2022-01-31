@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
-
+from scipy.stats import pearsonr
 from river_dl.postproc_utils import fmt_preds_obs
-from river_dl.loss_functions import rmse, nse, kge
 
 
 def filter_negative_preds(y_true, y_pred):
@@ -25,6 +24,32 @@ def filter_negative_preds(y_true, y_pred):
     y_pred = np.where(y_pred < 0, np.nan, y_pred)
     return y_true, y_pred
 
+def filter_nan_preds(y_true,y_pred):
+    y_pred = y_pred[~np.isnan(y_true)]
+    y_true = y_true[~np.isnan(y_true)]
+    return(y_true, y_pred)
+
+def nse_eval(y_true, y_pred):
+    y_true, y_pred = filter_nan_preds(y_true,y_pred)
+    mean = np.mean(y_true)
+    deviation = y_true - mean
+    error = y_pred-y_true
+    numerator = np.sum(np.square(error))
+    denominator = np.sum(np.square(deviation))
+    return 1 - numerator / denominator
+
+
+def rmse_eval(y_true, y_pred):
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
+    n = len(y_true)
+    sum_squared_error = np.sum(np.square(y_pred-y_true))
+    rmse = np.sqrt(sum_squared_error/n)
+    return rmse
+
+def bias_eval(y_true,y_pred):
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
+    bias = np.mean(y_pred-y_true)
+    return bias
 
 def rmse_logged(y_true, y_pred):
     """
@@ -33,8 +58,9 @@ def rmse_logged(y_true, y_pred):
     :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the rmse of the logged data
     """
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return rmse(np.log(y_true), np.log(y_pred))
+    return rmse_eval(np.log(y_true), np.log(y_pred))
 
 
 def nse_logged(y_true, y_pred):
@@ -44,8 +70,22 @@ def nse_logged(y_true, y_pred):
     :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the nse of the logged data
     """
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return nse(np.log(y_true), np.log(y_pred))
+    return nse_eval(np.log(y_true), np.log(y_pred))
+
+
+def kge_eval(y_true, y_pred):
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
+    r, _ = pearsonr(y_pred, y_true)
+    mean_true = np.mean(y_true)
+    mean_pred = np.mean(y_pred)
+    std_true = np.std(y_true)
+    std_pred = np.std(y_pred)
+    r_component = np.square(r - 1)
+    std_component = np.square((std_pred / std_true) - 1)
+    bias_component = np.square((mean_pred / mean_true) - 1)
+    return 1 - np.sqrt(r_component + std_component + bias_component)
 
 
 def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
@@ -94,29 +134,38 @@ def calc_metrics(df):
     """
     obs = df["obs"].values
     pred = df["pred"].values
+    obs, pred = filter_nan_preds(obs, pred)
+
     if len(obs) > 10:
         metrics = {
-            "rmse": rmse(obs, pred).numpy(),
-            "nse": nse(obs, pred).numpy(),
+            "rmse": rmse_eval(obs, pred),
+            "nse": nse_eval(obs, pred),
             "rmse_top10": percentile_metric(
-                obs, pred, rmse, 90, less_than=False
-            ).numpy(),
+                obs, pred, rmse_eval, 90, less_than=False
+            ),
             "rmse_bot10": percentile_metric(
-                obs, pred, rmse, 10, less_than=True
-            ).numpy(),
-            "rmse_logged": rmse_logged(obs, pred).numpy(),
+                obs, pred, rmse_eval, 10, less_than=True
+            ),
+            "rmse_logged": rmse_logged(obs, pred),
+            "mean_bias": bias_eval(obs,pred),
+            "mean_bias_top10":percentile_metric(
+                obs, pred, bias_eval, 90, less_than=False
+            ),
+            "mean_bias_bot10": percentile_metric(
+                obs, pred, bias_eval, 10, less_than=True
+            ),
             "nse_top10": percentile_metric(
-                obs, pred, nse, 90, less_than=False
-            ).numpy(),
+                obs, pred, nse_eval, 90, less_than=False
+            ),
             "nse_bot10": percentile_metric(
-                obs, pred, nse, 10, less_than=True
-            ).numpy(),
-            "nse_logged": nse_logged(obs, pred).numpy(),
-            "kge": kge(obs, pred).numpy(),
-            "rmse_logged": rmse_logged(obs, pred).numpy(),
-            "nse_top10": percentile_metric(obs, pred, nse, 90, less_than=False).numpy(),
-            "nse_bot10": percentile_metric(obs, pred, nse, 10, less_than=True).numpy(),
-            "nse_logged": nse_logged(obs, pred).numpy(),
+                obs, pred, nse_eval, 10, less_than=True
+            ),
+            "nse_logged": nse_logged(obs, pred),
+            "kge": kge_eval(obs, pred),
+            "rmse_logged": rmse_logged(obs, pred),
+            "nse_top10": percentile_metric(obs, pred, nse_eval, 90, less_than=False),
+            "nse_bot10": percentile_metric(obs, pred, nse_eval, 10, less_than=True),
+            "nse_logged": nse_logged(obs, pred),
         }
 
     else:
@@ -126,10 +175,17 @@ def calc_metrics(df):
             "rmse_top10": np.nan,
             "rmse_bot10": np.nan,
             "rmse_logged": np.nan,
+            "mean_bias": np.nan,
+            "mean_bias_top10": np.nan,
+            "mean_bias_bot10": np.nan,
             "nse_top10": np.nan,
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
             "kge": np.nan,
+            "rmse_logged": np.nan,
+            "nse_top10": np.nan,
+            "nse_bot10": np.nan,
+            "nse_logged": np.nan,
         }
     return pd.Series(metrics)
 
@@ -194,7 +250,7 @@ def partition_metrics(
         metrics["variable"] = data_var
         metrics["partition"] = partition
         var_metrics_list.append(metrics)
-        var_metrics = pd.concat(var_metrics_list)
+        var_metrics = pd.concat(var_metrics_list).round(6)
     if outfile:
         var_metrics.to_csv(outfile, header=True, index=False)
     return var_metrics

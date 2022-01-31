@@ -2,8 +2,6 @@ import numpy as np
 import math as m
 import tensorflow as tf
 
-#from river_dl.train import train_model
-
 
 @tf.function
 def rmse(y_true, y_pred):

@@ -14,7 +14,7 @@ from river_dl.postproc_utils import plot_obs
 from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl import loss_functions as lf
-from river_dl.rnns import LSTMModel
+from river_dl.tf_models import LSTMModel
 
 out_dir = config['out_dir']
 loss_function = lf.multitask_rmse(config['lambdas'])

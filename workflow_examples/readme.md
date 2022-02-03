@@ -14,6 +14,9 @@ This is an example of a basic workflow with an LSTM with pretraining and finetun
 ### Snakefile_rgcn.smk, config_rgcn.yml
 This is an example of a basic workflow with a RGCN and two training phases. It also uses early stopping.
 
+### Snakefile_rgcn_pytorch.smk, config_rgcn_pytorch.yml
+This is an example of a basic workflow with a pytorch RGCN and two training phases. It also uses early stopping.
+
 ### Snakefile_gw.smk, config_gw.yml
 This is an example of a workflow that does some customization to include groundwater-specific considerations. It uses an RGCN and and two training phase (pretraining and finetuning). It also uses early stopping.
 
@@ -21,13 +24,13 @@ This is an example of a workflow that does some customization to include groundw
 Assuming you have `snakemake` installed, you would run the "basic" workflow with 1 core with the following command: 
 
 ```
-snakemake -s Snakefile_basic.smk --configfile config.yml -j1
+snakemake -s Snakefile_basic.smk --configfile config_basic.yml -j1
 ```
 
 ## Train a model on a GPU
 To train a model using GPU, this line can be added to the `run` part of your training rule before the actual code that trains the model:
 ```python
-os.system("module load analytics cuda10.1/toolkit/10.1.105"
+os.system("module load analytics cuda11.3/toolkit/11.3.0")
 ```
 
 ## What might change when you make your own workflow
@@ -46,8 +49,8 @@ If you want to build from one of the example workflows, you will _need_ to chang
 
 
 **Things you may _want_ to change:**
-- `y_vars` - if you're output variables are different
-- `out_dir` - so you're outputs are going where you want them to
+- `y_vars` - if your output variables are different
+- `out_dir` - so your outputs are going where you want them to
 - other hyperparameters - such as (`dropout`, `hidden_size`, and learning rates)
 
 

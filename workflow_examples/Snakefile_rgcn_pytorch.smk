@@ -36,14 +36,6 @@ rule as_run_config:
     run:
         asRunConfig(config, code_dir, output[0])
 
-rule copy_snakefile:
-    output:
-        "{outdir}/Snakefile"
-    #group: "prep"
-    shell:
-        """
-        scp Snakefile {output[0]}
-        """
 
 rule prep_io_data:
     input:
@@ -195,11 +187,3 @@ rule combine_metrics:
                          outfile=output[0])
 
 
-rule plot_prepped_data:
-    input:
-        "{outdir}/prepped.npz",
-    output:
-        "{outdir}/{variable}_{partition}.png",
-    run:
-        plot_obs(input[0], wildcards.variable, output[0],
-                 partition=wildcards.partition)

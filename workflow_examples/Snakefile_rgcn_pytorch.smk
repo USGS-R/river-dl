@@ -147,7 +147,6 @@ rule make_predictions:
         in_dim = len(data['x_vars'])
         model = RGCN_v1(in_dim,config['hidden_size'],adj_mx)
         opt = optim.Adam(model.parameters(),lr=config['finetune_learning_rate'])
-        scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
         model.load_state_dict(torch.load(input[0]))
         predict_from_io_data(model=model, 
                              io_data=input[1],

@@ -4,13 +4,14 @@ sntemp_file: "../river_dl/tests/test_data/test_data_seg_id_nat"
 dist_matrix_file: "../river_dl/tests/test_data/test_dist_matrix.npz"
 reach_attr_file: "../river_dl/tests/test_data/test_seg_attr_seg_id_nat.csv"
 
-out_dir: "output_DRB_offsetTest"
+out_dir: "output_test_gw"
 
 code_dir: ".."
 
-#x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
-#x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
-x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet']
+
+#x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad','seg_outflow','seg_width_mean'] #full list of options
+#x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet'] #current base model variables
+x_vars: ['seg_ccov', 'seg_rain', 'seg_slope', 'seg_tave_air'] #code testing list
 
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']
@@ -66,7 +67,9 @@ val_start_date:
 val_end_date:
   - '2010-09-30'
 
-pt_epochs: 200 
-ft_epochs: 100
+pt_epochs: 5
+ft_epochs: 5
 
 hidden_size: 20
+pretrain_learning_rate: 0.005
+finetune_learning_rate: 0.01

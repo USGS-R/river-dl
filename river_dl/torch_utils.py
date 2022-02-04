@@ -157,8 +157,9 @@ def train_torch(model,
 
     model.to(device)
     ### Run training loop
-    log_cols = ['epoch', 'loss', 'time']
-    train_log = pd.DataFrame(columns=log_cols)
+    log_cols = ['epoch', 'loss', 'val_loss','time','val_time']
+    train_log = pd.DataFrame(columns=log_cols) 
+
     for i in range(max_epochs):
 
         #Train
@@ -168,7 +169,7 @@ def train_torch(model,
         model.train()
         epoch_loss = train_loop(i, train_loader, model, loss_function, optimizer, device)
         train_time.append(time.time() - t1)
-        train_log = pd.concat([train_log,pd.DataFrame([[i, epoch_loss, time.time()-t1]],columns=log_cols,index=['train'])])
+        train_log = pd.concat([train_log,pd.DataFrame([[i, epoch_loss, np.nan,time.time()-t1,np.nan]],columns=log_cols,index=[i])])
 
         #Val
         if x_val is not None:
@@ -185,7 +186,8 @@ def train_torch(model,
             if epochs_since_best > early_stopping_patience:
                 print(f"Early Stopping at Epoch {i}")
                 break
-            train_log = pd.concat([train_log,pd.DataFrame([[i, epoch_val_loss, time.time()-s1]],columns=log_cols,index=['val'])])
+            train_log.loc[train_log.epoch==i,"val_loss"]=epoch_val_loss
+            train_log.loc[train_log.epoch==i,"val_time"]=time.time() - s1
             val_time.append(time.time()-s1)
 
     train_log.to_csv(log_file)

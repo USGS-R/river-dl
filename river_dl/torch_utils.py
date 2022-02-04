@@ -162,7 +162,7 @@ def train_torch(model,
         model.train()
         epoch_loss = train_loop(i, train_loader, model, loss_function, optimizer, device)
         train_time.append(time.time() - t1)
-        train_log.append({'split':'train','epoch':i,'loss':epoch_loss,'time':time.time()-t1}, ignore_index=True)
+        train_log = train_log.append({'split':'train','epoch':i,'loss':epoch_loss,'time':time.time()-t1}, ignore_index=True)
 
         #Val
         if x_val is not None:
@@ -179,7 +179,7 @@ def train_torch(model,
             if epochs_since_best > early_stopping_patience:
                 print(f"Early Stopping at Epoch {i}")
                 break
-            train_log.append({'split': 'val', 'epoch': i, 'loss': epoch_val_loss, 'time': time.time() - s1},
+            train_log = train_log.append({'split': 'val', 'epoch': i, 'loss': epoch_val_loss, 'time': time.time() - s1},
                              ignore_index=True)
             val_time.append(time.time()-s1)
 

@@ -4,15 +4,13 @@ sntemp_file: "../river_dl/tests/test_data/test_data_seg_id_nat"
 dist_matrix_file: "../river_dl/tests/test_data/test_dist_matrix.npz"
 reach_attr_file: "../river_dl/tests/test_data/test_seg_attr_seg_id_nat.csv"
 
-out_dir: "output_DRB_7VarList_GW_main"
+out_dir: "output_DRB_offsetTest"
 
 code_dir: ".."
 
 #x_vars: ["seg_rain", "seg_tave_air", "seginc_swrad", "seg_length", "seginc_potet", "seg_slope", "seg_humid", "seg_elev"]
 #x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
-#x_vars: ['seg_ccov', 'seg_elev', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width_mean', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad']
 x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet']
-#x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet', 'seg_outflow']
 
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']
@@ -31,17 +29,19 @@ lambdas: [1]
 #lambdas: [1,0]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lambdas_gw: [0.5, 0]
+lambdas_gw: [0.5, 0.5]
 
 #gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
 gw_loss_type: 'fft'
 
-trn_offset: 60
-tst_val_offset: 60
+#gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
+gw_loss_type: 'fft'
 
+trn_offset: 0.5 
+tst_val_offset: 0.5
 
 #Define early stopping criteria, setting this to False will turn off early stopping rounds
-early_stopping: False 
+early_stopping: 20 
 
 #Choose whether to use the final weights from the end of training ('trained_weights') or the weights from the best
 # validation epoch ('best_val_weights')

@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import xarray as xr
-import statsmodels.api as sm
+#import statsmodels.api as sm
+from sklearn.linear_model import LinearRegression
 from datetime import datetime
 import math
 from itertools import compress, product
@@ -42,20 +43,35 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
         temp = [x if x >=1 and x<=45 else np.nan for x in temp]
     
     x = [[math.sin(2*math.pi*j),math.cos(2*math.pi*j)] for j in date_decimal]
-# this solves the regression using scikit-learn (not on the current import list), which doesn't give confidence intervals
-#     model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
-#     amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
-#     phi = math.asin(model.coef_[1]/amp)
-
-#this solves the regression using stats models, which provides confidence intervals on the coefficients
+    
 
 
-    X = sm.add_constant(x)
+
+
+
+    
+    
     try:
-        model = sm.OLS(temp,X, missing='drop')
-        results = model.fit()
+        #this solves the regression using stats models, which provides confidence intervals on the coefficients
+        #X = sm.add_constant(x) #use this with statsmodel
+        #model = sm.OLS(temp,X, missing='drop')
+        #results = model.fit()
+        
+        # this solves the regression using scikit-learn (not on the current import list), which doesn't give confidence intervals
+        model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
+        amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
+        phi = math.asin(model.coef_[1]/amp)
+        amp_low=np.nan
+        amp_high=np.nan
+        phi_low=np.nan
+        phi_high = np.nan
 
-        if results.rsquared < r_thresh and isWater and tempType=="obs":
+
+        #this is for statsmodels
+        #if results.rsquared < r_thresh and isWater and tempType=="obs":
+        
+        #this is for sklearn
+        if model.score(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp)))) < r_thresh and isWater and tempType=="obs":
             amp=np.nan
             phi=np.nan
             amp_low=np.nan
@@ -63,17 +79,17 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
             phi_low=np.nan
             phi_high = np.nan
 
-        else:
-            confInt = np.array(results.conf_int())
-
-            amp = math.sqrt(results.params[1]**2+results.params[2]**2)
-            amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
-            amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
-
-            phi =math.atan(results.params[2]/results.params[1])
-            phiRange = [math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
-            phi_low = np.min(phiRange)
-            phi_high = np.max(phiRange)
+#        else:
+#            confInt = np.array(results.conf_int())
+#
+#            amp = math.sqrt(results.params[1]**2+results.params[2]**2)
+#            amp_low = math.sqrt(np.min(abs(confInt[1]))**2+np.min(abs(confInt[2]))**2)
+#            amp_high = math.sqrt(np.max(abs(confInt[1]))**2+np.max(abs(confInt[2]))**2)
+#
+#            phi =math.atan(results.params[2]/results.params[1])
+#            phiRange = [math.atan(confInt[2][x]/confInt[1][y]) for x in range(2) for y in range(2)]
+#            phi_low = np.min(phiRange)
+#            phi_high = np.max(phiRange)
 
 
     except:

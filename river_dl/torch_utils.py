@@ -47,8 +47,13 @@ def reshape_for_gwn(cat_data, keep_portion=None):
 
     files_y = list(filter(lambda x: 'y_' in x, files))
     if keep_portion:
+        if keep_portion > 1:
+            period = int(keep_portion)
+        else:
+            seq_len = cat_reshaped['y_obs_trn'].shape[1]
+            period = int(keep_portion * seq_len)
         for i in files_y:
-            cat_reshaped[i] = cat_reshaped[i][:, -keep_portion:, ...]
+            cat_reshaped[i] = cat_reshaped[i][:, -period:, ...]
     return cat_reshaped
 
 ## Generic PyTorch Training Routine
@@ -152,7 +157,8 @@ def train_torch(model,
 
     model.to(device)
     ### Run training loop
-    train_log = pd.DataFrame(columns=['split', 'epoch', 'loss', 'time'])
+    log_cols = ['epoch', 'loss', 'time']
+    train_log = pd.DataFrame(columns=log_cols)
     for i in range(max_epochs):
 
         #Train
@@ -162,7 +168,7 @@ def train_torch(model,
         model.train()
         epoch_loss = train_loop(i, train_loader, model, loss_function, optimizer, device)
         train_time.append(time.time() - t1)
-        train_log.append({'split':'train','epoch':i,'loss':epoch_loss,'time':time.time()-t1}, ignore_index=True)
+        train_log = pd.concat([train_log,pd.DataFrame([[i, epoch_loss, time.time()-t1]],columns=log_cols,index=['train'])])
 
         #Val
         if x_val is not None:
@@ -179,11 +185,11 @@ def train_torch(model,
             if epochs_since_best > early_stopping_patience:
                 print(f"Early Stopping at Epoch {i}")
                 break
-            train_log.append({'split': 'val', 'epoch': i, 'loss': epoch_val_loss, 'time': time.time() - s1},
-                             ignore_index=True)
+            train_log = pd.concat([train_log,pd.DataFrame([[i, epoch_val_loss, time.time()-s1]],columns=log_cols,index=['val'])])
             val_time.append(time.time()-s1)
 
-    train_log.to_csv(log_file, index=False)
+    train_log.to_csv(log_file)
+    #print(train_log)
     if x_val is None:
         torch.save(model.state_dict(), weights_file)
         print("Average Training Time: {:.4f} secs/epoch".format(np.mean(train_time)))
@@ -206,13 +212,14 @@ def rmse_masked(y_true, y_pred):
     return rmse_loss
 
 
-def predict_torch(x_data, model, batch_size, device='cpu'):
+def predict_torch(x_data, model, batch_size):
     """
     @param model: [object] initialized torch model
     @param batch_size: [int]
     @param device: [str] cuda or cpu
     @return: [tensor] predicted values
     """
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     data = []
     for i in range(len(x_data)):
         data.append(torch.from_numpy(x_data[i]).float())
@@ -224,7 +231,7 @@ def predict_torch(x_data, model, batch_size, device='cpu'):
     for iter, x in enumerate(dataloader):
         trainx = x.to(device)
         with torch.no_grad():
-            output = model(trainx.to(device))
+            output = model(trainx.to(device)).cpu()
         predicted.append(output)
     predicted = torch.cat(predicted, dim=0)
     return predicted

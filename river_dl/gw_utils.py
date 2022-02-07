@@ -7,7 +7,7 @@ from datetime import datetime
 import math
 from itertools import compress, product
 import matplotlib.pyplot as plt
-import seaborn as sns
+#import seaborn as sns
 from copy import deepcopy
 
 from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
@@ -60,7 +60,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
         # this solves the regression using scikit-learn (not on the current import list), which doesn't give confidence intervals
         model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
         amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
-        phi = math.asin(model.coef_[1]/amp)
+        phi = math.atan(model.coef_[1]/model.coef_[0])
         amp_low=np.nan
         amp_high=np.nan
         phi_low=np.nan
@@ -138,7 +138,6 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     #get the phase and amplitude for air and water temps for each segment
     for i in range(len(thisData['seg_id_nat'])):
         thisSeg = thisData['seg_id_nat'][i].data
-
         waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
         #require temps > 1 and <60 C for signal analysis
         waterDF.loc[(waterDF.tave_water<1)|(waterDF.tave_water>60),"tave_water"]=np.nan
@@ -155,9 +154,6 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
         
         
         if waterSum.shape[0]>0 and thisSeg not in reservoirSegs:
-            #print(thisSeg)
-            #print(waterSum)
-            #get the air temp properties
             amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[air_temp_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=False)
             air_amp.append(amp)
             air_amp_low.append(amp_low)
@@ -224,7 +220,6 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
 
     Ar_obs = [water_amp_obs[x]/air_amp[x] for x in range(len(water_amp_obs))]
     delPhi_obs = [(air_phi[x]-water_phi_obs[x])*365/(2*math.pi) for x in range(len(water_amp_obs))]
-    
     Ar_low_obs = [water_amp_low_obs[x]/air_amp_high[x] for x in range(len(water_amp_obs))]
     Ar_high_obs = [water_amp_high_obs[x]/air_amp_low[x] for x in range(len(water_amp_obs))]
     
@@ -253,8 +248,6 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     
     #reset delPhi -10 to 0
     delPhi_obs = [x if x > 0 else 0 if np.isfinite(x) else np.nan for x in delPhi_obs]
-    
-    
     
     Ar_pbm = [water_amp_pbm[x]/air_amp[x] for x in range(len(water_amp_pbm))]
     delPhi_pbm = [(air_phi[x]-water_phi_pbm[x])*365/(2*math.pi) for x in range(len(water_amp_pbm))]

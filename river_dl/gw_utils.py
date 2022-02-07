@@ -565,7 +565,8 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name
                 nObs =["n: " + str(np.sum(np.isfinite(thisData[thisCol].values))) for thisCol in colsToPlot]
                 ax = fig.add_subplot(len(partDict), len(metricLst), thisFig)
                 ax.set_title('{}, {}'.format(thisMetric, thisPart))
-                ax=sns.boxplot(data=thisData[colsToPlot])
+                #ax=sns.boxplot(data=thisData[colsToPlot])
+                ax = thisData[colsToPlot].melt().boxplot(column=['value'],by=['variable'])
                 # Add it to the plot
                 pos = range(len(nObs))
                 for tick,label in zip(pos,ax.get_xticklabels()):

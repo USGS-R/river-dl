@@ -10,7 +10,6 @@ sys.path.insert(1, code_dir)
 
 from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
-from river_dl.torch_utils import reshape_for_gwn
 from river_dl.torch_utils import train_torch
 from river_dl.torch_utils import rmse_masked
 from river_dl.evaluate import combined_metrics
@@ -125,7 +124,7 @@ rule finetune_train:
             y_train=data['y_obs_trn'],
             x_val=data['x_val'],
             y_val=data['y_obs_val'],
-            max_epochs=config['pt_epochs'],
+            max_epochs=config['ft_epochs'],
             early_stopping_patience=config['early_stopping'],
             batch_size = num_segs,
             weights_file=output[0],

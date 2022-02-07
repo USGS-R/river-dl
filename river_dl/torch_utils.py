@@ -116,7 +116,8 @@ def train_torch(model,
                 shuffle = False,
                 weights_file = None,
                 log_file= None,
-                device = 'cpu'):
+                device = 'cpu',
+                keep_portion = None):
     """
     @param model: [objetct] initialized torch model
     @param loss_function: loss function
@@ -135,6 +136,15 @@ def train_torch(model,
 
     epochs_since_best = 0
     best_loss = 1000 # Will get overwritten
+
+    if keep_portion:
+        if keep_portion > 1:
+            period = int(keep_portion)
+        else:
+            period = int(keep_portion * y_train.shape[1])
+        y_train[:, :-period, ...] = np.nan
+        if y_val is not None:
+            y_val[:, :-period, ...] = np.nan
 
     # Put together dataloaders
     train_data = []

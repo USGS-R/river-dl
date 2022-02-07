@@ -7,7 +7,6 @@ from datetime import datetime
 import math
 from itertools import compress, product
 import matplotlib.pyplot as plt
-#import seaborn as sns
 from copy import deepcopy
 
 from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
@@ -565,7 +564,6 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name
                 nObs =["n: " + str(np.sum(np.isfinite(thisData[thisCol].values))) for thisCol in colsToPlot]
                 ax = fig.add_subplot(len(partDict), len(metricLst), thisFig)
                 ax.set_title('{}, {}'.format(thisMetric, thisPart))
-                #ax=sns.boxplot(data=thisData[colsToPlot])
                 ax = thisData[colsToPlot].melt().boxplot(column=['value'],by=['variable'])
                 # Add it to the plot
                 pos = range(len(nObs))

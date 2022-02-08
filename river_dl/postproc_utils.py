@@ -105,6 +105,15 @@ def plot_ts(pred_file, obs_file, variable, out_file):
     plt.tight_layout()
     plt.savefig(out_file)
 
+def plot_ts_obs_preds(pred_file, obs_file, index = 0):
+    combined = fmt_preds_obs(pred_file, obs_file)['temp_c']
+    counts = combined.groupby(combined.index.get_level_values(1)).count().sort_values("obs",ascending=False)
+    combined = combined[combined.index.get_level_values(1) == counts.index[index]]
+    df_piv = combined.reset_index().pivot(index=["date"], columns="seg_id_nat", values=['pred','obs'])
+    df_piv.plot(figsize=(8, 12))
+    plt.tight_layout()
+    plt.show()
+
 def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg_id_nat', time_idx_name='date'):
     """
     convert prepped x or y_dataset data in numpy array to pandas df

@@ -145,12 +145,13 @@ def predict(
         raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
     # keep only specified part of predictions
     if keep_last_portion>1:
-        frac_seq_len = int(y_pred.shape[1] - keep_last_portion)
+        frac_seq_len = int(pred_ids.shape[1] - keep_last_portion)
     else:
-        frac_seq_len = round(y_pred.shape[1] * (1 - keep_last_portion))
-    y_pred = y_pred[:, frac_seq_len:,...]
-    pred_ids = pred_ids[:, frac_seq_len:,...]
-    pred_dates = pred_dates[:, frac_seq_len:,...]
+        frac_seq_len = round(pred_ids.shape[1] * (keep_last_portion))
+
+    y_pred = y_pred[:, -frac_seq_len:,...]
+    pred_ids = pred_ids[:, -frac_seq_len:,...]
+    pred_dates = pred_dates[:, -frac_seq_len:,...]
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars, spatial_idx_name, time_idx_name)
 

@@ -73,10 +73,11 @@ rule prep_ann_temp:
 
 #get the GW loss parameters
 def get_gw_loss(input_data, temp_var="temp_c"):
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     io_data=np.load(input_data)
     temp_index = np.where(io_data['y_obs_vars']==temp_var)[0]
-    temp_mean = io_data['y_mean'][temp_index]
-    temp_sd = io_data['y_std'][temp_index]
+    temp_mean = torch.from_numpy(io_data['y_mean'][temp_index]).to(device)
+    temp_sd = torch.from_numpy(io_data['y_std'][temp_index]).to(device)
     gw_mean = io_data['GW_mean']
     gw_std = io_data['GW_std']
     return rmse_masked_gw(rmse_masked,temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lambda_Ar=config['lambdas_gw'][0],lambda_delPhi=config['lambdas_gw'][1], num_task=len(io_data['y_obs_vars']), gw_type=config['gw_loss_type'])

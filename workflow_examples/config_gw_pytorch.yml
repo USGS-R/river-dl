@@ -31,7 +31,7 @@ lambdas: [1]
 #lambdas: [1,0]
 
 #lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lambdas_gw: [0.5, 0.5]
+lambdas_gw: [0, 0.5]
 
 #gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
 gw_loss_type: 'fft'

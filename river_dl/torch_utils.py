@@ -4,6 +4,7 @@ import torch.utils.data
 import pandas as pd
 import time
 from tqdm import tqdm
+import math as m
 
 
 def reshape_for_gwn(cat_data, keep_portion=None):
@@ -245,10 +246,10 @@ def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw
     """
 
     def rmse_masked_combined_gw(data, y_pred):
-     
+        
         Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task, type=gw_type)
-        rmse_Ar = rmse_masked(Ar_obs,Ar_pred)
-        rmse_delPhi = rmse_masked(delPhi_obs,delPhi_pred)
+        rmse_Ar = rmse_masked(Ar_obs.float(),Ar_pred.float())
+        rmse_delPhi = rmse_masked(delPhi_obs.float(),delPhi_pred.float())
 
         
         rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi
@@ -264,7 +265,10 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     # assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
     # assumes the first two columns of data are the observed flow and temperature, and the remaining
     # ones (extracted here) are the data for gw analysis
+    #device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    #data = torch.from_numpy(data).to(device)
     y_true = data[:, :, num_task:]
+    #y_true = torch.from_numpy(y_true).to(device)
     y_true_temp = data[:, :, int(temp_index):(int(temp_index) + 1)] 
 
     y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
@@ -274,7 +278,10 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     
     Ar_obs = y_true[:, 0, 0]
     delPhi_obs = y_true[:, 0, 1]
-    
+    #print(type(y_pred_temp))
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    #y_pred_temp = torch.from_numpy(y_pred_temp).to(device)
+    #y_true_temp = torch.from_numpy(y_true_temp).to(device)
     if type=='fft':
         print("FFT LOSS")
         y_pred_temp = torch.squeeze(y_pred_temp)
@@ -284,8 +291,8 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         Phiw = torch.angle(fft_torch)
         phiIndex = torch.argmax(torch.abs(fft_torch), 1)
         idx = torch.stack(
-            [torch.reshape(torch.arange(0,Phiw.shape[0]), (-1, 1)),
-             torch.reshape(phiIndex.type(torch.int32), (phiIndex.shape[0], 1))],
+            [torch.reshape(torch.arange(0,Phiw.shape[0]).to(device), (-1, 1)),
+             torch.reshape(phiIndex.type(torch.int32).to(device), (phiIndex.shape[0], 1))],
                            axis=-1)
         #Phiw_out = tf.squeeze(tf.gather_nd(Phiw, idx))
         Phiw_out=Phiw[:,1]
@@ -301,13 +308,13 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
 
         phiIndex_air = torch.argmax(torch.abs(fft_torch_air), 1)
         ida = torch.stack(
-            [torch.reshape(torch.arange(Phia.shape[0]), (-1, 1)),
-             torch.reshape(phiIndex_air.type(torch.int32), (phiIndex_air.shape[0], 1))],
+            [torch.reshape(torch.arange(Phia.shape[0]).to(device), (-1, 1)),
+             torch.reshape(phiIndex_air.type(torch.int32).to(device), (phiIndex_air.shape[0], 1))],
             axis=-1)
         #Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
         Phia_out=Phia[:,1]
 
-        Aa = torch.max(torch.abs(fft_torch_air), 1).values / fft_tf.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
+        Aa = torch.max(torch.abs(fft_torch_air), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
         
         # calculate and scale predicted values
         # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
@@ -327,7 +334,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         #using incomplete datasets in annual stream temperature analyses: Ecological Indicators, v. 122, p. 107229, 
         #http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
 
-        X_mat=torch.stack((torch.ones(y_pred_temp.shape[0:2]), x_lm[:,:,0],x_lm[:,:,1]),axis=1)
+        X_mat=torch.stack((torch.ones(y_pred_temp.shape[0:2]).to(device), x_lm[:,:,0],x_lm[:,:,1]),axis=1)
         #getting the coefficients using a 3-d version of the normal equation:
         #https://cmdlinetips.com/2020/03/linear-regression-using-matrix-multiplication-in-python-using-numpy/
         #http://mlwiki.org/index.php/Normal_Equation
@@ -335,7 +342,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         X_mat_T_dot = torch.einsum('bij,bjk->bik',X_mat_T,X_mat)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
         X_mat_inv = torch.linalg.pinv(X_mat_T_dot)
         X_mat_inv_dot = torch.einsum('bij,bjk->bik',X_mat_inv,X_mat_T)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
-        a_b = torch.einsum('bij,bik->bjk',X_mat_inv_dot,y_pred_temp)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
+        a_b = torch.einsum('bij,bik->bjk',X_mat_inv_dot.float(),y_pred_temp.float())#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
         #the tensor a_b has the coefficients from the regression (reach x [[intercept],[a],[b]])
         #Aw = amplitude of the water temp sinusoid (deg C)
         #A = sqrt (a^2 + b^2)

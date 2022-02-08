@@ -60,7 +60,7 @@ def train_model(
 
     # If keep portion is specified, mask the sequence outside that portion to
     # force the loss function focus on only the keep portion.
-    if keep_portion:
+    if keep_portion is not None:
         if keep_portion > 1:
             period = int(keep_portion)
         else:

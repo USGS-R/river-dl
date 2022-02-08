@@ -48,7 +48,7 @@ def reshape_for_gwn(cat_data, keep_portion=None):
         cat_reshaped[file] = cat_data[file]
 
     files_y = list(filter(lambda x: 'y_' in x, files))
-    if keep_portion:
+    if keep_portion is not None:
         if keep_portion > 1:
             period = int(keep_portion)
         else:

@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import tensorflow as tf
 
 code_dir = config['code_dir']
 # if using river_dl installed with pip this is not needed
@@ -13,7 +14,7 @@ from river_dl.predict import predict_from_io_data
 from river_dl.train import train_model
 from river_dl import loss_functions as lf
 from river_dl.gw_utils import prep_annual_signal_data, calc_pred_ann_temp,calc_gw_metrics
-
+from river_dl.tf_models import RGCNModel
 
 out_dir = config['out_dir'] 
 pred_weights = config['pred_weights']
@@ -45,14 +46,6 @@ use rule all from base_workflow as base_all with:
         expand("{outdir}/GW_summary.csv", outdir=out_dir
         ),
         expand("{outdir}/asRunConfig.yml",outdir=out_dir)
-
-rule copy_config:
-    output:
-        "{outdir}/config_gw.yml"
-    shell:
-        """
-        scp config_gw.yml {output[0]}
-        """
 
         
  
@@ -93,37 +86,55 @@ def get_gw_loss(input_data, temp_var="temp_c"):
 rule finetune_train:
     input:
         "{outdir}/prepped_withGW.npz",
+        "{outdir}/pretrained_weights/"
     output:
         directory("{outdir}/trained_weights/"),
         directory("{outdir}/best_val_weights/"),
+        "{outdir}/finetune_log.csv",
+        "{outdir}/finetune_time.txt"
     run:
         data = np.load(input[0])
-        temp_air_index = np.where(io_data['x_vars'] == 'seg_tave_air')[0]
-        air_unscaled = io_data['x_trn'][:, :, temp_air_index] * io_data['x_std'][temp_air_index] + \
-                       io_data['x_mean'][temp_air_index]
+        temp_air_index = np.where(data['x_vars'] == 'seg_tave_air')[0]
+        air_unscaled = data['x_trn'][:, :, temp_air_index] * data['x_std'][temp_air_index] + \
+                       data['x_mean'][temp_air_index]
         y_trn_obs = np.concatenate(
-            [io_data["y_obs_trn"], io_data["GW_trn_reshape"], air_unscaled], axis=2
+            [data["y_obs_trn"], data["GW_trn_reshape"], air_unscaled], axis=2
         )
-        air_val = io_data['x_val'][:, :, temp_air_index] * io_data['x_std'][temp_air_index] + io_data['x_mean'][
+        air_val = data['x_val'][:, :, temp_air_index] * data['x_std'][temp_air_index] + data['x_mean'][
             temp_air_index]
         y_val_obs = np.concatenate(
-            [io_data["y_obs_val"], io_data["GW_val_reshape"], air_val], axis=2
+            [data["y_obs_val"], data["GW_val_reshape"], air_val], axis=2
         )
+        optimizer = tf.optimizers.Adam(learning_rate=config['finetune_learning_rate'])
+        num_segs = len(np.unique(data['ids_trn']))
+        model = RGCNModel(
+            config['hidden_size'],
+            recurrent_dropout=config['recurrent_dropout'],
+            dropout=config['dropout'],
+            num_tasks=len(config['y_vars_pretrain']),
+            A= data["dist_matrix"]
+        )
+
+        model.compile(optimizer=optimizer, loss=get_gw_loss(input[0]))
+        model.load_weights(input[1] + "/")
+
             # Run the finetuning within the training engine on CPU for the GW loss function
         train_model(model,
                     x_trn = data['x_trn'],
                     y_trn = y_trn_obs,
                     epochs = config['pt_epochs'],
-                    batch_size = 2,
+                    seed = config['seed'],
+                    batch_size = num_segs,
                     x_val = data['x_val'],
                     y_val = y_val_obs,
                     # I need to add a trailing slash here. Otherwise the wgts
                     # get saved in the "outdir"
                     weight_dir = output[0] + "/",
                     best_val_weight_dir = output[1] + "/",
-                    log_file = output[1],
-                    time_file = output[2],
-                    early_stop_patience=config['early_stopping'])
+                    log_file = output[2],
+                    time_file = output[3],
+                    early_stop_patience=config['early_stopping'],
+                    use_cpu = True)
 
                  
 rule compile_pred_GW_stats:

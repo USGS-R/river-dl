@@ -11,7 +11,7 @@ dist_matrix_file: "../data_DRB/distance_matrix_drb_Christiana_no3558.npz"
 #### for flow modeling, seg_width should be removed from x_vars
 x_vars: ['seg_ccov', 'seg_rain', 'seg_slope', 'seg_tave_air']
 
-out_dir: "output_test"
+out_dir: "output_test_rgcn"
 
 seed: False #random seed for training False==No seed, otherwise specify the seed
 

@@ -41,6 +41,8 @@ def reshape_for_gwn(cat_data, keep_portion=None):
         reshaped = np.moveaxis(reshaped,3,1)
         #reshaped = np.transpose(reshaped,(0,3,2,1))
         cat_reshaped[i] = reshaped
+        ## shape in n_batch*nseg,seq_len,n_var
+        ## shape out batches, n_var, n_seg, n_seq_len
 
     for file in set(cat_data.files) - set(files):
         cat_reshaped[file] = cat_data[file]
@@ -50,10 +52,10 @@ def reshape_for_gwn(cat_data, keep_portion=None):
         if keep_portion > 1:
             period = int(keep_portion)
         else:
-            seq_len = cat_reshaped['y_obs_trn'].shape[1]
+            seq_len = cat_reshaped['y_obs_trn'].shape[3]
             period = int(keep_portion * seq_len)
         for i in files_y:
-            cat_reshaped[i] = cat_reshaped[i][:, -period:, ...]
+            cat_reshaped[i] = cat_reshaped[i][:,:,:,-period:]
     return cat_reshaped
 
 ## Generic PyTorch Training Routine
@@ -137,7 +139,7 @@ def train_torch(model,
     epochs_since_best = 0
     best_loss = 1000 # Will get overwritten
 
-    if keep_portion:
+    if keep_portion is not None:
         if keep_portion > 1:
             period = int(keep_portion)
         else:

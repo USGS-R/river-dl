@@ -286,10 +286,12 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     # assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
     # assumes the first two columns of data are the observed flow and temperature, and the remaining
     # ones (extracted here) are the data for gw analysis
-    #device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    #data = torch.from_numpy(data).to(device)
+
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+    assert type=='fft', "the groundwater loss calculation method must be fft"
+
     y_true = data[:, :, num_task:]
-    #y_true = torch.from_numpy(y_true).to(device)
     y_true_temp = data[:, :, int(temp_index):(int(temp_index) + 1)] 
 
     y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
@@ -299,12 +301,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     
     Ar_obs = y_true[:, 0, 0]
     delPhi_obs = y_true[:, 0, 1]
-    #print(type(y_pred_temp))
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-    #y_pred_temp = torch.from_numpy(y_pred_temp).to(device)
-    #y_true_temp = torch.from_numpy(y_true_temp).to(device)
     if type=='fft':
-        print("FFT LOSS")
         y_pred_temp = torch.squeeze(y_pred_temp)
         y_pred_mean = torch.mean(y_pred_temp, 1, keepdims=True)
         temp_demean = y_pred_temp - y_pred_mean
@@ -315,7 +312,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
             [torch.reshape(torch.arange(0,Phiw.shape[0]).to(device), (-1, 1)),
              torch.reshape(phiIndex.type(torch.int32).to(device), (phiIndex.shape[0], 1))],
                            axis=-1)
-        #Phiw_out = tf.squeeze(tf.gather_nd(Phiw, idx))
         Phiw_out=Phiw[:,1]
 
         Aw = torch.max(torch.abs(fft_torch), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
@@ -332,7 +328,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
             [torch.reshape(torch.arange(Phia.shape[0]).to(device), (-1, 1)),
              torch.reshape(phiIndex_air.type(torch.int32).to(device), (phiIndex_air.shape[0], 1))],
             axis=-1)
-        #Phia_out = tf.squeeze(tf.gather_nd(Phia, ida))
         Phia_out=Phia[:,1]
 
         Aa = torch.max(torch.abs(fft_torch_air), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
@@ -346,7 +341,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
         
     elif type=="linalg":
-        print("LINALG LOSS")
         x_lm = y_true[:,:,-3:-1] #extract the sin(wt) and cos(wt)
 
         #a tensor of the sin(wt) and cos(wt) for each reach x day, the 1's are for the intercept of the linear regression

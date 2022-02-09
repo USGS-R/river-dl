@@ -143,7 +143,7 @@ rule finetune_train:
             y_train=data['y_obs_trn'],
             x_val=data['x_val'],
             y_val=data['y_obs_val'],
-            max_epochs=config['pt_epochs'],
+            max_epochs=config['ft_epochs'],
             early_stopping_patience=config['early_stopping'],
             batch_size = config['batch_size'],
             weights_file=output[0],

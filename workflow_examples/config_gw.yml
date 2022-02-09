@@ -64,8 +64,8 @@ test_end_date:
   - '2021-09-30'
 
 
-pt_epochs: 20 
-ft_epochs: 20
+pt_epochs: 5 
+ft_epochs: 5
 
 hidden_size: 20
 pretrain_learning_rate: 0.005

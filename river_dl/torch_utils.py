@@ -275,9 +275,6 @@ def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw
         
         rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi
 
-#        tf.debugging.assert_all_finite(
-#            rmse_loss, 'Nans is a bad loss to have. This might be because you are running the gw loss function on a GPU without requiring the CPU device or it might be an intermittent error that will be resolved by rerunning the train function'
-#        )
         return rmse_loss
     return rmse_masked_combined_gw
 

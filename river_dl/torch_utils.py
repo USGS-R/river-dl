@@ -113,7 +113,7 @@ def train_torch(model,
                 y_train,
                 batch_size,
                 max_epochs,
-                early_stopping_patience,
+                early_stopping_patience=False,
                 x_val = None,
                 y_val = None,
                 shuffle = False,
@@ -278,7 +278,6 @@ def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw
 #        tf.debugging.assert_all_finite(
 #            rmse_loss, 'Nans is a bad loss to have. This might be because you are running the gw loss function on a GPU without requiring the CPU device or it might be an intermittent error that will be resolved by rerunning the train function'
 #        )
-        torch._assert(torch.all(torch.isfinite(rmse_loss)),'Nans is a bad loss to have. This might be because you are running the gw loss function on a GPU without requiring the CPU device or it might be an intermittent error that will be resolved by rerunning the train function')
         return rmse_loss
     return rmse_masked_combined_gw
 
@@ -287,7 +286,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     # assumes the first two columns of data are the observed flow and temperature, and the remaining
     # ones (extracted here) are the data for gw analysis
 
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     assert type=='fft', "the groundwater loss calculation method must be fft"
 
@@ -308,10 +306,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         fft_torch = torch.fft.rfft(temp_demean)
         Phiw = torch.angle(fft_torch)
         phiIndex = torch.argmax(torch.abs(fft_torch), 1)
-        idx = torch.stack(
-            [torch.reshape(torch.arange(0,Phiw.shape[0]).to(device), (-1, 1)),
-             torch.reshape(phiIndex.type(torch.int32).to(device), (phiIndex.shape[0], 1))],
-                           axis=-1)
         Phiw_out=Phiw[:,1]
 
         Aw = torch.max(torch.abs(fft_torch), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
@@ -324,10 +318,6 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         Phia = torch.angle(fft_torch_air)
 
         phiIndex_air = torch.argmax(torch.abs(fft_torch_air), 1)
-        ida = torch.stack(
-            [torch.reshape(torch.arange(Phia.shape[0]).to(device), (-1, 1)),
-             torch.reshape(phiIndex_air.type(torch.int32).to(device), (phiIndex_air.shape[0], 1))],
-            axis=-1)
         Phia_out=Phia[:,1]
 
         Aa = torch.max(torch.abs(fft_torch_air), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]

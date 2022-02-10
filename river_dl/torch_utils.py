@@ -4,6 +4,7 @@ import torch.utils.data
 import pandas as pd
 import time
 from tqdm import tqdm
+import math as m
 
 
 def reshape_for_gwn(cat_data, keep_portion=None):
@@ -112,7 +113,7 @@ def train_torch(model,
                 y_train,
                 batch_size,
                 max_epochs,
-                early_stopping_patience,
+                early_stopping_patience=False,
                 x_val = None,
                 y_val = None,
                 shuffle = False,
@@ -135,6 +136,9 @@ def train_torch(model,
 
     print(f"Training on {device}")
     print("start training...",flush=True)
+    
+    if not early_stopping_patience:
+        early_stopping_patience = max_epochs
 
     epochs_since_best = 0
     best_loss = 1000 # Will get overwritten
@@ -233,7 +237,7 @@ def predict_torch(x_data, model, batch_size):
     @param device: [str] cuda or cpu
     @return: [tensor] predicted values
     """
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = next(model.parameters()).device
     data = []
     for i in range(len(x_data)):
         data.append(torch.from_numpy(x_data[i]).float())
@@ -249,3 +253,118 @@ def predict_torch(x_data, model, batch_size):
         predicted.append(output)
     predicted = torch.cat(predicted, dim=0)
     return predicted
+
+
+def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lambda_Ar=0, lambda_delPhi=0, num_task=2, gw_type='fft'):
+    """
+    calculate a weighted, masked rmse that includes the groundwater terms
+    :param lamb, lamb2, lamb3: [float] (short for lambda). The factor that the auxiliary loss, Ar loss, and deltaPhi loss
+    will be multiplied by before added to the main loss.
+    :param temp_index: [int]. Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param temp_mean: [float]. Mean temperature for unscaling the predicted temperatures.
+    :param temp_sd: [float]. Standard deviation of temperature for unscalind the predicted temperatures.
+    :param gw_type: [str]. Type of gw loss, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
+    """
+
+    def rmse_masked_combined_gw(data, y_pred):
+        
+        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task, type=gw_type)
+        rmse_Ar = rmse_masked(Ar_obs.float(),Ar_pred.float())
+        rmse_delPhi = rmse_masked(delPhi_obs.float(),delPhi_pred.float())
+
+        
+        rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi
+
+        return rmse_loss
+    return rmse_masked_combined_gw
+
+def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, num_task, type='fft'):
+    # assumes that axis 0 of data and y_pred are the reaches and axis 1 are daily values
+    # assumes the first two columns of data are the observed flow and temperature, and the remaining
+    # ones (extracted here) are the data for gw analysis
+
+
+    assert type=='fft', "the groundwater loss calculation method must be fft"
+
+    y_true = data[:, :, num_task:]
+    y_true_temp = data[:, :, int(temp_index):(int(temp_index) + 1)] 
+
+    y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]  # extract just the predicted temperature
+    # unscale the predicted temps prior to calculating the amplitude and phase
+    y_pred_temp = y_pred_temp * temp_sd + temp_mean
+    y_true_temp = y_true_temp * temp_sd + temp_mean
+    
+    Ar_obs = y_true[:, 0, 0]
+    delPhi_obs = y_true[:, 0, 1]
+    if type=='fft':
+        y_pred_temp = torch.squeeze(y_pred_temp)
+        y_pred_mean = torch.mean(y_pred_temp, 1, keepdims=True)
+        temp_demean = y_pred_temp - y_pred_mean
+        fft_torch = torch.fft.rfft(temp_demean)
+        Phiw = torch.angle(fft_torch)
+        phiIndex = torch.argmax(torch.abs(fft_torch), 1)
+        Phiw_out=Phiw[:,1]
+
+        Aw = torch.max(torch.abs(fft_torch), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf, out_type=tf.dtypes.float32)[1]
+
+        #get the air signal properties
+        y_true_air = y_true[:, :, -1]
+        y_true_air_mean = torch.mean(y_true_air, 1, keepdims=True)
+        air_demean = y_true_air - y_true_air_mean
+        fft_torch_air = torch.fft.rfft(air_demean)
+        Phia = torch.angle(fft_torch_air)
+
+        phiIndex_air = torch.argmax(torch.abs(fft_torch_air), 1)
+        Phia_out=Phia[:,1]
+
+        Aa = torch.max(torch.abs(fft_torch_air), 1).values / fft_torch.shape[1]  # tf.shape(fft_tf_air, out_type=tf.dtypes.float32)[1]
+        
+        # calculate and scale predicted values
+        # delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
+        delPhi_pred = (Phia_out-Phiw_out)
+        delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+        
+        # Ar_pred = the ratio of the water temp and air temp amplitudes
+        Ar_pred = (Aw / Aa - gw_mean[0]) / gw_std[0]
+        
+    elif type=="linalg":
+        x_lm = y_true[:,:,-3:-1] #extract the sin(wt) and cos(wt)
+
+        #a tensor of the sin(wt) and cos(wt) for each reach x day, the 1's are for the intercept of the linear regression
+        # T(t) = T_mean + a*sin(wt) + b*cos(wt)
+        # Johnson, Z.C., Johnson, B.G., Briggs, M.A., Snyder, C.D., Hitt, N.P., and Devine, W.D., 2021, Heed the data gap: Guidelines for 
+        #using incomplete datasets in annual stream temperature analyses: Ecological Indicators, v. 122, p. 107229, 
+        #http://www.sciencedirect.com/science/article/pii/S1470160X20311687.
+
+        X_mat=torch.stack((torch.ones(y_pred_temp.shape[0:2]).to(device), x_lm[:,:,0],x_lm[:,:,1]),axis=1)
+        #getting the coefficients using a 3-d version of the normal equation:
+        #https://cmdlinetips.com/2020/03/linear-regression-using-matrix-multiplication-in-python-using-numpy/
+        #http://mlwiki.org/index.php/Normal_Equation
+        X_mat_T = torch.permute(X_mat,dims=(0,2,1))
+        X_mat_T_dot = torch.einsum('bij,bjk->bik',X_mat_T,X_mat)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
+        X_mat_inv = torch.linalg.pinv(X_mat_T_dot)
+        X_mat_inv_dot = torch.einsum('bij,bjk->bik',X_mat_inv,X_mat_T)#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
+        a_b = torch.einsum('bij,bik->bjk',X_mat_inv_dot.float(),y_pred_temp.float())#eigensums are used instead of dot products because we want the dot products of axis 1 and 2, not 0
+        #the tensor a_b has the coefficients from the regression (reach x [[intercept],[a],[b]])
+        #Aw = amplitude of the water temp sinusoid (deg C)
+        #A = sqrt (a^2 + b^2)
+        Aw = torch.sqrt(a_b[:,1,0]**2+a_b[:,2,0]**2)
+        #Phiw = phase of the water temp sinusoid (radians)
+        #Phi = atan (b/a) - in radians
+        Phiw = torch.atan(a_b[:,2,0]/a_b[:,1,0])
+
+        #calculate the air properties
+        y_true_air = y_true[:, :, -1:]
+        a_b_air = torch.einsum('bij,bik->bjk',X_mat_inv_dot,y_true_air)
+        A_air = torch.sqrt(a_b_air[:,1,0]**2+a_b_air[:,2,0]**2)
+        Phi_air = torch.atan(a_b_air[:,2,0]/a_b_air[:,1,0])
+
+        #calculate and scale predicted values
+        #delPhi_pred = the difference in phase between the water temp and air temp sinusoids, in days
+        delPhi_pred = Phi_air-Phiw
+        delPhi_pred = (delPhi_pred * 365 / (2 * m.pi) - gw_mean[1]) / gw_std[1]
+
+        #Ar_pred = the ratio of the water temp and air temp amplitudes
+        Ar_pred = (Aw/A_air-gw_mean[0])/gw_std[0]
+
+    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred

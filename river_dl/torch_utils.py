@@ -152,6 +152,7 @@ def train_torch(model,
         if y_val is not None:
             y_val[:, :-period, ...] = np.nan
 
+
     # Put together dataloaders
     train_data = []
     for i in range(len(x_train)):

@@ -105,6 +105,33 @@ def plot_ts(pred_file, obs_file, variable, out_file):
     plt.tight_layout()
     plt.savefig(out_file)
 
+def plot_ts_obs_preds(pred_file, obs_file, index_start = 0, index_end=3, outfile=None):
+    """
+    Plots the observations vs predictions for a subset of reaches with the most observations
+    @param pred_file: [str] path to feather file with predictions
+    @param obs_file: [str] path to observation file
+    @param index_start: [int] start reach index
+    @param index_end: [int] end reach index
+    """
+    combined = fmt_preds_obs(pred_file, obs_file)['temp_c']
+    counts = combined.groupby(combined.index.get_level_values(1)).count().sort_values("obs",ascending=False)
+    combined = combined[combined.index.get_level_values(1).isin(counts.index[index_start:index_end])].reset_index(level='seg_id_nat')
+    segs = np.unique(combined.seg_id_nat)
+    num_plots = len(segs)
+    fig, axes = plt.subplots(nrows=num_plots)
+    for seg, ax in zip(segs, axes.flat):
+        df = combined.loc[combined.seg_id_nat == seg]#.melt(id_vars=['seg_id_nat','date'])
+        ax.plot("pred", data = df, label="pred",alpha=0.5)
+        ax.plot("obs", data=df, label = 'obs',alpha=0.5)
+        ax.legend()
+        ax.set_title(seg)
+    plt.tight_layout()
+    if out_file:
+        plt.savefig(outfile)
+    else:
+        plt.show()
+
+
 def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg_id_nat', time_idx_name='date'):
     """
     convert prepped x or y_dataset data in numpy array to pandas df

@@ -20,6 +20,10 @@ This is an example of a basic workflow with a pytorch RGCN and two training phas
 ### Snakefile_gw.smk, config_gw.yml
 This is an example of a workflow that does some customization to include groundwater-specific considerations. It uses an RGCN and and two training phase (pretraining and finetuning). It also uses early stopping.
 
+### Snakefile_rgcn_hypertune.smk, config* (will work with basic.yml)
+This is an example of how to use wildcards in a Snakefile to train models with various hyperparameter settings.  The example focuses on 
+sequence length and sequence offset, but the same approach can be used to train models in replicate or explore other hyperparameter tuning spaces. 
+
 ## Running an example workflow
 Assuming you have `snakemake` installed, you would run the "basic" workflow with 1 core with the following command: 
 

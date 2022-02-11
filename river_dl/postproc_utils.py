@@ -105,7 +105,7 @@ def plot_ts(pred_file, obs_file, variable, out_file):
     plt.tight_layout()
     plt.savefig(out_file)
 
-def plot_ts_obs_preds(pred_file, obs_file, index_start = 0, index_end=3):
+def plot_ts_obs_preds(pred_file, obs_file, index_start = 0, index_end=3, outfile=None):
     """
     Plots the observations vs predictions for a subset of reaches with the most observations
     @param pred_file: [str] path to feather file with predictions
@@ -126,7 +126,10 @@ def plot_ts_obs_preds(pred_file, obs_file, index_start = 0, index_end=3):
         ax.legend()
         ax.set_title(seg)
     plt.tight_layout()
-    plt.show()
+    if out_file:
+        plt.savefig(outfile)
+    else:
+        plt.show()
 
 
 def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg_id_nat', time_idx_name='date'):

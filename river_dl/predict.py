@@ -145,7 +145,7 @@ def predict(
         raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
     # keep only specified part of predictions
     if keep_last_portion>1:
-        frac_seq_len = int(pred_ids.shape[1] - keep_last_portion)
+        frac_seq_len = int(keep_last_portion)
     else:
         frac_seq_len = round(pred_ids.shape[1] * (keep_last_portion))
 

@@ -148,8 +148,6 @@ def train_torch(model,
         if y_val is not None:
             y_val[:, :-period, ...] = np.nan
 
-    if not early_stopping_patience:
-        early_stopping_patience = max_epochs
 
     # Put together dataloaders
     train_data = []

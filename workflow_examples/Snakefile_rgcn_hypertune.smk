@@ -17,30 +17,30 @@ code_dir = ''
 ### Set up your hyperparameters as wild cards
 offsets = [15,.25, .5, 1]
 sequence_length = [60,180,365]
-model = ['RGCN']
+run_id = ['RGCN_Hypertune']
 
 rule all:
     input:
-        expand("{outdir}/{offset}_{seq_length}/{model}/{metric_type}_metrics.csv",
+        expand("{outdir}/{offset}_{seq_length}/{run_id}/{metric_type}_metrics.csv",
             outdir=out_dir,
             offset=offsets,
             seq_length=sequence_length,
             metric_type=['overall', 'month', 'reach'],
-            model=model
+            run_id=run_id
         ),
-        expand("{outdir}/asRunConfig_{model}.yml", outdir=out_dir, model = model),
-        expand("{outdir}/Snakefile_{model}", outdir=out_dir, model = model),
+        expand("{outdir}/asRunConfig_{run_id}.yml", outdir=out_dir, run_id = run_id),
+        expand("{outdir}/Snakefile_{run_id}", outdir=out_dir, run_id = run_id),
 
 rule as_run_config:
     output:
-        "{outdir}/asRunConfig_{model}.yml"
+        "{outdir}/asRunConfig_{run_id}.yml"
     group: "prep"
     run:
         asRunConfig(config,code_dir,output[0])
 
 rule copy_snakefile:
     output:
-        "{outdir}/Snakefile_{model}"
+        "{outdir}/Snakefile_{run_id}"
     group: "prep"
     shell:
         """
@@ -86,8 +86,8 @@ rule pre_train:
     input:
         "{outdir}/{offset}_{seq_length}/prepped.npz"
     output:
-        "{outdir}/{offset}_{seq_length}/{model}/pretrained_weights.pth",
-        "{outdir}/{offset}_{seq_length}/{model}/pretrain_log.csv",
+        "{outdir}/{offset}_{seq_length}/{run_id}/pretrained_weights.pth",
+        "{outdir}/{offset}_{seq_length}/{run_id}/pretrain_log.csv",
     threads: 4
     group: 'train'
     run:
@@ -120,11 +120,11 @@ rule pre_train:
 rule finetune_train:
     input:
         "{outdir}/{offset}_{seq_length}/prepped.npz",
-        "{outdir}/{offset}_{seq_length}/{model}/pretrained_weights.pth",
-        "{outdir}/{offset}_{seq_length}/{model}/pretrain_log.csv",
+        "{outdir}/{offset}_{seq_length}/{run_id}/pretrained_weights.pth",
+        "{outdir}/{offset}_{seq_length}/{run_id}/pretrain_log.csv",
     output:
-        "{outdir}/{offset}_{seq_length}/{model}/finetuned_weights.pth",
-        "{outdir}/{offset}_{seq_length}/{model}/finetune_log.csv",
+        "{outdir}/{offset}_{seq_length}/{run_id}/finetuned_weights.pth",
+        "{outdir}/{offset}_{seq_length}/{run_id}/finetune_log.csv",
     threads: 4
     group: 'train'
     run:
@@ -158,10 +158,10 @@ rule finetune_train:
 
 rule make_predictions:
     input:
-        "{outdir}/{offset}_{seq_length}/{model}/finetuned_weights.pth",
+        "{outdir}/{offset}_{seq_length}/{run_id}/finetuned_weights.pth",
         "{outdir}/{offset}_{seq_length}/prepped.npz"
     output:
-        "{outdir}/{offset}_{seq_length}/{model}/{partition}_preds.feather",
+        "{outdir}/{offset}_{seq_length}/{run_id}/{partition}_preds.feather",
     group: 'train'
     threads: 3
     run:
@@ -193,11 +193,11 @@ def get_grp_arg(wildcards):
 rule combine_metrics:
     input:
         config['obs_file'],
-        "{outdir}/{offset}_{seq_length}/{model}/trn_preds.feather",
-        "{outdir}/{offset}_{seq_length}/{model}/val_preds.feather",
-        "{outdir}/{offset}_{seq_length}/{model}/tst_preds.feather"
+        "{outdir}/{offset}_{seq_length}/{run_id}/trn_preds.feather",
+        "{outdir}/{offset}_{seq_length}/{run_id}/val_preds.feather",
+        "{outdir}/{offset}_{seq_length}/{run_id}/tst_preds.feather"
     output:
-        "{outdir}/{offset}_{seq_length}/{model}/{metric_type}_metrics.csv"
+        "{outdir}/{offset}_{seq_length}/{run_id}/{metric_type}_metrics.csv"
     group: 'predict_eval'
     threads: 3
     params:

@@ -22,7 +22,7 @@ def asRunConfig(config, code_dir, outFile):
     status = str(subprocess.Popen(['git status'], shell=True,cwd=code_dir, stdout=subprocess.PIPE).communicate()[0]).split("\\n")
     modifiedFiles = [x.split()[1].strip() for x in status if "modified" in x]
     newFiles = [x.split()[1].strip() for x in status if "new file" in x]
-    config['gitStatus']= 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
+    config['gitStatus']= 'unknown' if not 'On branch' in status else 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
     config['gitModified']=modifiedFiles
     config['gitNew']=newFiles
     config['gitBranch']=branch

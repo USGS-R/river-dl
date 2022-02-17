@@ -3,7 +3,7 @@ import numpy as np
 import yaml, time, os
 import xarray as xr
 import datetime
-
+import subprocess
 
 def asRunConfig(config, code_dir, outFile):
     """
@@ -19,6 +19,12 @@ def asRunConfig(config, code_dir, outFile):
         branch = ref.split("/")[-1]
     with open(os.path.join(code_dir,'.git/', ref),'r') as git_hash:
         commit = git_hash.readline().strip()
+    status = str(subprocess.Popen(['git status'], shell=True,cwd=code_dir, stdout=subprocess.PIPE).communicate()[0]).split("\\n")
+    modifiedFiles = [x.split()[1].strip() for x in status if "modified" in x]
+    newFiles = [x.split()[1].strip() for x in status if "new file" in x]
+    config['gitStatus']= 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
+    config['gitModified']=modifiedFiles
+    config['gitNew']=newFiles
     config['gitBranch']=branch
     config['gitCommit'] = commit
     #and the file info for the input files

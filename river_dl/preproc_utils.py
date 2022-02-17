@@ -81,10 +81,10 @@ def separate_trn_tst(
     time_idx_name,
     train_start_date,
     train_end_date,
-    val_start_date,
-    val_end_date,
-    test_start_date,
-    test_end_date,
+    val_start_date=None,
+    val_end_date=None,
+    test_start_date=None,
+    test_end_date=None,
 ):
     """
     separate the train data from the test data according to the start and end
@@ -110,12 +110,29 @@ def separate_trn_tst(
     train = sel_partition_data(
         dataset, time_idx_name, train_start_date, train_end_date
     )
-    val = sel_partition_data(
-        dataset, time_idx_name, val_start_date, val_end_date
-    )
-    test = sel_partition_data(
-        dataset, time_idx_name, test_start_date, test_end_date
-    )
+
+    if val_start_date and val_end_date:
+        val = sel_partition_data(
+            dataset, time_idx_name, val_start_date, val_end_date
+        )
+    elif val_start_date and not val_end_date:
+        raise ValueError("With a val_start_date a val_end_date must be given")
+    elif val_end_date and not val_start_date:
+        raise ValueError("With a val_end_date a val_start_date must be given")
+    else:
+        val = None
+
+    if test_start_date and test_end_date:
+        test = sel_partition_data(
+            dataset, time_idx_name, test_start_date, test_end_date
+        )
+    elif test_start_date and not test_end_date:
+        raise ValueError("With a test_start_date a test_end_date must be given")
+    elif test_end_date and not test_start_date:
+        raise ValueError("With a test_end_date a test_start_date must be given")
+    else:
+        test = None
+
     return train, val, test
 
 
@@ -427,6 +444,11 @@ def convert_batch_reshape(
     the first batch will be 0-365 and the second will be 182-547)
     :return: [numpy array] batched and reshaped dataset
     """
+    # If there is no dataset (like if a test or validation set is not supplied)
+    # just return None
+    if not dataset:
+        return None
+
     # convert xr.dataset to numpy array
     dataset = dataset.transpose(spatial_idx_name, time_idx_name)
 
@@ -471,6 +493,11 @@ def coord_as_reshaped_array(
     the first batch will be 0-365 and the second will be 182-547)
     :return:
     """
+    # If there is no dataset (like if a test or validation set is not supplied)
+    # just return None
+    if not dataset:
+        return None
+
     # I need one variable name. It can be any in the dataset, but I'll use the
     # first
     first_var = next(iter(dataset.data_vars.keys()))
@@ -511,10 +538,10 @@ def prep_y_data(
     x_data,
     train_start_date,
     train_end_date,
-    val_start_date,
-    val_end_date,
-    test_start_date,
-    test_end_date,
+    val_start_date=None,
+    val_end_date=None,
+    test_start_date=None,
+    test_end_date=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
@@ -597,10 +624,12 @@ def prep_y_data(
             y_mean, xr.Dataset
         ):
             y_trn, y_std, y_mean = scale(y_trn)
-            y_val, _, _ = scale(y_val, y_std, y_mean)
+            if y_val:
+                y_val, _, _ = scale(y_val, y_std, y_mean)
         else:
             y_trn, _, _ = scale(y_trn)
-            y_val, _, _ = scale(y_val, y_std, y_mean)
+            if y_val:
+                y_val, _, _ = scale(y_val, y_std, y_mean)
 
 
     if y_type == 'obs':
@@ -645,13 +674,13 @@ def prep_y_data(
 def prep_all_data(
     x_data_file,
     y_data_file,
+    x_vars,
     train_start_date,
     train_end_date,
-    val_start_date,
-    val_end_date,
-    test_start_date,
-    test_end_date,
-    x_vars,
+    val_start_date=None,
+    val_end_date=None,
+    test_start_date=None,
+    test_end_date=None,
     y_vars_finetune=None,
     y_vars_pretrain=None,
     spatial_idx_name="seg_id_nat",
@@ -776,8 +805,16 @@ def prep_all_data(
     x_scl, x_std, x_mean = scale(x_data)
 
     x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
-    x_val_scl, _, _ = scale(x_val, std=x_std, mean=x_mean)
-    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+
+    if x_val:
+        x_val_scl, _, _ = scale(x_val, std=x_std, mean=x_mean)
+    else:
+        x_val_scl = None
+
+    if x_tst:
+        x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+    else:
+        x_tst_scl = None
 
     # read, filter observations for finetuning
 

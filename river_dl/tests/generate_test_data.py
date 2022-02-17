@@ -38,13 +38,17 @@ def sel_date_segs(df, segs, start_date, end_date):
 data_dir = "../../../drb-dl-model/data/in/"
 start_date = "2003-09-15"
 end_date = "2006-10-15"
-segs = [2012, 2007]
+segs = [2012, 2007, 2014, 2037]
 
 # Subset sntemp data
 dfs = pd.read_feather(
     os.path.join(data_dir, "uncal_sntemp_input_output_subset.feather")
 )
+test_variables = ['seg_rain', 'seg_tave_air', 'seg_slope', 'seg_humid',
+                  'seg_tave_water', 'seg_outflow']
+test_variables.extend(['date', 'seg_id_nat'])
 dfs["date"] = pd.to_datetime(dfs["date"])
+dfs = dfs[test_variables]
 dfs = sel_date_segs(dfs, segs, start_date, end_date)
 dfs.to_xarray().to_zarr("test_data/test_data", mode="w")
 

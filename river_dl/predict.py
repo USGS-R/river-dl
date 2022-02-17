@@ -256,7 +256,7 @@ def predict_one_date_range(
     )
     x_batch_ids = coord_as_reshaped_array(
         x_data,
-        "seg_id_nat",
+        spatial_idx_name,
         seq_len=seq_len,
         offset=offset,
         spatial_idx_name=spatial_idx_name,
@@ -264,7 +264,7 @@ def predict_one_date_range(
     )
     x_batch_dates = coord_as_reshaped_array(
         x_data,
-        "date",
+        time_idx_name,
         seq_len=seq_len,
         offset=offset,
         spatial_idx_name=spatial_idx_name,
@@ -399,10 +399,10 @@ def predict_from_arbitrary_data(
 
     # trim beginning and end predictions
     predictions_beginning_trim = beginning_predictions[
-        beginning_predictions["date"] < middle_predictions["date"].min()
+        beginning_predictions[time_idx_name] < middle_predictions[time_idx_name].min()
     ]
     predictions_end_trim = end_predictions[
-        end_predictions["date"] > middle_predictions["date"].max()
+        end_predictions[time_idx_name] > middle_predictions[time_idx_name].max()
     ]
 
     predictions_combined = pd.concat(

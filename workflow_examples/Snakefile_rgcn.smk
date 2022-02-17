@@ -26,14 +26,25 @@ rule all:
                 outdir=out_dir,
                 metric_type=['overall', 'month', 'reach', 'month_reach'],
         ),
-        expand("{outdir}/asRunConfig.yml",  outdir=out_dir)
-        
+        expand("{outdir}/asRunConfig.yml",  outdir=out_dir),
+        expand("{outdir}/Snakefile", outdir=out_dir),        
 
 rule as_run_config:
     output:
         "{outdir}/asRunConfig.yml"
     run:
         asRunConfig(config, code_dir, output[0])
+
+
+rule copy_snakefile:
+    output:
+        "{outdir}/Snakefile"
+    #group: "prep"
+    shell:
+        """
+        scp Snakefile_rgcn.smk {output[0]}
+        """
+
 
 rule prep_io_data:
     input:

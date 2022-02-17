@@ -3,7 +3,33 @@ import numpy as np
 import yaml, time, os
 import xarray as xr
 import datetime
+import subprocess
+import shutil
+import os
 
+
+def saveRunLog(config,code_dir,outFile):
+    """
+    function to add the run specs to a csv log file
+    :param config: [dict] the current config dictionary
+    :param code_dir: [str] path to river-dl directory
+    :param outFile: [str] the filename for the output
+    """
+
+    #check if the log already exists
+    newLog = not os.path.exists(outFile)
+
+    #add a default run description if needed
+    if not "runDescription" in config.keys():
+        config['runDescription']=""
+
+    #replace commas with semi-colons for csv readability
+    config['runDescription']=config['runDescription'].replace(",",";")
+
+    with open(outFile,"a+") as f:
+        if newLog:
+            f.write("'Date','Directory','Description'\n")
+        f.write("%s,'%s','%s'\n"%(datetime.date.today().strftime("%m/%d/%y"),os.path.join(os.path.relpath(os.getcwd(),code_dir),config['out_dir']),config['runDescription']))
 
 def asRunConfig(config, code_dir, outFile):
     """
@@ -19,12 +45,24 @@ def asRunConfig(config, code_dir, outFile):
         branch = ref.split("/")[-1]
     with open(os.path.join(code_dir,'.git/', ref),'r') as git_hash:
         commit = git_hash.readline().strip()
+    status = str(subprocess.Popen(['git status'], cwd = None if code_dir=="" else code_dir,shell=True,stdout=subprocess.PIPE).communicate()[0]).split("\\n")
+    modifiedFiles = [x.split()[1].strip() for x in status if "modified" in x]
+    newFiles = [x.split()[1].strip() for x in status if "new file" in x]
+    config['gitStatus']= 'unknown' if len(status)==1 else 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
+    #if the repo is dirty, make a zipped archive of the code directory
+    if config['gitStatus']=='dirty':
+        shutil.make_archive(os.path.join(os.path.dirname(outFile),"river_dl"),"zip",os.path.join(code_dir,"river_dl"))
+    config['gitModified']=modifiedFiles
+    config['gitNew']=newFiles
     config['gitBranch']=branch
     config['gitCommit'] = commit
     #and the file info for the input files
     config['input_file_info']={config[x]:{'file_size':os.stat(config[x]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[x]).st_ctime))} for x in config.keys() if "file" in x and x!="input_file_info"}
     with open(outFile,'w') as f:
         yaml.dump(config, f, default_flow_style=False)
+
+    #add the log entry
+    saveRunLog(config,code_dir,os.path.join(code_dir,"runLog.csv"))
 
 def scale(dataset, std=None, mean=None):
     """

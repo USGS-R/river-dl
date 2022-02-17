@@ -1,3 +1,5 @@
+runDescription: "example run of rgcn using tensorflow"
+
 # Input files
 #obs_file: "../river_dl/tests/test_data/obs_temp_flow_seg_id_nat"
 #sntemp_file: "../river_dl/tests/test_data/test_data_seg_id_nat"

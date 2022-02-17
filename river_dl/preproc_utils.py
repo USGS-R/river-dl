@@ -4,6 +4,8 @@ import yaml, time, os
 import xarray as xr
 import datetime
 import subprocess
+import shutil
+import os
 
 def asRunConfig(config, code_dir, outFile):
     """
@@ -22,7 +24,10 @@ def asRunConfig(config, code_dir, outFile):
     status = str(subprocess.Popen(['git status'], shell=True,cwd=code_dir, stdout=subprocess.PIPE).communicate()[0]).split("\\n")
     modifiedFiles = [x.split()[1].strip() for x in status if "modified" in x]
     newFiles = [x.split()[1].strip() for x in status if "new file" in x]
-    config['gitStatus']= 'unknown' if not 'On branch' in status else 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
+    config['gitStatus']= 'unknown' if len(status)==1 else 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
+    #if the repo is dirty, make a zipped archive of the code directory
+    if config['gitStatus']=='dirty':
+        shutil.make_archive(os.path.join(os.path.dirname(outFile),"river_dl"),"zip",os.path.join("..","river_dl"))
     config['gitModified']=modifiedFiles
     config['gitNew']=newFiles
     config['gitBranch']=branch

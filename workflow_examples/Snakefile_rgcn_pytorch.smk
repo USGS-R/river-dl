@@ -10,7 +10,6 @@ sys.path.insert(1, code_dir)
 
 from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
-from river_dl.preproc_utils import saveRunLog
 from river_dl.torch_utils import train_torch
 from river_dl.torch_utils import rmse_masked
 from river_dl.evaluate import combined_metrics

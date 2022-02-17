@@ -35,13 +35,14 @@ rule as_run_config:
     run:
         asRunConfig(config, code_dir, output[0])
 
+
 rule copy_snakefile:
     output:
         "{outdir}/Snakefile"
     #group: "prep"
     shell:
         """
-        scp Snakefile {output[0]}
+        scp Snakefile_rgcn.smk {output[0]}
         """
 
 

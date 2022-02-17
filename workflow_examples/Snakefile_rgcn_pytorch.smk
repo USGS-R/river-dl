@@ -10,6 +10,7 @@ sys.path.insert(1, code_dir)
 
 from river_dl.preproc_utils import asRunConfig
 from river_dl.preproc_utils import prep_all_data
+from river_dl.preproc_utils import saveRunLog
 from river_dl.torch_utils import train_torch
 from river_dl.torch_utils import rmse_masked
 from river_dl.evaluate import combined_metrics
@@ -35,14 +36,13 @@ rule as_run_config:
     run:
         asRunConfig(config, code_dir, output[0])
 
-
 rule copy_snakefile:
     output:
         "{outdir}/Snakefile"
     #group: "prep"
     shell:
         """
-        scp Snakefile {output[0]}
+        scp Snakefile_rgcn_pytorch.smk {output[0]}
         """
 
 rule prep_io_data:

@@ -245,7 +245,7 @@ def predict_one_date_range(
     half predictions. This option makes most sense only when keep_last_portion=0.5.
     :return: [pd dataframe] the predictions
     """
-    ds_x_scaled = ds_x_scaled[train_io_data["x_cols"]]
+    ds_x_scaled = ds_x_scaled[train_io_data["x_vars"]]
     x_data = ds_x_scaled.sel(date=slice(start_date, end_date))
     x_batches = convert_batch_reshape(
         x_data,
@@ -332,10 +332,10 @@ def predict_from_arbitrary_data(
 
     ds = xr.open_zarr(raw_data_file)
 
-    ds_x = ds[train_io_data["x_cols"]]
+    ds_x = ds[train_io_data["x_vars"]]
 
-    x_stds = mean_or_std_dataset_from_np(train_io_data, "x_std", "x_cols")
-    x_means = mean_or_std_dataset_from_np(train_io_data, "x_mean", "x_cols")
+    x_stds = mean_or_std_dataset_from_np(train_io_data, "x_std", "x_vars")
+    x_means = mean_or_std_dataset_from_np(train_io_data, "x_mean", "x_vars")
 
     ds_x_scaled, _, _ = scale(ds_x, std=x_stds, mean=x_means)
 

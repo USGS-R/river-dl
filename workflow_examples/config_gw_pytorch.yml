@@ -30,8 +30,8 @@ pred_weights: 'best_val_weights'
 lambdas: [1]
 #lambdas: [1,0]
 
-#lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lambdas_gw: [0.5, 0.5]
+#lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio), deltaPhi (phase difference), and mean temperature
+lambdas_gw: [0.5, 0.5, 0.5]
 
 #gw loss calculation method, either 'fft' (fourier fast transform) !!! as if 2/22, the linalg option is not working !!! or 'linalg' (linear algebra)
 gw_loss_type: 'linalg'

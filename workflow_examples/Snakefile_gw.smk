@@ -79,7 +79,7 @@ def get_gw_loss(input_data, temp_var="temp_c"):
     temp_sd = io_data['y_std'][temp_index]
     gw_mean = io_data['GW_mean']
     gw_std = io_data['GW_std']
-    return lf.weighted_masked_rmse_gw(loss_function,temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lambda_Ar=config['lambdas_gw'][0],lambda_delPhi=config['lambdas_gw'][1], num_task=len(io_data['y_obs_vars']), gw_type=config['gw_loss_type'])
+    return lf.weighted_masked_rmse_gw(loss_function,temp_index,temp_mean, temp_sd,gw_mean=gw_mean, gw_std = gw_std,lambda_Ar=config['lambdas_gw'][0],lambda_delPhi=config['lambdas_gw'][1],lambda_Tmean=config['lambdas_gw'][2], num_task=len(io_data['y_obs_vars']), gw_type=config['gw_loss_type'])
 
 
 # Finetune/train the model on observations

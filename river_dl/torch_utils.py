@@ -256,7 +256,7 @@ def predict_torch(x_data, model, batch_size):
     return predicted
 
 
-def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lambda_Ar=0, lambda_delPhi=0, num_task=2, gw_type='fft'):
+def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lambda_Ar=0, lambda_delPhi=0, lambda_Tmean = 0, num_task=2, gw_type='fft'):
     """
     calculate a weighted, masked rmse that includes the groundwater terms
     :param lamb, lamb2, lamb3: [float] (short for lambda). The factor that the auxiliary loss, Ar loss, and deltaPhi loss
@@ -269,12 +269,13 @@ def rmse_masked_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw
 
     def rmse_masked_combined_gw(data, y_pred):
         
-        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task, type=gw_type)
+        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred,Tmean_obs,Tmean_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task, type=gw_type)
         rmse_Ar = rmse_masked(Ar_obs.float(),Ar_pred.float())
         rmse_delPhi = rmse_masked(delPhi_obs.float(),delPhi_pred.float())
+        rmse_Tmean = rmse_masked(Tmean_obs.float(),Tmean_pred.float())
 
         
-        rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi
+        rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi+lambda_Tmean*rmse_Tmean
 
         return rmse_loss
     return rmse_masked_combined_gw
@@ -297,6 +298,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     
     Ar_obs = y_true[:, 0, 0]
     delPhi_obs = y_true[:, 0, 1]
+    Tmean_obs = y_true[:, 0, 2]
     if type=='fft':
         y_pred_temp = torch.squeeze(y_pred_temp)
         y_pred_mean = torch.mean(y_pred_temp, 1, keepdims=True)
@@ -367,5 +369,10 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
 
         #Ar_pred = the ratio of the water temp and air temp amplitudes
         Ar_pred = (Aw/A_air-gw_mean[0])/gw_std[0]
+        y_pred_temp = torch.squeeze(y_pred_temp)
+        y_pred_mean = y_pred_mean = torch.mean(y_pred_temp, 1, keepdims=True)
 
-    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred
+    #scale the predicted mean temp
+    Tmean_pred = torch.squeeze((y_pred_mean-gw_mean[2])/gw_std[2])
+
+    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred, Tmean_obs, Tmean_pred

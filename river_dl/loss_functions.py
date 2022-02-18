@@ -173,7 +173,7 @@ def kge_norm_loss(y_true, y_pred):
 def kge_loss(y_true, y_pred):
     return -1 * kge(y_true, y_pred)
 
-def weighted_masked_rmse_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lambda_Ar=0, lambda_delPhi=0, num_task=2, gw_type='fft'):
+def weighted_masked_rmse_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw_mean, gw_std, lambda_Ar=0, lambda_delPhi=0, lambda_Tmean = 0, num_task=2, gw_type='fft'):
     """
     calculate a weighted, masked rmse that includes the groundwater terms
     :param lamb, lamb2, lamb3: [float] (short for lambda). The factor that the auxiliary loss, Ar loss, and deltaPhi loss
@@ -186,12 +186,13 @@ def weighted_masked_rmse_gw(loss_function_main, temp_index,temp_mean, temp_sd,gw
 
     def rmse_masked_combined_gw(data, y_pred):
      
-        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task, type=gw_type)
+        Ar_obs, Ar_pred, delPhi_obs, delPhi_pred,Tmean_obs,Tmean_pred = GW_loss_prep(temp_index,data, y_pred, temp_mean, temp_sd,gw_mean, gw_std, num_task, type=gw_type)
         rmse_Ar = rmse(Ar_obs,Ar_pred)
         rmse_delPhi = rmse(delPhi_obs,delPhi_pred)
+        rmse_Tmean = rmse(Tmean_obs,Tmean_pred)
 
         
-        rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi
+        rmse_loss = loss_function_main(data[:,:,:num_task],y_pred) + lambda_Ar*rmse_Ar +lambda_delPhi*rmse_delPhi+lambda_Tmean*rmse_Tmean
 
         tf.debugging.assert_all_finite(
             rmse_loss, 'Nans is a bad loss to have. This might be because you are running the gw loss function on a GPU without requiring the CPU device or it might be an intermittent error that will be resolved by rerunning the train function'
@@ -214,6 +215,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     
     Ar_obs = y_true[:, 0, 0]
     delPhi_obs = y_true[:, 0, 1]
+    Tmean_obs = y_true[:, 0, 2]
     
     if type=='fft':
         print("FFT LOSS")
@@ -297,7 +299,12 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         
         #Ar_pred = the ratio of the water temp and air temp amplitudes
         Ar_pred = (Aw/A_air-gw_mean[0])/gw_std[0]
+        y_pred_temp = tf.squeeze(y_pred_temp)
+        y_pred_mean = tf.reduce_mean(y_pred_temp, 1, keepdims=True)
 
-    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred
+    #scale the predicted mean temp
+    Tmean_pred = tf.squeeze((y_pred_mean-gw_mean[2])/gw_std[2])
+
+    return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred, Tmean_obs, Tmean_pred
 
 

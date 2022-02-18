@@ -377,8 +377,8 @@ def prep_annual_signal_data(
     data['GW_vars']=gwVarList
     data['gw_loss_type']=gw_loss_type
     data['GW_cols']=GW_trn.columns.values.astype('str')
-    data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']]],axis=0)
-    data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']]],axis=0)
+    data['GW_mean']=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0)
+    data['GW_std']=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0)
     np.savez_compressed(out_file, **data)
 
     

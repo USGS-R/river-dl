@@ -245,7 +245,7 @@ def predict_one_date_range(
     half predictions. This option makes most sense only when keep_last_portion=0.5.
     :return: [pd dataframe] the predictions
     """
-    ds_x_scaled = ds_x_scaled[train_io_data["x_cols"]]
+    ds_x_scaled = ds_x_scaled[train_io_data["x_vars"]]
     x_data = ds_x_scaled.sel(date=slice(start_date, end_date))
     x_batches = convert_batch_reshape(
         x_data,
@@ -256,7 +256,7 @@ def predict_one_date_range(
     )
     x_batch_ids = coord_as_reshaped_array(
         x_data,
-        "seg_id_nat",
+        spatial_idx_name,
         seq_len=seq_len,
         offset=offset,
         spatial_idx_name=spatial_idx_name,
@@ -264,7 +264,7 @@ def predict_one_date_range(
     )
     x_batch_dates = coord_as_reshaped_array(
         x_data,
-        "date",
+        time_idx_name,
         seq_len=seq_len,
         offset=offset,
         spatial_idx_name=spatial_idx_name,
@@ -332,10 +332,10 @@ def predict_from_arbitrary_data(
 
     ds = xr.open_zarr(raw_data_file)
 
-    ds_x = ds[train_io_data["x_cols"]]
+    ds_x = ds[train_io_data["x_vars"]]
 
-    x_stds = mean_or_std_dataset_from_np(train_io_data, "x_std", "x_cols")
-    x_means = mean_or_std_dataset_from_np(train_io_data, "x_mean", "x_cols")
+    x_stds = mean_or_std_dataset_from_np(train_io_data, "x_std", "x_vars")
+    x_means = mean_or_std_dataset_from_np(train_io_data, "x_mean", "x_vars")
 
     ds_x_scaled, _, _ = scale(ds_x, std=x_stds, mean=x_means)
 
@@ -399,10 +399,10 @@ def predict_from_arbitrary_data(
 
     # trim beginning and end predictions
     predictions_beginning_trim = beginning_predictions[
-        beginning_predictions["date"] < middle_predictions["date"].min()
+        beginning_predictions[time_idx_name] < middle_predictions[time_idx_name].min()
     ]
     predictions_end_trim = end_predictions[
-        end_predictions["date"] > middle_predictions["date"].max()
+        end_predictions[time_idx_name] > middle_predictions[time_idx_name].max()
     ]
 
     predictions_combined = pd.concat(

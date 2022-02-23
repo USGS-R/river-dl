@@ -71,23 +71,28 @@ def fmt_preds_obs(pred_data,
     return variables_data
 
 
-def plot_obs(prepped_data, variable, outfile, partition="trn"):
+def plot_obs(prepped_data, variable, outfile, spatial_idx_name="seg_id_nat", time_idx_name="date",  partition="trn"):
     """
     plot training observations
     :param prepped_data: [str] path to npz file of prepped data
     :param variable: [str] which variable to plot, 'flow' or 'temp'
     :param outfile: [str] where to store the resulting file
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
     :return: None
     """
     data = np.load(prepped_data, allow_pickle=True)
     df = prepped_array_to_df(
         data[f"y_obs_{partition}"],
-        data[f"dates_{partition}"],
+        data[f"times_{partition}"],
         data[f"ids_{partition}"],
-        data["y_vars"],
+        data["y_obs_vars"],
+        spatial_idx_name = spatial_idx_name,
+        time_idx_name = time_idx_name
     )
-    _, seg_var = get_var_names(variable)
-    df_piv = df.pivot(index="date", columns="seg_id_nat", values=seg_var)
+    df_piv = df.pivot(index=time_idx_name, columns=spatial_idx_name)
     df_piv.dropna(axis=1, how="all", inplace=True)
     try:
         df_piv.plot(subplots=True, figsize=(8, 12))
@@ -98,9 +103,9 @@ def plot_obs(prepped_data, variable, outfile, partition="trn"):
     plt.savefig(outfile)
 
 
-def plot_ts(pred_file, obs_file, variable, out_file):
+def plot_ts(pred_file, obs_file, spatial_idx_name, variable, out_file):
     combined = fmt_preds_obs(pred_file, obs_file, variable)
-    combined = combined.droplevel("seg_id_nat")
+    combined = combined.droplevel(spatial_idx_name)
     ax = combined.plot(alpha=0.65)
     plt.tight_layout()
     plt.savefig(out_file)
@@ -140,8 +145,11 @@ def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg
     n_out]
     :param dates:[numpy array] array of dates [nbatch, seq_len, n_out]
     :param ids: [numpy array] array of seg_ids [nbatch, seq_len, n_out]
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+        (usually 'time')
     :return:[pd dataframe] df with cols
-    ['date', 'seg_id_nat', 'temp_c', 'discharge_cms]
     """
     data_array = data_array.flatten()
     dates = dates.flatten()

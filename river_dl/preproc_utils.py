@@ -79,28 +79,24 @@ def sel_partition_data(dataset, time_idx_name, start_dates, end_dates):
 def separate_trn_tst(
     dataset,
     time_idx_name,
-    spatial_idx_name,
     train_start_date,
     train_end_date,
     val_start_date=None,
     val_end_date=None,
     test_start_date=None,
     test_end_date=None,
-    val_sites=None,
-    test_sites=None,
 ):
     """
     separate the train data from the test data according to the start and end
-    dates and val_sites and test_sites. This assumes your training data is in
-    one continuous block. Be aware, if your train/test/val partitions are
-    discontinuous (composed of multiple periods), depending on your sequence
-    length and how the data line up, you could end up with sequences starting
-    in one period and ending in another.
+    dates. This assumes your training data is in one continuous block. Be aware,
+    if your train/test/val partitions are discontinuous (composed of multiple
+    periods), depending on your sequence length and how the data line up, you
+    could end up with sequences starting in one period and ending in another.
+    The breaking up of sequences would happen in the `convert_batch_reshape`
+    function
     :param dataset: [xr dataset] input or output data with dims
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
-    :param spatial_idx_name: [str] name of column that is used for spatial
-        index (e.g., 'seg_id_nat')
     :param train_start_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to start
     train period (can have multiple discontinuous periods)
     :param train_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end train
@@ -113,34 +109,18 @@ def separate_trn_tst(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
-    :param val_sites: [list of site_ids] sites to retain for validation. These
-    sites will be witheld from training
-    :param test_sites: [list of site_ids] sites to retain for testing. These
-    sites will be witheld from training and validation
     :return: [tuple] separated data
     """
     train = sel_partition_data(
         dataset, time_idx_name, train_start_date, train_end_date
     )
 
-    # remove validation and test sites from the training data
-    train_sites = train[spatial_idx_name].to_index().to_list()
-    if val_sites:
-        train_sites = list(set(train_sites) - set(val_sites))
-    if test_sites:
-        train_sites = list(set(train_sites) - set(test_sites))
-    train = train.sel({spatial_idx_name: train_sites})
 
     if val_start_date and val_end_date:
         val = sel_partition_data(
             dataset, time_idx_name, val_start_date, val_end_date
         )
         
-        # remove test_sites from the validation data
-        train_val_sites = train_sites.copy()
-        if val_sites:
-            train_val_sites.extend(val_sites)
-        val = val.sel({spatial_idx_name: train_val_sites})
     elif val_start_date and not val_end_date:
         raise ValueError("With a val_start_date a val_end_date must be given")
     elif val_end_date and not val_start_date:
@@ -631,16 +611,23 @@ def prep_y_data(
     y_trn, y_val, y_tst = separate_trn_tst(
         y_data,
         time_idx_name,
-        spatial_idx_name,
         train_start_date,
         train_end_date,
         val_start_date,
         val_end_date,
         test_start_date,
         test_end_date,
-        val_sites,
-        test_sites
     )
+
+
+    # replace validation sites' (and test sites') data with np.nan
+    if val_sites:
+        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+
+    if test_sites:
+        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
+        y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
+
 
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)
@@ -835,15 +822,12 @@ def prep_all_data(
     x_trn, x_val, x_tst = separate_trn_tst(
         x_data,
         time_idx_name,
-        spatial_idx_name,
         train_start_date,
         train_end_date,
         val_start_date,
         val_end_date,
         test_start_date,
         test_end_date,
-        val_sites,
-        test_sites
     )
 
     x_scl, x_std, x_mean = scale(x_data)
@@ -958,6 +942,8 @@ def prep_all_data(
             val_end_date=val_end_date,
             test_start_date=test_start_date,
             test_end_date=test_end_date,
+            val_sites=val_sites,
+            test_sites=test_sites,
             spatial_idx_name=spatial_idx_name,
             time_idx_name=time_idx_name,
             seq_len=seq_len,
@@ -981,6 +967,8 @@ def prep_all_data(
                 val_end_date=val_end_date,
                 test_start_date=test_start_date,
                 test_end_date=test_end_date,
+                val_sites=val_sites,
+                test_sites=test_sites,
                 spatial_idx_name=spatial_idx_name,
                 time_idx_name=time_idx_name,
                 seq_len=seq_len,

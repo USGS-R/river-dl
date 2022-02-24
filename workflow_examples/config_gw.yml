@@ -1,3 +1,5 @@
+runDescription: "test run for gw loss with tensorflow"
+
 # Input file
 obs_file: "../data_DRB/Obs_temp_flow_drb_Christiana_no3558"
 sntemp_file: "../data_DRB/sntemp_inputs_outputs_drb_Christiana_no3558"
@@ -12,7 +14,7 @@ code_dir: ".."
 
 #x_vars: ['seg_ccov', 'seg_elev', 'seg_length', 'seg_rain', 'seg_slope', 'seg_tave_air', 'seg_tave_gw', 'seg_tave_ss', 'seg_tave_upstream', 'seg_upstream_inflow', 'seg_width', 'seginc_gwflow', 'seginc_potet', 'seginc_sroff', 'seginc_ssflow', 'seginc_swrad','seg_outflow','seg_width_mean'] #full list of options
 #x_vars: ['seg_slope','seg_elev','seg_width_mean','seg_tave_air','seginc_swrad','seg_rain','seginc_potet'] #current base model variables
-x_vars: ['seg_ccov', 'seg_rain', 'seg_slope', 'seg_tave_air'] #code testing list
+x_vars: ['seg_elev', 'seg_rain', 'seg_slope', 'seg_tave_air'] #code testing list
 
 y_vars_pretrain: ['seg_tave_water']
 y_vars_finetune: ['temp_c']
@@ -30,8 +32,8 @@ pred_weights: 'best_val_weights'
 lambdas: [1]
 #lambdas: [1,0]
 
-#lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio) and deltaPhi (phase difference)
-lambdas_gw: [0.5, 0.5]
+#lambdas_gw are hyper params for weighting the rmses of Ar (amplitude ratio), deltaPhi (phase difference), and mean temperature
+lambdas_gw: [0.5, 0.5, 0.5]
 
 #gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
 gw_loss_type: 'fft'
@@ -40,7 +42,7 @@ trn_offset: 1.0
 tst_val_offset: 1.0
 
 #Define early stopping criteria, setting this to False will turn off early stopping rounds
-early_stopping: False 
+early_stopping: 20 
 
 train_start_date:
   - '1984-10-01'

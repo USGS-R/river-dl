@@ -370,7 +370,7 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
         #Ar_pred = the ratio of the water temp and air temp amplitudes
         Ar_pred = (Aw/A_air-gw_mean[0])/gw_std[0]
         y_pred_temp = torch.squeeze(y_pred_temp)
-        y_pred_mean = y_pred_mean = torch.mean(y_pred_temp, 1, keepdims=True)
+        y_pred_mean = torch.mean(y_pred_temp, 1, keepdims=True)
 
     #scale the predicted mean temp
     Tmean_pred = torch.squeeze((y_pred_mean-gw_mean[2])/gw_std[2])

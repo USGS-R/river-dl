@@ -151,9 +151,13 @@ def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg
         (usually 'time')
     :return:[pd dataframe] df with cols
     """
-    data_array = data_array.flatten()
+    num_out_vars = data_array.shape[-1]
+    flat_data = [data_array[..., i].flatten() for i in range(num_out_vars)]
+    flat_data_combined = np.stack(flat_data, axis=1)
+
     dates = dates.flatten()
     ids = ids.flatten()
+    df_preds = pd.DataFrame(flat_data_combined , columns=col_names)
     df_preds = pd.DataFrame(data_array, columns=col_names)
     df_dates = pd.DataFrame(dates, columns=[time_idx_name])
     df_ids = pd.DataFrame(ids, columns=[spatial_idx_name])

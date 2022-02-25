@@ -967,8 +967,6 @@ def prep_all_data(
                 val_end_date=val_end_date,
                 test_start_date=test_start_date,
                 test_end_date=test_end_date,
-                val_sites=val_sites,
-                test_sites=test_sites,
                 spatial_idx_name=spatial_idx_name,
                 time_idx_name=time_idx_name,
                 seq_len=seq_len,

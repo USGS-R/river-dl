@@ -197,6 +197,7 @@ def partition_metrics(
         spatial_idx_name="seg_id_nat",
         time_idx_name="date",
         group=None,
+        id_dict=None,
         outfile=None
 ):
     """
@@ -213,6 +214,9 @@ def partition_metrics(
     Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
     and month), and None (everything is left together)
+    :param id_dict: [dict] dictionary of id_dict where dict keys are the id
+    names and dict values are the id values. These are added as columns to the
+    metrics information
     :param outfile: [str] file where the metrics should be written
     :return: [pd dataframe] the condensed metrics
     """
@@ -249,6 +253,9 @@ def partition_metrics(
 
         metrics["variable"] = data_var
         metrics["partition"] = partition
+        if id_dict:
+            for id_name, id_val in id_dict.items():
+                metrics[id_name] = id_val
         var_metrics_list.append(metrics)
         var_metrics = pd.concat(var_metrics_list).round(6)
     if outfile:
@@ -264,6 +271,7 @@ def combined_metrics(
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     group=None,
+    id_dict=None,
     outfile=None,
 ):
     """
@@ -281,6 +289,9 @@ def combined_metrics(
     Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
     and month), and None (everything is left together)
+    :param id_dict: [dict] dictionary of id_dict where dict keys are the id
+    names and dict values are the id values. These are added as columns to the
+    metrics information
     :param outfile: [str] csv file where the metrics should be written
     :return: combined metrics
     """
@@ -291,6 +302,7 @@ def combined_metrics(
                                         partition="trn",
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
+                                        id_dict=id_dict,
                                         group=group)
         df_all.extend([trn_metrics])
     if pred_val:
@@ -299,6 +311,7 @@ def combined_metrics(
                                         partition="val",
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
+                                        id_dict=id_dict,
                                         group=group)
         df_all.extend([val_metrics])
     if pred_tst:
@@ -307,6 +320,7 @@ def combined_metrics(
                                         partition="tst",
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
+                                        id_dict=id_dict,
                                         group=group)
         df_all.extend([tst_metrics])
     df_all = pd.concat(df_all, axis=0)

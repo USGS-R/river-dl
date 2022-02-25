@@ -158,7 +158,6 @@ def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg
     dates = dates.flatten()
     ids = ids.flatten()
     df_preds = pd.DataFrame(flat_data_combined , columns=col_names)
-    df_preds = pd.DataFrame(data_array, columns=col_names)
     df_dates = pd.DataFrame(dates, columns=[time_idx_name])
     df_ids = pd.DataFrame(ids, columns=[spatial_idx_name])
     df = pd.concat([df_dates, df_ids, df_preds], axis=1)

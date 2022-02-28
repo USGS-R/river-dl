@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from postproc_utils import rmse_masked, nse
+from river_dl.loss_functions import rmse_masked, nse
 
 
 def test_rmse_masked():

@@ -265,6 +265,7 @@ def partition_metrics(
 
 def combined_metrics(
     obs_file,
+    pred_data=None,
     pred_trn=None,
     pred_val=None,
     pred_tst=None,
@@ -278,6 +279,9 @@ def combined_metrics(
     calculate the metrics for flow and temp and training and test sets for a
     given grouping
     :param obs_file: [str] path to observations zarr file
+    :param pred_data: [dict] dict where keys are partition labels and values 
+    are the corresponding prediction data file. If this is provided, this will
+    be used and none of pred_trn, pred_val, or pred_tst will be used.
     :param pred_trn: [str] path to training prediction feather file
     :param pred_val: [str] path to validation prediction feather file
     :param pred_tst: [str] path to testing prediction feather file
@@ -295,34 +299,33 @@ def combined_metrics(
     :param outfile: [str] csv file where the metrics should be written
     :return: combined metrics
     """
+
+    if pred_data and not all(v is None for v in [pred_trn, pred_val, pred_tst]):
+        print("Warning: pred_data and pred_trn/_val/ or _tst were provided.\n"
+                "Only pred_data will be used")
+
+    if not pred_data:
+        pred_data = {}
+        if pred_trn:
+            pred_data['trn'] = pred_trn
+        if pred_val:
+            pred_data['val'] = pred_trn
+        if pred_tst:
+            pred_data['tst'] = pred_trn
+
+    if not pred_data:
+        raise KeyError("No prediction data was provided")
+
     df_all = []
-    if pred_trn:
-        trn_metrics = partition_metrics(pred_file=pred_trn,
-                                        obs_file=obs_file,
-                                        partition="trn",
-                                        spatial_idx_name=spatial_idx_name,
-                                        time_idx_name=time_idx_name,
-                                        id_dict=id_dict,
-                                        group=group)
-        df_all.extend([trn_metrics])
-    if pred_val:
-        val_metrics = partition_metrics(pred_file=pred_val,
-                                        obs_file=obs_file,
-                                        partition="val",
-                                        spatial_idx_name=spatial_idx_name,
-                                        time_idx_name=time_idx_name,
-                                        id_dict=id_dict,
-                                        group=group)
-        df_all.extend([val_metrics])
-    if pred_tst:
-        tst_metrics = partition_metrics(pred_file=pred_tst,
-                                        obs_file=obs_file,
-                                        partition="tst",
-                                        spatial_idx_name=spatial_idx_name,
-                                        time_idx_name=time_idx_name,
-                                        id_dict=id_dict,
-                                        group=group)
-        df_all.extend([tst_metrics])
+    for partition, pred_file in pred_data.items():
+        metrics = partition_metrics(pred_file=pred_file,
+                                    obs_file=obs_file,
+                                    partition=partition,
+                                    spatial_idx_name=spatial_idx_name,
+                                    time_idx_name=time_idx_name,
+                                    id_dict=id_dict,
+                                    group=group)
+        df_all.extend([metrics])
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)

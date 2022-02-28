@@ -191,7 +191,7 @@ def calc_metrics(df):
 
 
 def partition_metrics(
-        pred_file,
+        preds,
         obs_file,
         partition,
         spatial_idx_name="seg_id_nat",
@@ -203,7 +203,8 @@ def partition_metrics(
     """
     calculate metrics for a certain group (or no group at all) for a given
     partition and variable
-    :param pred_file: [str] path to predictions feather file
+    :param preds: [str or DataFrame] path to predictions feather file or Pandas
+    DataFrame of predictions
     :param obs_file: [str] path to observations zarr file
     :param partition: [str] data partition for which metrics are calculated
     :param spatial_idx_name: [str] name of column that is used for spatial
@@ -220,7 +221,7 @@ def partition_metrics(
     :param outfile: [str] file where the metrics should be written
     :return: [pd dataframe] the condensed metrics
     """
-    var_data = fmt_preds_obs(pred_file, obs_file, spatial_idx_name,
+    var_data = fmt_preds_obs(preds, obs_file, spatial_idx_name,
                              time_idx_name)
     var_metrics_list = []
 
@@ -280,11 +281,15 @@ def combined_metrics(
     given grouping
     :param obs_file: [str] path to observations zarr file
     :param pred_data: [dict] dict where keys are partition labels and values 
-    are the corresponding prediction data file. If this is provided, this will
-    be used and none of pred_trn, pred_val, or pred_tst will be used.
-    :param pred_trn: [str] path to training prediction feather file
-    :param pred_val: [str] path to validation prediction feather file
-    :param pred_tst: [str] path to testing prediction feather file
+    are the corresponding prediction data file or predictions as a pandas
+    dataframe. If pred_data is provided, this will be used and none of
+    pred_trn, pred_val, or pred_tst will be used.
+    :param pred_trn: [str or DataFrame] path to training prediction feather file
+    or training predictions as pandas dataframe
+    :param pred_val: [str or DataFrame] path to validation prediction feather
+    file or validation predictions as pandas dataframe
+    :param pred_tst: [str or DataFrame] path to testing prediction feather file
+    or test predictions as pandas dataframe
     :param spatial_idx_name: [str] name of column that is used for spatial
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -317,8 +322,8 @@ def combined_metrics(
         raise KeyError("No prediction data was provided")
 
     df_all = []
-    for partition, pred_file in pred_data.items():
-        metrics = partition_metrics(pred_file=pred_file,
+    for partition, preds in pred_data.items():
+        metrics = partition_metrics(preds=preds,
                                     obs_file=obs_file,
                                     partition=partition,
                                     spatial_idx_name=spatial_idx_name,

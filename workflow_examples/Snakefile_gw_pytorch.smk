@@ -109,7 +109,7 @@ rule finetune_train:
         adj_mx = data['dist_matrix']
         in_dim = len(data['x_vars'])
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        model = RGCN_v1(in_dim,config['hidden_size'],adj_mx,device=device)
+        model = RGCN_v1(in_dim,config['hidden_size'],adj_mx,device=device, seed=config['seed'])
         opt = optim.Adam(model.parameters(),lr=config['finetune_learning_rate'])
         model.load_state_dict(torch.load(input[1]))
         train_torch(model,
@@ -124,6 +124,7 @@ rule finetune_train:
             batch_size = num_segs,
             weights_file=output[0],
             log_file=output[1],
+            seed = config['seed'],
             device=device)
 
 

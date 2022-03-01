@@ -91,7 +91,7 @@ rule pre_train:
         adj_mx = data['dist_matrix']
         in_dim = len(data['x_vars'])
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        model = RGCN_v1(in_dim, config['hidden_size'], adj_mx,device=device)
+        model = RGCN_v1(in_dim, config['hidden_size'], adj_mx,device=device, seed=config['seed'])
         opt = optim.Adam(model.parameters(),lr=config['pretrain_learning_rate'])
         train_torch(model,
                     loss_function = rmse_masked,
@@ -103,6 +103,7 @@ rule pre_train:
                     batch_size = num_segs,
                     weights_file = output[0],
                     log_file = output[1],
+                    seed = config['seed'],
                     device=device)
 
 
@@ -121,7 +122,7 @@ rule finetune_train:
         adj_mx = data['dist_matrix']
         in_dim = len(data['x_vars'])
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-        model = RGCN_v1(in_dim,config['hidden_size'],adj_mx,device=device)
+        model = RGCN_v1(in_dim,config['hidden_size'],adj_mx,device=device, seed=config['seed'])
         opt = optim.Adam(model.parameters(),lr=config['finetune_learning_rate'])
         scheduler = optim.lr_scheduler.LambdaLR(opt,lr_lambda=lambda epoch: 0.97 ** epoch)
         model.load_state_dict(torch.load(input[1]))
@@ -137,6 +138,7 @@ rule finetune_train:
             batch_size = num_segs,
             weights_file=output[0],
             log_file=output[1],
+            seed = config['seed'],
             device=device)
 
 

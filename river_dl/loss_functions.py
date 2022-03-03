@@ -213,6 +213,10 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
     y_true_temp = y_true_temp * temp_sd + temp_mean
     
+    #set temps < 1 to 1
+    y_pred_temp[y_pred_temp<1]=1
+    y_true_temp[y_true_temp<1]=1
+ 
     Ar_obs = y_true[:, 0, 0]
     delPhi_obs = y_true[:, 0, 1]
     Tmean_obs = y_true[:, 0, 2]

@@ -195,7 +195,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
                     #    waterDF = waterDF.loc[waterDF.bin==maxBin]
 
             amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
-            meanTemp = Tmean)
+            meanTemp = Tmean
 
         else:
             amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)

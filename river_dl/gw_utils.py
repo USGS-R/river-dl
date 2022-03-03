@@ -331,7 +331,7 @@ def prep_annual_signal_data(
         reservoirSegs = reachDF.seg_id_nat.loc[reachDF.reach_class.isin(['contains_reservoir','downstream of reservoir (1)','downstream of reservoir (2)','reservoir_inlet_reach','reservoir_outlet_reach','within_reservoir'])].values
         #seg_id_nat isn't included in the reservoir csv as of 1/6/2022
         if extraResSegments:
-            reservoirSegs = np.append(reservoirSegs,extraResSegment)
+            reservoirSegs = np.append(reservoirSegs,extraResSegments)
 
     else:
         reservoirSegs = []

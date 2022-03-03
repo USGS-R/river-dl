@@ -279,6 +279,7 @@ def prep_annual_signal_data(
     water_temp_obs_col = 'temp_c',
     segs = None,
     reach_file = None,
+    extraResSegments = None,
     gw_loss_type = 'fft',
     trn_offset = 1,
     tst_val_offset = 1
@@ -327,7 +328,8 @@ def prep_annual_signal_data(
         reachDF = pd.read_csv(reach_file)
         reservoirSegs = reachDF.seg_id_nat.loc[reachDF.reach_class.isin(['contains_reservoir','downstream of reservoir (1)','downstream of reservoir (2)','reservoir_inlet_reach','reservoir_outlet_reach','within_reservoir'])].values
         #seg_id_nat isn't included in the reservoir csv as of 1/6/2022
-        reservoirSegs = np.append(reservoirSegs,2005)
+        if extraResSegments:
+            reservoirSegs = np.append(reservoirSegs,extraResSegment)
 
     else:
         reservoirSegs = []

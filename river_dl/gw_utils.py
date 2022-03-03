@@ -406,10 +406,10 @@ def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="pred"):
     water_phi_preds = []
     water_mean_preds = []
     for thisSeg in segList:
-        amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True, tempType = tempType)
+        amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True, tempType = tempType)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
-        water_mean_preds.append(np.nanmean(thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col]))
+        water_mean_preds.append(Tmean)
     return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds, 'Tmean_pred':water_mean_preds})
 
 def make_decimal_date(date, ref_date = "1980-10-01"):

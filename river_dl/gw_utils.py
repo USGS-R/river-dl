@@ -60,6 +60,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
         model = LinearRegression().fit(list(compress(x, np.isfinite(temp))),list(compress(temp, np.isfinite(temp))))
         amp = math.sqrt(model.coef_[0]**2+model.coef_[1]**2)
         phi = math.atan(model.coef_[1]/model.coef_[0])
+        Tmean = np.nanmean(temp)
         amp_low=np.nan
         amp_high=np.nan
         phi_low=np.nan
@@ -98,8 +99,9 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
         amp_high=np.nan
         phi_low=np.nan
         phi_high = np.nan
+        Tmean = np.nan
     
-    return amp, phi, amp_low, amp_high, phi_low, phi_high
+    return amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean
 
 
 def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water_temp_obs_col="seg_tave_water",air_temp_col = 'seg_tave_air', reservoirSegs = []):
@@ -141,7 +143,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
         thisSeg = thisData['seg_id_nat'][i].data
         waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
         #require temps > 1 and <60 C for signal analysis
-        waterDF.loc[(waterDF.tave_water<1)|(waterDF.tave_water>60),"tave_water"]=np.nan
+        waterDF.loc[(waterDF.tave_water<1),"tave_water"]=1
         waterDF.dropna(inplace=True)
         waterDF['waterYear']=waterDF['date'].dt.year 
         waterDF.loc[waterDF['date'].dt.month>=10,"waterYear"]= waterDF.loc[waterDF['date'].dt.month>=10,'date'].dt.year+1
@@ -155,7 +157,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
         
         
         if waterSum.shape[0]>0 and thisSeg not in reservoirSegs:
-            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[air_temp_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=False)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[air_temp_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=False)
             air_amp.append(amp)
             air_amp_low.append(amp_low)
             air_amp_high.append(amp_high)
@@ -164,14 +166,14 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
             air_phi_high.append(phi_high)
 
             #get the process-based model (pbm) water temp properties
-            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[water_temp_pbm_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=True)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[water_temp_pbm_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=True)
             water_amp_pbm.append(amp)
             water_amp_low_pbm.append(amp_low)
             water_amp_high_pbm.append(amp_high)
             water_phi_pbm.append(phi)
             water_phi_low_pbm.append(phi_low)
             water_phi_high_pbm.append(phi_high)
-            water_mean_pbm.append(np.nanmean(thisData[water_temp_pbm_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)]))
+            water_mean_pbm.append(Tmean)
 
 
             #get the observed water temp properties
@@ -192,11 +194,11 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
                     #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
                     #    waterDF = waterDF.loc[waterDF.bin==maxBin]
 
-            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
-            meanTemp = np.nanmean(waterDF.tave_water.values)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
+            meanTemp = Tmean)
 
         else:
-            amp, phi, amp_low, amp_high, phi_low, phi_high = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
             air_amp.append(amp)
             air_amp_low.append(amp_low)
             air_amp_high.append(amp_high)

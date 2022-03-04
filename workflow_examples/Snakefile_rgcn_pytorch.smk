@@ -103,7 +103,6 @@ rule pre_train:
                     batch_size = num_segs,
                     weights_file = output[0],
                     log_file = output[1],
-                    seed = config['seed'],
                     device=device)
 
 
@@ -138,7 +137,6 @@ rule finetune_train:
             batch_size = num_segs,
             weights_file=output[0],
             log_file=output[1],
-            seed = config['seed'],
             device=device)
 
 

@@ -5,7 +5,6 @@ import pandas as pd
 import time
 from tqdm import tqdm
 import math as m
-import os
 
 def reshape_for_gwn(cat_data, keep_portion=None):
     """

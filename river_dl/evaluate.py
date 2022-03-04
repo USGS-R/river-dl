@@ -197,7 +197,9 @@ def partition_metrics(
         spatial_idx_name="seg_id_nat",
         time_idx_name="date",
         group=None,
-        outfile=None
+        outfile=None,
+        val_sites=None,
+        test_sites=None,
 ):
     """
     calculate metrics for a certain group (or no group at all) for a given
@@ -214,6 +216,8 @@ def partition_metrics(
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
     and month), and None (everything is left together)
     :param outfile: [str] file where the metrics should be written
+    :param val_sites: [list] sites to exclude from training metrics
+    :param test_sites: [list] sites to exclude from validation and training metrics
     :return: [pd dataframe] the condensed metrics
     """
     var_data = fmt_preds_obs(pred_file, obs_file, spatial_idx_name,
@@ -222,6 +226,15 @@ def partition_metrics(
 
     for data_var, data in var_data.items():
         data.reset_index(inplace=True)
+        # mask out validation and test sites from trn partition
+        if val_sites and partition == 'trn':
+            data = data[~data[spatial_idx_name].isin(val_sites)]
+        if test_sites and partition == 'trn':
+            data = data[~data[spatial_idx_name].isin(test_sites)]
+        # mask out test sites from val partition
+        if test_sites and partition=='val':
+            data = data[~data[spatial_idx_name].isin(test_sites)]
+
         if not group:
             metrics = calc_metrics(data)
             # need to convert to dataframe and transpose so it looks like the
@@ -261,6 +274,8 @@ def combined_metrics(
     pred_trn=None,
     pred_val=None,
     pred_tst=None,
+    val_sites=None,
+    test_sites=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     group=None,
@@ -273,6 +288,8 @@ def combined_metrics(
     :param pred_trn: [str] path to training prediction feather file
     :param pred_val: [str] path to validation prediction feather file
     :param pred_tst: [str] path to testing prediction feather file
+    :param val_sites: [list] sites to exclude from training metrics
+    :param test_sites: [list] sites to exclude from validation and training metrics
     :param spatial_idx_name: [str] name of column that is used for spatial
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -291,7 +308,9 @@ def combined_metrics(
                                         partition="trn",
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
-                                        group=group)
+                                        group=group,
+                                        val_sites = val_sites,
+                                        test_sites = test_sites)
         df_all.extend([trn_metrics])
     if pred_val:
         val_metrics = partition_metrics(pred_file=pred_val,
@@ -299,7 +318,9 @@ def combined_metrics(
                                         partition="val",
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
-                                        group=group)
+                                        group=group,
+                                        val_sites=val_sites,
+                                        test_sites=test_sites)
         df_all.extend([val_metrics])
     if pred_tst:
         tst_metrics = partition_metrics(pred_file=pred_tst,
@@ -307,7 +328,9 @@ def combined_metrics(
                                         partition="tst",
                                         spatial_idx_name=spatial_idx_name,
                                         time_idx_name=time_idx_name,
-                                        group=group)
+                                        group=group,
+                                        val_sites=val_sites,
+                                        test_sites=test_sites)
         df_all.extend([tst_metrics])
     df_all = pd.concat(df_all, axis=0)
     if outfile:

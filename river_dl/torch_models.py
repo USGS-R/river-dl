@@ -8,7 +8,7 @@ import torch.nn.functional as F
 class RGCN_v0(nn.Module):
 
     # Built off of https://towardsdatascience.com/building-a-lstm-by-hand-on-pytorch-59c02a4ec091
-    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout=0, dropout=0, return_states=False, device='cpu'):
+    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout=0, dropout=0, return_states=False, device='cpu', seed = None):
         """
         @param input_dim: [int] number input feature
         @param hidden_dim: [int] hidden size
@@ -17,6 +17,14 @@ class RGCN_v0(nn.Module):
         @param dropout: [float] fraction of the units to drop from the input
         @param return_states: [bool] If true, returns h and c states as well as predictions
         """
+
+        if seed:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
         super().__init__()
 
         # New stuff
@@ -102,7 +110,7 @@ class RGCN_v0(nn.Module):
 # https://doi.org/10.1137/1.9781611976700.69
 class RGCN_v1(nn.Module):
     # Built off of https://towardsdatascience.com/building-a-lstm-by-hand-on-pytorch-59c02a4ec091
-    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout=0, dropout=0, return_states=False, device='cpu'):
+    def __init__(self, input_dim, hidden_dim, adj_matrix, recur_dropout=0, dropout=0, return_states=False, device='cpu', seed=None):
         """
         @param input_dim: [int] number input feature
         @param hidden_dim: [int] hidden size
@@ -111,6 +119,14 @@ class RGCN_v1(nn.Module):
         @param dropout: [float] fraction of the units to drop from the input
         @param return_states: [bool] If true, returns h and c states as well as predictions
         """
+        if seed:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
+
         super().__init__()
 
         # New stuff
@@ -209,7 +225,17 @@ class gwnet(nn.Module):
                  addaptadj=True, aptinit=None, in_dim=2, out_dim=12,
                  residual_channels=32, dilation_channels=32,
                  skip_channels=256, end_channels=512, kernel_size=2, blocks=4, layers=2,
-                 apt_size=10, cat_feat_gc=False):
+                 apt_size=10, cat_feat_gc=False, seed = None):
+
+
+        if seed:
+            torch.manual_seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+
+
         super().__init__()
         self.dropout = dropout
         self.blocks = blocks

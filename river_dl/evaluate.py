@@ -198,7 +198,10 @@ def partition_metrics(
         time_idx_name="date",
         group=None,
         id_dict=None,
-        outfile=None
+        outfile=None,
+        val_sites=None,
+        test_sites=None,
+
 ):
     """
     calculate metrics for a certain group (or no group at all) for a given
@@ -219,6 +222,8 @@ def partition_metrics(
     names and dict values are the id values. These are added as columns to the
     metrics information
     :param outfile: [str] file where the metrics should be written
+    :param val_sites: [list] sites to exclude from training metrics
+    :param test_sites: [list] sites to exclude from validation and training metrics
     :return: [pd dataframe] the condensed metrics
     """
     var_data = fmt_preds_obs(preds, obs_file, spatial_idx_name,
@@ -227,6 +232,15 @@ def partition_metrics(
 
     for data_var, data in var_data.items():
         data.reset_index(inplace=True)
+        # mask out validation and test sites from trn partition
+        if val_sites and partition == 'trn':
+            data = data[~data[spatial_idx_name].isin(val_sites)]
+        if test_sites and partition == 'trn':
+            data = data[~data[spatial_idx_name].isin(test_sites)]
+        # mask out test sites from val partition
+        if test_sites and partition=='val':
+            data = data[~data[spatial_idx_name].isin(test_sites)]
+
         if not group:
             metrics = calc_metrics(data)
             # need to convert to dataframe and transpose so it looks like the
@@ -270,6 +284,8 @@ def combined_metrics(
     pred_trn=None,
     pred_val=None,
     pred_tst=None,
+    val_sites=None,
+    test_sites=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     group=None,
@@ -290,6 +306,8 @@ def combined_metrics(
     file or validation predictions as pandas dataframe
     :param pred_tst: [str or DataFrame] path to testing prediction feather file
     or test predictions as pandas dataframe
+    :param val_sites: [list] sites to exclude from training metrics
+    :param test_sites: [list] sites to exclude from validation and training metrics
     :param spatial_idx_name: [str] name of column that is used for spatial
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -329,8 +347,11 @@ def combined_metrics(
                                     spatial_idx_name=spatial_idx_name,
                                     time_idx_name=time_idx_name,
                                     id_dict=id_dict,
-                                    group=group)
+                                    group=group,
+                                    val_sites = val_sites,
+                                    test_sites = test_sites)
         df_all.extend([metrics])
+
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)

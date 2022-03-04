@@ -6,7 +6,6 @@ import time
 from tqdm import tqdm
 import math as m
 
-
 def reshape_for_gwn(cat_data, keep_portion=None):
     """
     Helper function to reshape input data for GraphWaveNet Model
@@ -133,6 +132,7 @@ def train_torch(model,
     @param log_file: [str] path to save training log to
     @return: [object] trained model
     """
+
 
     print(f"Training on {device}")
     print("start training...",flush=True)

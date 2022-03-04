@@ -191,20 +191,23 @@ def calc_metrics(df):
 
 
 def partition_metrics(
-        pred_file,
+        preds,
         obs_file,
         partition,
         spatial_idx_name="seg_id_nat",
         time_idx_name="date",
         group=None,
+        id_dict=None,
         outfile=None,
         val_sites=None,
         test_sites=None,
+
 ):
     """
     calculate metrics for a certain group (or no group at all) for a given
     partition and variable
-    :param pred_file: [str] path to predictions feather file
+    :param preds: [str or DataFrame] path to predictions feather file or Pandas
+    DataFrame of predictions
     :param obs_file: [str] path to observations zarr file
     :param partition: [str] data partition for which metrics are calculated
     :param spatial_idx_name: [str] name of column that is used for spatial
@@ -215,12 +218,15 @@ def partition_metrics(
     Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
     and month), and None (everything is left together)
+    :param id_dict: [dict] dictionary of id_dict where dict keys are the id
+    names and dict values are the id values. These are added as columns to the
+    metrics information
     :param outfile: [str] file where the metrics should be written
     :param val_sites: [list] sites to exclude from training metrics
     :param test_sites: [list] sites to exclude from validation and training metrics
     :return: [pd dataframe] the condensed metrics
     """
-    var_data = fmt_preds_obs(pred_file, obs_file, spatial_idx_name,
+    var_data = fmt_preds_obs(preds, obs_file, spatial_idx_name,
                              time_idx_name)
     var_metrics_list = []
 
@@ -262,6 +268,9 @@ def partition_metrics(
 
         metrics["variable"] = data_var
         metrics["partition"] = partition
+        if id_dict:
+            for id_name, id_val in id_dict.items():
+                metrics[id_name] = id_val
         var_metrics_list.append(metrics)
         var_metrics = pd.concat(var_metrics_list).round(6)
     if outfile:
@@ -271,6 +280,7 @@ def partition_metrics(
 
 def combined_metrics(
     obs_file,
+    pred_data=None,
     pred_trn=None,
     pred_val=None,
     pred_tst=None,
@@ -279,15 +289,23 @@ def combined_metrics(
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     group=None,
+    id_dict=None,
     outfile=None,
 ):
     """
     calculate the metrics for flow and temp and training and test sets for a
     given grouping
     :param obs_file: [str] path to observations zarr file
-    :param pred_trn: [str] path to training prediction feather file
-    :param pred_val: [str] path to validation prediction feather file
-    :param pred_tst: [str] path to testing prediction feather file
+    :param pred_data: [dict] dict where keys are partition labels and values 
+    are the corresponding prediction data file or predictions as a pandas
+    dataframe. If pred_data is provided, this will be used and none of
+    pred_trn, pred_val, or pred_tst will be used.
+    :param pred_trn: [str or DataFrame] path to training prediction feather file
+    or training predictions as pandas dataframe
+    :param pred_val: [str or DataFrame] path to validation prediction feather
+    file or validation predictions as pandas dataframe
+    :param pred_tst: [str or DataFrame] path to testing prediction feather file
+    or test predictions as pandas dataframe
     :param val_sites: [list] sites to exclude from training metrics
     :param test_sites: [list] sites to exclude from validation and training metrics
     :param spatial_idx_name: [str] name of column that is used for spatial
@@ -298,40 +316,42 @@ def combined_metrics(
     Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
     and month), and None (everything is left together)
+    :param id_dict: [dict] dictionary of id_dict where dict keys are the id
+    names and dict values are the id values. These are added as columns to the
+    metrics information
     :param outfile: [str] csv file where the metrics should be written
     :return: combined metrics
     """
+
+    if pred_data and not all(v is None for v in [pred_trn, pred_val, pred_tst]):
+        print("Warning: pred_data and pred_trn/_val/ or _tst were provided.\n"
+                "Only pred_data will be used")
+
+    if not pred_data:
+        pred_data = {}
+        if pred_trn:
+            pred_data['trn'] = pred_trn
+        if pred_val:
+            pred_data['val'] = pred_trn
+        if pred_tst:
+            pred_data['tst'] = pred_trn
+
+    if not pred_data:
+        raise KeyError("No prediction data was provided")
+
     df_all = []
-    if pred_trn:
-        trn_metrics = partition_metrics(pred_file=pred_trn,
-                                        obs_file=obs_file,
-                                        partition="trn",
-                                        spatial_idx_name=spatial_idx_name,
-                                        time_idx_name=time_idx_name,
-                                        group=group,
-                                        val_sites = val_sites,
-                                        test_sites = test_sites)
-        df_all.extend([trn_metrics])
-    if pred_val:
-        val_metrics = partition_metrics(pred_file=pred_val,
-                                        obs_file=obs_file,
-                                        partition="val",
-                                        spatial_idx_name=spatial_idx_name,
-                                        time_idx_name=time_idx_name,
-                                        group=group,
-                                        val_sites=val_sites,
-                                        test_sites=test_sites)
-        df_all.extend([val_metrics])
-    if pred_tst:
-        tst_metrics = partition_metrics(pred_file=pred_tst,
-                                        obs_file=obs_file,
-                                        partition="tst",
-                                        spatial_idx_name=spatial_idx_name,
-                                        time_idx_name=time_idx_name,
-                                        group=group,
-                                        val_sites=val_sites,
-                                        test_sites=test_sites)
-        df_all.extend([tst_metrics])
+    for partition, preds in pred_data.items():
+        metrics = partition_metrics(preds=preds,
+                                    obs_file=obs_file,
+                                    partition=partition,
+                                    spatial_idx_name=spatial_idx_name,
+                                    time_idx_name=time_idx_name,
+                                    id_dict=id_dict,
+                                    group=group,
+                                    val_sites = val_sites,
+                                    test_sites = test_sites)
+        df_all.extend([metrics])
+
     df_all = pd.concat(df_all, axis=0)
     if outfile:
         df_all.to_csv(outfile, index=False)

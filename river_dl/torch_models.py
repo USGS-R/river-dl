@@ -197,14 +197,7 @@ def nconv(x, A):
     return torch.einsum('ncvl,vw->ncwl', (x, A)).contiguous()
 
 class GraphConvNet(nn.Module):
-    def __init__(self, c_in, c_out, dropout, support_len=3, order=2, seed = None):
-
-        if seed:
-            torch.manual_seed(seed)
-            torch.cuda.manual_seed(seed)
-            torch.backends.cudnn.deterministic = True
-            torch.backends.cudnn.benchmark = False
-
+    def __init__(self, c_in, c_out, dropout, support_len=3, order=2):
         super().__init__()
         c_in = (order * support_len + 1) * c_in
         self.final_conv = Conv2d(c_in, c_out, (1, 1), padding=(0, 0), stride=(1, 1), bias=True)

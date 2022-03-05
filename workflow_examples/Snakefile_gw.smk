@@ -65,6 +65,7 @@ rule prep_ann_temp:
                   test_start_date=config['test_start_date'],
                   test_end_date=config['test_end_date'], 
                   out_file=output[0],
+                  extraResSegments = config['extraResSegments'],
                   reach_file= config['reach_attr_file'],
                   gw_loss_type=config['gw_loss_type'],
                   trn_offset = config['trn_offset'],

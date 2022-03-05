@@ -3,27 +3,66 @@ import numpy as np
 import yaml, time, os
 import xarray as xr
 import datetime
+import subprocess
+import shutil
+import os
 
 
-def asRunConfig(config, outFile):
+def saveRunLog(config,code_dir,outFile):
+    """
+    function to add the run specs to a csv log file
+    :param config: [dict] the current config dictionary
+    :param code_dir: [str] path to river-dl directory
+    :param outFile: [str] the filename for the output
+    """
+
+    #check if the log already exists
+    newLog = not os.path.exists(outFile)
+
+    #add a default run description if needed
+    if not "runDescription" in config.keys():
+        config['runDescription']=""
+
+    #replace commas with semi-colons for csv readability
+    config['runDescription']=config['runDescription'].replace(",",";")
+
+    with open(outFile,"a+") as f:
+        if newLog:
+            f.write("'Date','Directory','Description'\n")
+        f.write("%s,'%s','%s'\n"%(datetime.date.today().strftime("%m/%d/%y"),os.path.join(os.path.relpath(os.getcwd(),code_dir),config['out_dir']),config['runDescription']))
+
+def asRunConfig(config, code_dir, outFile):
     """
     function to save the as-run config settings to a text file
     :param config: [dict] the current config dictionary
+    :param code_dir: [str] path to river-dl directory
     :param outFile: [str] the filename for the output
     """
     #store some run parameters
     config['runDate']=datetime.date.today().strftime("%m/%d/%y")
-    with open(".git/HEAD",'r') as head:
+    with open(os.path.join(code_dir,".git/HEAD"),'r') as head:
         ref = head.readline().split(' ')[-1].strip()
         branch = ref.split("/")[-1]
-    with open('.git/'+ref,'r') as git_hash:
+    with open(os.path.join(code_dir,'.git/', ref),'r') as git_hash:
         commit = git_hash.readline().strip()
+    status = str(subprocess.Popen(['git status'], cwd = None if code_dir=="" else code_dir,shell=True,stdout=subprocess.PIPE).communicate()[0]).split("\\n")
+    modifiedFiles = [x.split()[1].strip() for x in status if "modified" in x]
+    newFiles = [x.split()[1].strip() for x in status if "new file" in x]
+    config['gitStatus']= 'unknown' if len(status)==1 else 'dirty' if len(modifiedFiles)>0 or len(newFiles)>0 else 'clean'
+    #if the repo is dirty, make a zipped archive of the code directory
+    if config['gitStatus']=='dirty':
+        shutil.make_archive(os.path.join(os.path.dirname(outFile),"river_dl"),"zip",os.path.join(code_dir,"river_dl"))
+    config['gitModified']=modifiedFiles
+    config['gitNew']=newFiles
     config['gitBranch']=branch
     config['gitCommit'] = commit
     #and the file info for the input files
     config['input_file_info']={config[x]:{'file_size':os.stat(config[x]).st_size,'file_date':time.strftime("%m/%d/%Y %I:%M:%S %p",time.localtime(os.stat(config[x]).st_ctime))} for x in config.keys() if "file" in x and x!="input_file_info"}
     with open(outFile,'w') as f:
         yaml.dump(config, f, default_flow_style=False)
+
+    #add the log entry
+    saveRunLog(config,code_dir,os.path.join(code_dir,"runLog.csv"))
 
 def scale(dataset, std=None, mean=None):
     """
@@ -80,15 +119,19 @@ def separate_trn_tst(
     time_idx_name,
     train_start_date,
     train_end_date,
-    val_start_date,
-    val_end_date,
-    test_start_date,
-    test_end_date,
+    val_start_date=None,
+    val_end_date=None,
+    test_start_date=None,
+    test_end_date=None,
 ):
     """
     separate the train data from the test data according to the start and end
-    dates. This assumes your training data is in one continuous block and all
-    the dates that are not in the training are in the testing.
+    dates. This assumes your training data is in one continuous block. Be aware,
+    if your train/test/val partitions are discontinuous (composed of multiple
+    periods), depending on your sequence length and how the data line up, you
+    could end up with sequences starting in one period and ending in another.
+    The breaking up of sequences would happen in the `convert_batch_reshape`
+    function
     :param dataset: [xr dataset] input or output data with dims
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
@@ -104,16 +147,36 @@ def separate_trn_tst(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
+    :return: [tuple] separated data
     """
     train = sel_partition_data(
         dataset, time_idx_name, train_start_date, train_end_date
     )
-    val = sel_partition_data(
-        dataset, time_idx_name, val_start_date, val_end_date
-    )
-    test = sel_partition_data(
-        dataset, time_idx_name, test_start_date, test_end_date
-    )
+
+
+    if val_start_date and val_end_date:
+        val = sel_partition_data(
+            dataset, time_idx_name, val_start_date, val_end_date
+        )
+        
+    elif val_start_date and not val_end_date:
+        raise ValueError("With a val_start_date a val_end_date must be given")
+    elif val_end_date and not val_start_date:
+        raise ValueError("With a val_end_date a val_start_date must be given")
+    else:
+        val = None
+
+    if test_start_date and test_end_date:
+        test = sel_partition_data(
+            dataset, time_idx_name, test_start_date, test_end_date
+        )
+    elif test_start_date and not test_end_date:
+        raise ValueError("With a test_start_date a test_end_date must be given")
+    elif test_end_date and not test_start_date:
+        raise ValueError("With a test_end_date a test_start_date must be given")
+    else:
+        test = None
+
     return train, val, test
 
 
@@ -123,18 +186,23 @@ def split_into_batches(data_array, seq_len=365, offset=1.0):
     :param data_array: [numpy array] array of training data with dims [nseg,
     ndates, nfeat]
     :param seq_len: [int] length of sequences (e.g., 365)
-    :param offset: [float] 0-1, how to offset the batches (e.g., 0.5 means that
-    the first batch will be 0-365 and the second will be 182-547)
+    :param offset: [float] How to offset the batches. Values < 1 are taken as fractions, (e.g., 0.5 means that
+    the first batch will be 0-365 and the second will be 182-547), values > 1 are used as a constant number of
+    observations to offset by.
     :return: [numpy array] batched data with dims [nbatches, nseg, seq_len
     (batch_size), nfeat]
     """
-    combined = []
-    for i in range(int(1 / offset)):
-        start = int(i * offset * seq_len)
-        idx = np.arange(start=start, stop=data_array.shape[1] + 1, step=seq_len)
-        split = np.split(data_array, indices_or_sections=idx, axis=1)
-        # add all but the first and last batch since they will be smaller
-        combined.extend([s for s in split if s.shape[1] == seq_len])
+    if offset>1:
+        period = int(offset)
+    else:
+        period = int(offset*seq_len)
+    num_batches = data_array.shape[1]//period
+    combined=[]
+    for i in range(num_batches+1):
+        idx = int(period*i)
+        batch = data_array[:,idx:idx+seq_len,...]
+        combined.append(batch)
+    combined = [b for b in combined if b.shape[1]==seq_len]
     combined = np.asarray(combined)
     return combined
 
@@ -149,7 +217,7 @@ def read_obs(obs_file, y_vars, x_data):
     :param obs_file: [list] filenames of observation file
     :return: [xr dataset] the observations in the same time
     """
-    ds = xr.open_zarr(obs_file)
+    ds = xr.open_zarr(obs_file, consolidated=False)
     obs = xr.merge([x_data, ds], join="left")
     obs = obs[y_vars]
     return obs
@@ -168,11 +236,13 @@ def join_catch_properties(x_data_ts, catch_props):
     return xr.merge([x_data_ts, ds_catch], join="left")
 
 
-def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
+def prep_catch_props(x_data_ts, catch_prop_file, spatial_idx_name, replace_nan_with_mean=True):
     """
     read catch property file and join with ts data
     :param x_data_ts: [xr dataset] timeseries x-data
     :param catch_prop_file: [str] the feather file of catchment attributes
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
     :param replace_nan_with_mean: [bool] if true, any nan will be replaced with
     the mean of that variable
     :return: [xr dataset] merged datasets
@@ -183,7 +253,7 @@ def prep_catch_props(x_data_ts, catch_prop_file, replace_nan_with_mean=True):
         df_catch_props = df_catch_props.apply(
             lambda x: x.fillna(x.mean()), axis=0
         )
-    ds_catch_props = df_catch_props.set_index("seg_id_nat").to_xarray()
+    ds_catch_props = df_catch_props.set_index(spatial_idx_name).to_xarray()
     return join_catch_properties(x_data_ts, ds_catch_props)
 
 
@@ -418,6 +488,11 @@ def convert_batch_reshape(
     the first batch will be 0-365 and the second will be 182-547)
     :return: [numpy array] batched and reshaped dataset
     """
+    # If there is no dataset (like if a test or validation set is not supplied)
+    # just return None
+    if not dataset:
+        return None
+
     # convert xr.dataset to numpy array
     dataset = dataset.transpose(spatial_idx_name, time_idx_name)
 
@@ -462,6 +537,11 @@ def coord_as_reshaped_array(
     the first batch will be 0-365 and the second will be 182-547)
     :return:
     """
+    # If there is no dataset (like if a test or validation set is not supplied)
+    # just return None
+    if not dataset:
+        return None
+
     # I need one variable name. It can be any in the dataset, but I'll use the
     # first
     first_var = next(iter(dataset.data_vars.keys()))
@@ -502,10 +582,12 @@ def prep_y_data(
     x_data,
     train_start_date,
     train_end_date,
-    val_start_date,
-    val_end_date,
-    test_start_date,
-    test_end_date,
+    val_start_date=None,
+    val_end_date=None,
+    test_start_date=None,
+    test_end_date=None,
+    val_sites=None,
+    test_sites=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
@@ -541,6 +623,10 @@ def prep_y_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
+    :param val_sites: [list of site_ids] sites to retain for validation. These
+    sites will be witheld from training
+    :param test_sites: [list of site_ids] sites to retain for testing. These
+    sites will be witheld from training and validation
     :param seq_len: [int] length of sequences (e.g., 365)
     :param log_vars: [list-like] which variables_to_log (if any) to take log of
     :param exclude_file: [str] path to exclude file
@@ -558,6 +644,11 @@ def prep_y_data(
     if isinstance(y_vars, str):
         y_vars = [y_vars]
 
+    # when specifying mean and std, they get passed as an np.ndarray where we need xr.Datasets
+    if isinstance(y_mean, np.ndarray):
+        y_mean = xr.Dataset(dict(zip(y_vars,y_mean)))
+        y_std = xr.Dataset(dict(zip(y_vars,y_std)))
+
     y_data = read_obs(y_data_file, y_vars, x_data)
 
     y_trn, y_val, y_tst = separate_trn_tst(
@@ -570,6 +661,16 @@ def prep_y_data(
         test_start_date,
         test_end_date,
     )
+
+
+    # replace validation sites' (and test sites') data with np.nan
+    if val_sites:
+        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+
+    if test_sites:
+        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
+        y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
+
 
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)
@@ -584,14 +685,14 @@ def prep_y_data(
     # scale the validation partition to benchmark epoch performance
     if normalize_y:
     # check if mean and std are already calculated/exist
-        if not isinstance(y_std, xr.Dataset) or not isinstance(
-            y_mean, xr.Dataset
-        ):
+        if not isinstance(y_std, xr.Dataset) or not isinstance(y_mean, xr.Dataset):
             y_trn, y_std, y_mean = scale(y_trn)
-            y_val, _, _ = scale(y_val, y_std, y_mean)
+            if y_val:
+                y_val, _, _ = scale(y_val, y_std, y_mean)
         else:
-            y_trn, _, _ = scale(y_trn)
-            y_val, _, _ = scale(y_val, y_std, y_mean)
+            y_trn, _, _ = scale(y_trn,y_std,y_mean)
+            if y_val:
+                y_val, _, _ = scale(y_val, y_std, y_mean)
 
 
     if y_type == 'obs':
@@ -614,9 +715,7 @@ def prep_y_data(
         }
     elif y_type == 'pre':
         if normalize_y:
-            if not isinstance(y_std, xr.Dataset) or not isinstance(
-                    y_mean, xr.Dataset
-            ):
+            if not isinstance(y_std, xr.Dataset) or not isinstance(y_mean, xr.Dataset):
                 y_trn, y_std, y_mean = scale(y_trn)
             else:
                 y_data, _, _ = scale(y_data, y_std, y_mean)
@@ -636,13 +735,15 @@ def prep_y_data(
 def prep_all_data(
     x_data_file,
     y_data_file,
+    x_vars,
     train_start_date,
     train_end_date,
-    val_start_date,
-    val_end_date,
-    test_start_date,
-    test_end_date,
-    x_vars,
+    val_start_date=None,
+    val_end_date=None,
+    test_start_date=None,
+    test_end_date=None,
+    val_sites=None,
+    test_sites=None,
     y_vars_finetune=None,
     y_vars_pretrain=None,
     spatial_idx_name="seg_id_nat",
@@ -683,6 +784,10 @@ def prep_all_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
+    :param val_sites: [list of site_ids] sites to retain for validation. These
+    sites will be witheld from training
+    :param test_sites: [list of site_ids] sites to retain for testing. These
+    sites will be witheld from training and validation
     :param spatial_idx_name: [str] name of column that is used for spatial
     index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -741,7 +846,7 @@ def prep_all_data(
     if pretrain_file and not y_vars_pretrain:
         raise ValueError("included pretrain file but no pretrain vars")
 
-    x_data = xr.open_zarr(x_data_file)
+    x_data = xr.open_zarr(x_data_file,consolidated=False)
     x_data = x_data.sortby([spatial_idx_name, time_idx_name])
 
     if segs:
@@ -750,7 +855,7 @@ def prep_all_data(
     x_data = x_data[x_vars]
 
     if catch_prop_file:
-        x_data = prep_catch_props(x_data, catch_prop_file)
+        x_data = prep_catch_props(x_data, catch_prop_file, spatial_idx_name)
     # make sure we don't have any weird or missing input values
     check_if_finite(x_data)
     x_trn, x_val, x_tst = separate_trn_tst(
@@ -764,11 +869,19 @@ def prep_all_data(
         test_end_date,
     )
 
-    x_scl, x_std, x_mean = scale(x_data)
+    x_trn_scl, x_std, x_mean = scale(x_trn)
 
-    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
-    x_val_scl, _, _ = scale(x_val, std=x_std, mean=x_mean)
-    x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+    x_scl, _, _ = scale(x_data,std=x_std,mean=x_mean)
+
+    if x_val:
+        x_val_scl, _, _ = scale(x_val, std=x_std, mean=x_mean)
+    else:
+        x_val_scl = None
+
+    if x_tst:
+        x_tst_scl, _, _ = scale(x_tst, std=x_std, mean=x_mean)
+    else:
+        x_tst_scl = None
 
     # read, filter observations for finetuning
 
@@ -868,6 +981,8 @@ def prep_all_data(
             val_end_date=val_end_date,
             test_start_date=test_start_date,
             test_end_date=test_end_date,
+            val_sites=val_sites,
+            test_sites=test_sites,
             spatial_idx_name=spatial_idx_name,
             time_idx_name=time_idx_name,
             seq_len=seq_len,

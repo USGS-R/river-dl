@@ -1,0 +1,55 @@
+runDescription: "example run for pytorch rgcn"
+
+# Input files
+obs_file: "../river_dl/tests/test_data/obs_temp_flow_seg_id_nat"
+sntemp_file: "../river_dl/tests/test_data/test_data_seg_id_nat"
+dist_matrix_file: "../river_dl/tests/test_data/test_dist_matrix.npz"
+code_dir: ".."
+
+
+#### for flow modeling, seg_width should be removed from x_vars
+x_vars: ['seg_ccov', 'seg_rain', 'seg_slope', 'seg_tave_air']
+
+out_dir: "output_test_pytorch"
+
+seed: False #random seed for training False==No seed, otherwise specify the seed
+
+y_vars_pretrain: ['seg_tave_water']
+y_vars_finetune: ['temp_c']
+#y_vars_pretrain: ['seg_tave_water', 'seg_outflow']
+#y_vars_finetune: ['temp_c', 'discharge_cms']
+
+lambdas: [1]
+#lambdas: [1,0]
+
+trn_offset: 1.0
+tst_val_offset: 1.0
+
+#Define early stopping criteria, setting this to False will turn off early stopping rounds
+early_stopping: 1
+
+
+
+train_start_date:
+  - '2003-09-15'
+train_end_date:
+  - '2005-09-14'
+val_start_date:
+  - '2005-09-14'
+val_end_date:
+  - '2006-09-14'
+test_start_date:
+  - '1980-10-01'
+test_end_date:
+  - '1985-09-30'
+
+
+pt_epochs: 5
+ft_epochs: 5
+hidden_size: 20
+
+dropout: 0.2
+recurrent_dropout: 0.2
+pretrain_learning_rate: 0.005
+finetune_learning_rate: 0.01
+

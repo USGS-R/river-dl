@@ -1,18 +1,24 @@
-name: rgcn
+name: rdl_torch_tf
 channels:
+    - pytorch
     - conda-forge
     - defaults
     - bioconda
 dependencies:
-    - dask
-    - ipython
+    - git
+    - pytorch
+    - torchvision
+    - torchaudio
+    - pip
+    - jupyterlab
     - matplotlib
     - pandas
     - pyarrow
     - scikit-learn
     - snakemake
-    - tensorflow = 2.1.0
-    - tensorflow-gpu = 2.1.0
-    - tensorflow-estimator = 2.1.0
     - xarray
     - zarr
+    - tqdm
+    - dask
+    - pip:
+          - tensorflow # or tensorflow-gpu

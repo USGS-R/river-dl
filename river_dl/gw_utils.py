@@ -495,8 +495,8 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     someTemps = np.array([x for x in someTemps if not x in noNA])
     
     #calculate the batch-level observatins
-    Ar_pred_lm, delPhi_pred_lm = lm_gw_utils(temp_index, dates[someTemps,:,:], data[someTemps,:,:], temp_data[someTemps,:, int(temp_index):(int(temp_index) + 1)], temp_mean, temp_sd, gw_mean, gw_std)
-    Ar_obs_fft, Ar_pred_fft, delPhi_obs_fft, delPhi_pred_fft = GW_loss_prep(temp_index, data[noNA,:,:], temp_data[noNA,:,:], temp_mean, temp_sd, gw_mean, gw_std, num_task, type='fft')
+    Ar_pred_lm, delPhi_pred_lm, Tmean_pred_lm = lm_gw_utils(temp_index, dates[someTemps,:,:], data[someTemps,:,:], temp_data[someTemps,:, int(temp_index):(int(temp_index) + 1)], temp_mean, temp_sd, gw_mean, gw_std)
+    Ar_obs_fft, Ar_pred_fft, delPhi_obs_fft, delPhi_pred_fft, Tmean_obs_fft, Tmean_pred_fft = GW_loss_prep(temp_index, data[noNA,:,:], temp_data[noNA,:,:], temp_mean, temp_sd, gw_mean, gw_std, num_task, type='fft')
 
     print(len(someTemps))
     print(len(Ar_pred_lm))
@@ -506,9 +506,11 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     #replace the batches with some temp data
     GW_Arr[someTemps,:,0]=np.repeat(Ar_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
     GW_Arr[someTemps,:,1]=np.repeat(delPhi_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
+    GW_Arr[someTemps,:,2]=np.repeat(Tmean_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
     #replace the batches with complete temp data
     GW_Arr[noNA,:,0]=np.repeat(Ar_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
     GW_Arr[noNA,:,1]=np.repeat(delPhi_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
+    GW_Arr[noNA,:,2]=np.repeat(Tmean_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
     
     #get the batches that have NA's for the observed Ar / delPhi and, if possible, use the mean from the other batches for the same reach
     batchNA = np.where(~np.isfinite(GW_Arr[:,0,0]))[0] #batches with no obs gw data
@@ -522,6 +524,7 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     for idx in idsToUpdate:
         GW_Arr[:,:,0][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,0][id_data[:,:,0]==idx])
         GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
+        GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
 
     return GW_Arr
 
@@ -530,15 +533,17 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
     Aa=[]
     Phiw=[]
     Phia=[]
+    Tmean=[]
     y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
     for thisSite in range(y_pred.shape[0]):
-        amp, phi,_,_,_,_ = amp_phi(dates[thisSite],y_pred_temp[thisSite,:,0],isWater=True)
-        amp_air, phi_air,_,_,_,_ = amp_phi(dates[thisSite],data[thisSite,:,-1],isWater=False)
+        amp, phi,_,_,_,_,tmean = amp_phi(dates[thisSite],y_pred_temp[thisSite,:,0],isWater=True)
+        amp_air, phi_air,_,_,_,_,_ = amp_phi(dates[thisSite],data[thisSite,:,-1],isWater=False)
         Aw.append(amp)
         Phiw.append(phi)
         Aa.append(amp_air)
         Phia.append(phi_air)
+        Tmean.append(tmean)
 
     Ar_obs = [Aw[x]/Aa[x] for x in range(len(Aw))]
     delPhi_obs = [(Phiw[x]-Phia[x])*365/(2*math.pi) for x in range(len(Phiw))]
@@ -546,8 +551,9 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
     #scale the outputs
     Ar_obs = (Ar_obs-gw_mean[0])/gw_std[0]
     delPhi_obs = (delPhi_obs-gw_mean[1])/gw_std[1]
+    Tmean_obs = (Tmean_obs-gw_mean[2])/gw_std[2]
     
-    return Ar_obs, delPhi_obs
+    return Ar_obs, delPhi_obs, Tmean_obs
 
 def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output):
     """

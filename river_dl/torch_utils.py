@@ -5,7 +5,6 @@ import pandas as pd
 import time
 from tqdm import tqdm
 import math as m
-import os
 
 def reshape_for_gwn(cat_data, keep_portion=None):
     """
@@ -120,7 +119,6 @@ def train_torch(model,
                 weights_file = None,
                 log_file= None,
                 device = 'cpu',
-                seed = None,
                 keep_portion = None):
     """
     @param model: [objetct] initialized torch model
@@ -135,13 +133,6 @@ def train_torch(model,
     @return: [object] trained model
     """
 
-    if seed:
-        os.environ["PYTHONHASHSEED"] = str(seed)
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        np.random.seed(seed)
 
     print(f"Training on {device}")
     print("start training...",flush=True)

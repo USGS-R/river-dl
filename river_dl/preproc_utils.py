@@ -644,6 +644,11 @@ def prep_y_data(
     if isinstance(y_vars, str):
         y_vars = [y_vars]
 
+    # when specifying mean and std, they get passed as an np.ndarray where we need xr.Datasets
+    if isinstance(y_mean, np.ndarray):
+        y_mean = xr.Dataset(dict(zip(y_vars,y_mean)))
+        y_std = xr.Dataset(dict(zip(y_vars,y_std)))
+
     y_data = read_obs(y_data_file, y_vars, x_data)
 
     y_trn, y_val, y_tst = separate_trn_tst(
@@ -680,14 +685,12 @@ def prep_y_data(
     # scale the validation partition to benchmark epoch performance
     if normalize_y:
     # check if mean and std are already calculated/exist
-        if not isinstance(y_std, xr.Dataset) or not isinstance(
-            y_mean, xr.Dataset
-        ):
+        if not isinstance(y_std, xr.Dataset) or not isinstance(y_mean, xr.Dataset):
             y_trn, y_std, y_mean = scale(y_trn)
             if y_val:
                 y_val, _, _ = scale(y_val, y_std, y_mean)
         else:
-            y_trn, _, _ = scale(y_trn)
+            y_trn, _, _ = scale(y_trn,y_std,y_mean)
             if y_val:
                 y_val, _, _ = scale(y_val, y_std, y_mean)
 
@@ -712,9 +715,7 @@ def prep_y_data(
         }
     elif y_type == 'pre':
         if normalize_y:
-            if not isinstance(y_std, xr.Dataset) or not isinstance(
-                    y_mean, xr.Dataset
-            ):
+            if not isinstance(y_std, xr.Dataset) or not isinstance(y_mean, xr.Dataset):
                 y_trn, y_std, y_mean = scale(y_trn)
             else:
                 y_data, _, _ = scale(y_data, y_std, y_mean)
@@ -868,9 +869,9 @@ def prep_all_data(
         test_end_date,
     )
 
-    x_scl, x_std, x_mean = scale(x_data)
+    x_trn_scl, x_std, x_mean = scale(x_trn)
 
-    x_trn_scl, _, _ = scale(x_trn, std=x_std, mean=x_mean)
+    x_scl, _, _ = scale(x_data,std=x_std,mean=x_mean)
 
     if x_val:
         x_val_scl, _, _ = scale(x_val, std=x_std, mean=x_mean)

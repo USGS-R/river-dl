@@ -378,9 +378,9 @@ def prep_annual_signal_data(
     num_task = len(data['y_obs_vars'])
     temp_air_index = np.where(data['x_vars']=='seg_tave_air')[0]
     
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0), num_task = num_task, offset=trn_offset)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0), num_task = num_task, offset=tst_val_offset)
-    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs']],axis=0), num_task = num_task, offset=tst_val_offset)
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=trn_offset)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset)
+    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset)
 
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
@@ -551,7 +551,7 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
     #scale the outputs
     Ar_obs = (Ar_obs-gw_mean[0])/gw_std[0]
     delPhi_obs = (delPhi_obs-gw_mean[1])/gw_std[1]
-    Tmean_obs = (Tmean_obs-gw_mean[2])/gw_std[2]
+    Tmean_obs = (Tmean-gw_mean[2])/gw_std[2]
     
     return Ar_obs, delPhi_obs, Tmean_obs
 

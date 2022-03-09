@@ -41,7 +41,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     #remove water temps below 1C or above 45C to avoid complex freeze-thaw dynamics near 0 C and because >45C is likely erroneous  
     if isWater:
         #temp = [x if x >=1 and x<=45 else np.nan for x in temp]
-        temp = [x if x>=1 else 1 for x in temp]
+        temp = [x if x>=1 or np.isnan(x) else 1 for x in temp]
     x = [[math.sin(2*math.pi*j),math.cos(2*math.pi*j)] for j in date_decimal]
     
 
@@ -502,7 +502,7 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     print(len(Ar_pred_lm))
     
     #reset the observed values
-    GW_Arr[:,:,0:2]=np.nan
+    GW_Arr[:,:,0:3]=np.nan
     #replace the batches with some temp data
     GW_Arr[someTemps,:,0]=np.repeat(Ar_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
     GW_Arr[someTemps,:,1]=np.repeat(delPhi_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)

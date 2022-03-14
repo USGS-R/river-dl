@@ -687,19 +687,14 @@ def prep_y_data(
     # check if mean and std are already calculated/exist
         if not isinstance(y_std, xr.Dataset) or not isinstance(y_mean, xr.Dataset):
             y_trn, y_std, y_mean = scale(y_trn)
-            if y_val:
-                y_val, _, _ = scale(y_val, y_std, y_mean)
-
-            if y_tst:
-                y_tst, _, _ = scale(y_tst, y_std, y_mean)
-
         else:
             y_trn, _, _ = scale(y_trn,y_std,y_mean)
-            if y_val:
-                y_val, _, _ = scale(y_val, y_std, y_mean)
+            
+        if y_val:
+            y_val, _, _ = scale(y_val, y_std, y_mean)
 
-            if y_tst:
-                y_tst, _, _ = scale(y_tst, y_std, y_mean)
+        if y_tst:
+            y_tst, _, _ = scale(y_tst, y_std, y_mean)
 
 
     if y_type == 'obs':

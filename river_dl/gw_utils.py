@@ -497,20 +497,19 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     #calculate the batch-level observatins
     Ar_pred_lm, delPhi_pred_lm, Tmean_pred_lm = lm_gw_utils(temp_index, dates[someTemps,:,:], data[someTemps,:,:], temp_data[someTemps,:, int(temp_index):(int(temp_index) + 1)], temp_mean, temp_sd, gw_mean, gw_std)
     Ar_obs_fft, Ar_pred_fft, delPhi_obs_fft, delPhi_pred_fft, Tmean_obs_fft, Tmean_pred_fft = GW_loss_prep(temp_index, data[noNA,:,:], temp_data[noNA,:,:], temp_mean, temp_sd, gw_mean, gw_std, num_task, type='fft')
-
-    print(len(someTemps))
-    print(len(Ar_pred_lm))
-    
+     
     #reset the observed values
     GW_Arr[:,:,0:3]=np.nan
     #replace the batches with some temp data
     GW_Arr[someTemps,:,0]=np.repeat(Ar_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
     GW_Arr[someTemps,:,1]=np.repeat(delPhi_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
     GW_Arr[someTemps,:,2]=np.repeat(Tmean_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
+
     #replace the batches with complete temp data
     GW_Arr[noNA,:,0]=np.repeat(Ar_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
     GW_Arr[noNA,:,1]=np.repeat(delPhi_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
     GW_Arr[noNA,:,2]=np.repeat(Tmean_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
+
     
     #get the batches that have NA's for the observed Ar / delPhi and, if possible, use the mean from the other batches for the same reach
     batchNA = np.where(~np.isfinite(GW_Arr[:,0,0]))[0] #batches with no obs gw data
@@ -525,6 +524,8 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
         GW_Arr[:,:,0][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,0][id_data[:,:,0]==idx])
         GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
         GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
+        
+    
 
     return GW_Arr
 
@@ -546,7 +547,7 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
         Tmean.append(tmean)
 
     Ar_obs = [Aw[x]/Aa[x] for x in range(len(Aw))]
-    delPhi_obs = [(Phiw[x]-Phia[x])*365/(2*math.pi) for x in range(len(Phiw))]
+    delPhi_obs = [(Phia[x]-Phiw[x])*365/(2*math.pi) for x in range(len(Phiw))]
     
     #scale the outputs
     Ar_obs = (Ar_obs-gw_mean[0])/gw_std[0]

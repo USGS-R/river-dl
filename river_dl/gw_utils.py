@@ -522,8 +522,8 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
 
     for idx in idsToUpdate:
         GW_Arr[:,:,0][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,0][id_data[:,:,0]==idx])
-        GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
-        GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
+        GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,1])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
+        GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,2])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
         
     
 

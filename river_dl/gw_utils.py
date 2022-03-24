@@ -285,7 +285,8 @@ def prep_annual_signal_data(
     extraResSegments = None,
     gw_loss_type = 'fft',
     trn_offset = 1,
-    tst_val_offset = 1
+    tst_val_offset = 1,
+    metric_method = 'batch'
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -304,6 +305,7 @@ def prep_annual_signal_data(
     :param gw_loss_type: str with the gw loss method (fft or linalg)
     :param trn_offset: [float] value for the training offset
     :param tst_val_offset: [float] value for the testing and validation offset
+    :param metric_method: [str] method for calculating the annual metrics (options are "static","batch","high_data_batches","low_data_years")
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -378,9 +380,9 @@ def prep_annual_signal_data(
     num_task = len(data['y_obs_vars'])
     temp_air_index = np.where(data['x_vars']=='seg_tave_air')[0]
     
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=trn_offset)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset)
-    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset)
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=trn_offset,metric_method=metric_method)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method)
+    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method)
 
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
@@ -452,7 +454,7 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     return obsDF
 
 
-def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, offset=1):
+def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, offset=1,metric_method='batch'):
 
     """
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
@@ -483,11 +485,12 @@ def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, 
     
     data = np.concatenate([temp_data, GW_Arr, air_data], axis=2)
     
-    GW_Arr = calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task)
+    if !metric_method=='static':
+        GW_Arr = calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method)
     
     return GW_Arr
 
-def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task):
+def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method):
     #recalculate the observed Ar and delPhi for each batch
     #identify the batches with some temp data and no missing temp data
     noNA = np.where(np.isfinite(np.mean(temp_data,axis=1)))[0]
@@ -510,21 +513,25 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     GW_Arr[noNA,:,1]=np.repeat(delPhi_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
     GW_Arr[noNA,:,2]=np.repeat(Tmean_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
 
-    
-    #get the batches that have NA's for the observed Ar / delPhi and, if possible, use the mean from the other batches for the same reach
-    batchNA = np.where(~np.isfinite(GW_Arr[:,0,0]))[0] #batches with no obs gw data
-    batchNotNA = np.where(np.isfinite(GW_Arr[:,0,0]))[0] #batches with obs gw data
-    idsNA = np.unique(id_data[batchNA,0,0]) #segment id's with missing gw data
-    idsNotNA = np.unique(id_data[batchNotNA,0,0]) #segment id's with gw data
-    batchWithData = np.where(np.isin(id_data[:,0,0],idsNotNA))[0] #batches on segments that have data (those that could be updated and those that already have data)
-    batchToUpdate=[x for x in batchNA if x in batchWithData] #batches that can be updated
-    idsToUpdate = np.unique(id_data[batchToUpdate,0,0]) #segment id's that can be updated from other batches
+    if metric_method != 'high_data_batches':
+        #get the batches that have NA's for the observed Ar / delPhi and, if possible, use the mean from the other batches for the same reach
+        batchNA = np.where(~np.isfinite(GW_Arr[:,0,0]))[0] #batches with no obs gw data
+        batchNotNA = np.where(np.isfinite(GW_Arr[:,0,0]))[0] #batches with obs gw data
+        idsNA = np.unique(id_data[batchNA,0,0]) #segment id's with missing gw data
+        idsNotNA = np.unique(id_data[batchNotNA,0,0]) #segment id's with gw data
+        batchWithData = np.where(np.isin(id_data[:,0,0],idsNotNA))[0] #batches on segments that have data (those that could be updated and those that already have data)
+        batchToUpdate=[x for x in batchNA if x in batchWithData] #batches that can be updated
+        idsToUpdate = np.unique(id_data[batchToUpdate,0,0]) #segment id's that can be updated from other batches
 
-    for idx in idsToUpdate:
-        GW_Arr[:,:,0][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,0][id_data[:,:,0]==idx])
-        GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,1])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
-        GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,2])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
-        
+        for idx in idsToUpdate:
+            GW_Arr[:,:,0][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,0][id_data[:,:,0]==idx])
+            GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,1])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
+            GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,2])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
+    if metric_method == 'low_data_years':
+        #set batches with sufficient data to NA (this keeps the GW loss only on batches with <300 data points
+        #reset the observed values
+        GW_Arr[someTemps,:,0:3]=np.nan
+        GW_Arr[noNA,:,0:3]=np.nan
     
 
     return GW_Arr

@@ -485,7 +485,7 @@ def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, 
     
     data = np.concatenate([temp_data, GW_Arr, air_data], axis=2)
     
-    if !metric_method=='static':
+    if metric_method!='static':
         GW_Arr = calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method)
     
     return GW_Arr

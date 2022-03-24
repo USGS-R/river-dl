@@ -194,7 +194,8 @@ rule combine_metrics:
         grp_arg = get_grp_arg
     run:
         combined_metrics(obs_file=input[0],
-                         pred_data={'trn':input[1],'val':input[2]},
+                         pred_trn=input[1],
+                         pred_val=input[2],
                          spatial_idx_name='segs_test',
                          time_idx_name='times_test',
                          group=params.grp_arg,

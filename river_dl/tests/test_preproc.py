@@ -605,4 +605,26 @@ def test_prep_data_multi_test_site():
     assert get_num_non_nans(df_tst, 2037) > 0
 
 
+def test_prep_data_no_scale_y():
+    data = preproc_utils.prep_all_data(
+            x_data_file="test_data/test_data",
+            y_data_file="test_data/obs_temp_flow",
+            pretrain_file="test_data/test_data",
+            train_start_date="2003-09-15",
+            train_end_date="2004-09-16",
+            val_start_date="2004-09-17",
+            val_end_date="2005-09-18",
+            test_start_date="2005-09-19",
+            test_end_date="2006-09-20",
+            test_sites=[2012, 2037],
+            spatial_idx_name="segs_test",
+            normalize_y=False,
+            time_idx_name="times_test",
+            x_vars=["seg_rain", "seg_tave_air"],
+            y_vars_finetune=["temp_c", "discharge_cms"],
+            y_vars_pretrain=["seg_tave_water", "seg_outflow"],
+        )
 
+    # make sure all the std's are 1 and the means are 0
+    assert ((data['y_std'] - 1).sum() == 0)
+    assert (data['y_mean'].sum() == 0)

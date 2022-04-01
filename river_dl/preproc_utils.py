@@ -695,6 +695,10 @@ def prep_y_data(
 
         if y_tst:
             y_tst, _, _ = scale(y_tst, y_std, y_mean)
+    else:
+        _, y_std, y_mean = scale(y_trn)
+        y_std = y_std/y_std
+        y_mean = y_mean * 0
 
 
     if y_type == 'obs':

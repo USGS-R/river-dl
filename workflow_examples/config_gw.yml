@@ -40,6 +40,9 @@ lambdas_gw: [0.5, 0.5, 0.5]
 #gw loss calculation method, either 'fft' (fourier fast transform) or 'linalg' (linear algebra)
 gw_loss_type: 'fft'
 
+#annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches)
+metric_method: 'batch'
+
 trn_offset: 1.0 
 tst_val_offset: 1.0
 

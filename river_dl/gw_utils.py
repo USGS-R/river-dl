@@ -11,6 +11,7 @@ from copy import deepcopy
 
 from river_dl.preproc_utils import separate_trn_tst, read_obs, convert_batch_reshape
 from river_dl.evaluate import calc_metrics
+from river_dl.loss_functions import GW_loss_prep
 
 def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     """
@@ -37,7 +38,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     #convert the date to decimal years
     date_decimal = make_decimal_date(Date)
     
-    #remove water temps below 1C or above 45C to avoid complex freeze-thaw dynamics near 0 C and because >45C is likely erroneous  
+    #remove water temps below 1C to avoid complex freeze-thaw dynamics near 0 C
     if isWater:
         temp = [x if x>=1 or np.isnan(x) else 1 for x in temp]
 
@@ -284,7 +285,8 @@ def prep_annual_signal_data(
     extraResSegments = None,
     gw_loss_type = 'fft',
     trn_offset = 1,
-    tst_val_offset = 1
+    tst_val_offset = 1,
+    metric_method = 'batch'
 ):
     """
     add annual air and water temp signal properties (phase and amplitude to
@@ -303,6 +305,7 @@ def prep_annual_signal_data(
     :param gw_loss_type: str with the gw loss method (fft or linalg)
     :param trn_offset: [float] value for the training offset
     :param tst_val_offset: [float] value for the testing and validation offset
+    :param metric_method: [str] method for calculating the annual metrics (options are "static","batch","high_data_batches","low_data_years")
     :returns: phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio
     """
@@ -371,9 +374,15 @@ def prep_annual_signal_data(
     preppedData = np.load(io_data_file)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
 
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList, offset=trn_offset)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList, offset=tst_val_offset)
-    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList, offset=tst_val_offset)
+    temp_index = np.where(data['y_obs_vars']==water_temp_obs_col)[0]
+    temp_mean = data['y_mean'][temp_index]
+    temp_sd = data['y_std'][temp_index]
+    num_task = len(data['y_obs_vars'])
+    temp_air_index = np.where(data['x_vars']=='seg_tave_air')[0]
+    
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=trn_offset,metric_method=metric_method)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method)
+    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method)
 
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
@@ -444,13 +453,26 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     obsDF['delPhi_pred'] = (obsDF['air_phi']-obsDF['water_phi_pred'])*365/(2*math.pi)
     return obsDF
 
-def make_GW_dataset (GW_data,x_data,varList, offset=1):
+
+def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, offset=1,metric_method='batch'):
+
     """
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
     :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
-    :param x_data: [str] observation dataset
+    :param x_data: [dataset] observation dataset
     :param varList: [str] variables_to_log to keep in the final dataset
+    :param dates: array of dates for the dataset
+    :param id_data: array of segment id's
+    :param air_data: array of air temps, unscaled
+    :param temp_data: array of water temps, scaled
+    :param temp_index: [int] Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param temp_mean: [float] mean water temp for unscaling
+    :param temp_sd: [float] std of water temps for unscaling
+    :param gw_mean: [float] list of the mean values of the annual metrics for unscaling
+    :param gw_sd: [float] list of the stds of the annual metrics for unscaling
+    :param num_task: number of y variables
     :param offset: [float] offset for the dataset
+    :param metric_method: [str] annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches) 
     :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
     """
     #make a dataframe with all combinations of segment and date and then join the annual temperature signal properties dataframe to it
@@ -472,8 +494,112 @@ def make_GW_dataset (GW_data,x_data,varList, offset=1):
     GW_ds = GW_ds[varList]
     GW_Arr = convert_batch_reshape(GW_ds, offset=offset)
     
-    return GW_Arr
+    if metric_method!='static':
+        data = np.concatenate([temp_data, GW_Arr, air_data], axis=2)
+        GW_Arr = calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method)
     
+    return GW_Arr
+
+def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method):
+    """
+    #recalculate the observed Ar and delPhi for each batch
+    :param dates: array of dates for the dataset
+    :param id_data: array of segment id's
+    :param data: array of water temperature data, GW metrics, and air temperature data
+    :param temp_data: array of water temps, scaled
+    :param temp_index: [int] Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param temp_mean: [float] mean water temp for unscaling
+    :param temp_sd: [float] std of water temps for unscaling
+    :param gw_mean: [float] list of the mean values of the annual metrics for unscaling
+    :param gw_sd: [float] list of the stds of the annual metrics for unscaling
+    :param num_task: number of y variables
+    :param metric_method: [str] annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches) 
+    :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
+    """
+    
+    #identify the batches with some temp data and no missing temp data
+    noNA = np.where(np.isfinite(np.mean(temp_data,axis=1)))[0]
+    someTemps=np.where(np.sum(np.isfinite(temp_data),axis=1)>=300)[0]
+    someTemps = np.array([x for x in someTemps if not x in noNA])
+    
+    #calculate the batch-level observatins
+    Ar_pred_lm, delPhi_pred_lm, Tmean_pred_lm = lm_gw_utils(temp_index, dates[someTemps,:,:], data[someTemps,:,:], temp_data[someTemps,:, int(temp_index):(int(temp_index) + 1)], temp_mean, temp_sd, gw_mean, gw_std)
+    Ar_obs_fft, Ar_pred_fft, delPhi_obs_fft, delPhi_pred_fft, Tmean_obs_fft, Tmean_pred_fft = GW_loss_prep(temp_index, data[noNA,:,:], temp_data[noNA,:,:], temp_mean, temp_sd, gw_mean, gw_std, num_task, type='fft')
+     
+    #reset the observed values
+    GW_Arr[:,:,0:3]=np.nan
+    #replace the batches with some temp data
+    GW_Arr[someTemps,:,0]=np.repeat(Ar_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
+    GW_Arr[someTemps,:,1]=np.repeat(delPhi_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
+    GW_Arr[someTemps,:,2]=np.repeat(Tmean_pred_lm,GW_Arr.shape[1]).reshape(GW_Arr[someTemps,:,0].shape)
+
+    #replace the batches with complete temp data
+    GW_Arr[noNA,:,0]=np.repeat(Ar_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
+    GW_Arr[noNA,:,1]=np.repeat(delPhi_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
+    GW_Arr[noNA,:,2]=np.repeat(Tmean_pred_fft,GW_Arr.shape[1]).reshape(GW_Arr[noNA,:,0].shape)
+
+    if metric_method != 'high_data_batches':
+        #get the batches that have NA's for the observed Ar / delPhi and, if possible, use the mean from the other batches for the same reach
+        batchNA = np.where(~np.isfinite(GW_Arr[:,0,0]))[0] #batches with no obs gw data
+        batchNotNA = np.where(np.isfinite(GW_Arr[:,0,0]))[0] #batches with obs gw data
+        idsNA = np.unique(id_data[batchNA,0,0]) #segment id's with missing gw data
+        idsNotNA = np.unique(id_data[batchNotNA,0,0]) #segment id's with gw data
+        batchWithData = np.where(np.isin(id_data[:,0,0],idsNotNA))[0] #batches on segments that have data (those that could be updated and those that already have data)
+        batchToUpdate=[x for x in batchNA if x in batchWithData] #batches that can be updated
+        idsToUpdate = np.unique(id_data[batchToUpdate,0,0]) #segment id's that can be updated from other batches
+
+        for idx in idsToUpdate:
+            GW_Arr[:,:,0][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,0])]=np.nanmean(GW_Arr[:,:,0][id_data[:,:,0]==idx])
+            GW_Arr[:,:,1][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,1])]=np.nanmean(GW_Arr[:,:,1][id_data[:,:,0]==idx])
+            GW_Arr[:,:,2][(id_data[:,:,0]==idx)&~np.isfinite(GW_Arr[:,:,2])]=np.nanmean(GW_Arr[:,:,2][id_data[:,:,0]==idx])
+    if metric_method == 'low_data_years':
+        #set batches with sufficient data to NA (this keeps the GW loss only on batches with <300 data points
+        #reset the observed values
+        GW_Arr[someTemps,:,0:3]=np.nan
+        GW_Arr[noNA,:,0:3]=np.nan
+    
+
+    return GW_Arr
+
+def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
+    """
+    function to calculate the annual temp metrics using a batched array of data
+    :param temp_index: [int] Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param dates: array of dates for the dataset
+    :param data: array of water temperature data, GW metrics, and air temperature data
+    :param y_pred: array of water temps, scaled
+    :param temp_mean: [float] mean water temp for unscaling
+    :param temp_sd: [float] std of water temps for unscaling
+    :param gw_mean: [float] list of the mean values of the annual metrics for unscaling
+    :param gw_sd: [float] list of the stds of the annual metrics for unscaling
+    :returns: lists of the annual metrics (Ar, delPhi, Tmean)
+    """
+    Aw=[]
+    Aa=[]
+    Phiw=[]
+    Phia=[]
+    Tmean=[]
+    y_pred_temp = y_pred[:, :, int(temp_index):(int(temp_index) + 1)]
+    y_pred_temp = y_pred_temp * temp_sd + temp_mean
+    for thisSite in range(y_pred.shape[0]):
+        amp, phi,_,_,_,_,tmean = amp_phi(dates[thisSite],y_pred_temp[thisSite,:,0],isWater=True)
+        amp_air, phi_air,_,_,_,_,_ = amp_phi(dates[thisSite],data[thisSite,:,-1],isWater=False)
+        Aw.append(amp)
+        Phiw.append(phi)
+        Aa.append(amp_air)
+        Phia.append(phi_air)
+        Tmean.append(tmean)
+
+    Ar_obs = [Aw[x]/Aa[x] for x in range(len(Aw))]
+    delPhi_obs = [(Phia[x]-Phiw[x])*365/(2*math.pi) for x in range(len(Phiw))]
+    
+    #scale the outputs
+    Ar_obs = (Ar_obs-gw_mean[0])/gw_std[0]
+    delPhi_obs = (delPhi_obs-gw_mean[1])/gw_std[1]
+    Tmean_obs = (Tmean-gw_mean[2])/gw_std[2]
+    
+    return Ar_obs, delPhi_obs, Tmean_obs
+
 def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output):
     """
     calculates annual temperature signal properties using predicted temperatures

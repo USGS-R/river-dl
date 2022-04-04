@@ -312,3 +312,4 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     return Ar_obs, Ar_pred, delPhi_obs, delPhi_pred, Tmean_obs, Tmean_pred
 
 
+

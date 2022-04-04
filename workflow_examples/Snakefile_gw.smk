@@ -70,7 +70,8 @@ rule prep_ann_temp:
                   gw_loss_type=config['gw_loss_type'],
                   trn_offset = config['trn_offset'],
                   tst_val_offset = config['tst_val_offset'],
-				  metric_method = config['metric_method'])
+		  metric_method = config['metric_method'])
+
 
 
 #get the GW loss parameters

@@ -38,7 +38,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     #convert the date to decimal years
     date_decimal = make_decimal_date(Date)
     
-    #remove water temps below 1C or above 45C to avoid complex freeze-thaw dynamics near 0 C and because >45C is likely erroneous  
+    #remove water temps below 1C to avoid complex freeze-thaw dynamics near 0 C
     if isWater:
         temp = [x if x>=1 or np.isnan(x) else 1 for x in temp]
 
@@ -459,9 +459,20 @@ def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, 
     """
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
     :param GW_data: [dataframe] dataframe of annual temperature signal properties by segment
-    :param x_data: [str] observation dataset
+    :param x_data: [dataset] observation dataset
     :param varList: [str] variables_to_log to keep in the final dataset
+    :param dates: array of dates for the dataset
+    :param id_data: array of segment id's
+    :param air_data: array of air temps, unscaled
+    :param temp_data: array of water temps, scaled
+    :param temp_index: [int] Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param temp_mean: [float] mean water temp for unscaling
+    :param temp_sd: [float] std of water temps for unscaling
+    :param gw_mean: [float] list of the mean values of the annual metrics for unscaling
+    :param gw_sd: [float] list of the stds of the annual metrics for unscaling
+    :param num_task: number of y variables
     :param offset: [float] offset for the dataset
+    :param metric_method: [str] annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches) 
     :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
     """
     #make a dataframe with all combinations of segment and date and then join the annual temperature signal properties dataframe to it
@@ -483,15 +494,29 @@ def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, 
     GW_ds = GW_ds[varList]
     GW_Arr = convert_batch_reshape(GW_ds, offset=offset)
     
-    data = np.concatenate([temp_data, GW_Arr, air_data], axis=2)
-    
     if metric_method!='static':
+        data = np.concatenate([temp_data, GW_Arr, air_data], axis=2)
         GW_Arr = calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method)
     
     return GW_Arr
 
 def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, metric_method):
+    """
     #recalculate the observed Ar and delPhi for each batch
+    :param dates: array of dates for the dataset
+    :param id_data: array of segment id's
+    :param data: array of water temperature data, GW metrics, and air temperature data
+    :param temp_data: array of water temps, scaled
+    :param temp_index: [int] Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param temp_mean: [float] mean water temp for unscaling
+    :param temp_sd: [float] std of water temps for unscaling
+    :param gw_mean: [float] list of the mean values of the annual metrics for unscaling
+    :param gw_sd: [float] list of the stds of the annual metrics for unscaling
+    :param num_task: number of y variables
+    :param metric_method: [str] annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches) 
+    :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
+    """
+    
     #identify the batches with some temp data and no missing temp data
     noNA = np.where(np.isfinite(np.mean(temp_data,axis=1)))[0]
     someTemps=np.where(np.sum(np.isfinite(temp_data),axis=1)>=300)[0]
@@ -537,6 +562,18 @@ def calculate_observations_by_batch(GW_Arr,dates, id_data,data, temp_data, temp_
     return GW_Arr
 
 def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std):
+    """
+    function to calculate the annual temp metrics using a batched array of data
+    :param temp_index: [int] Index of temperature column (0 if temp is the primary prediction, 1 if it is the auxiliary).
+    :param dates: array of dates for the dataset
+    :param data: array of water temperature data, GW metrics, and air temperature data
+    :param y_pred: array of water temps, scaled
+    :param temp_mean: [float] mean water temp for unscaling
+    :param temp_sd: [float] std of water temps for unscaling
+    :param gw_mean: [float] list of the mean values of the annual metrics for unscaling
+    :param gw_sd: [float] list of the stds of the annual metrics for unscaling
+    :returns: lists of the annual metrics (Ar, delPhi, Tmean)
+    """
     Aw=[]
     Aa=[]
     Phiw=[]

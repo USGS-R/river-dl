@@ -332,9 +332,9 @@ def combined_metrics(
         if pred_trn:
             pred_data['trn'] = pred_trn
         if pred_val:
-            pred_data['val'] = pred_trn
+            pred_data['val'] = pred_val
         if pred_tst:
-            pred_data['tst'] = pred_trn
+            pred_data['tst'] = pred_tst
 
     if not pred_data:
         raise KeyError("No prediction data was provided")

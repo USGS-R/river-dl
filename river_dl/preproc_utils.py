@@ -698,7 +698,7 @@ def prep_y_data(
     else:
         _, y_std, y_mean = scale(y_trn)
         y_std = y_std/y_std
-        y_mean = y_mean * 
+        y_mean = y_mean * 0 
 
     if y_type == 'obs':
         data = {

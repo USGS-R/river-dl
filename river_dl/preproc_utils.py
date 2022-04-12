@@ -875,7 +875,7 @@ def prep_all_data(
     if catch_prop_file:
         x_data = prep_catch_props(x_data, catch_prop_file, catch_prop_vars, spatial_idx_name)
         #update the list of x_vars
-        x_vars = [i for i in x_data.data_vars]
+        x_vars = list(x_data.data_vars)
     # make sure we don't have any weird or missing input values
     check_if_finite(x_data)
     x_trn, x_val, x_tst = separate_trn_tst(

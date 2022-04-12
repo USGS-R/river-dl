@@ -260,9 +260,7 @@ def prep_catch_props(x_data_ts, catch_prop_file, catch_prop_vars, spatial_idx_na
         df_catch_props = df_catch_props.apply(
             lambda x: x.fillna(x.mean()), axis=0
         )
-    #this filters the catchment properties to only the reaches in the x dataset
-    ds_catch_props = df_catch_props.loc[df_catch_props[spatial_idx_name].isin(x_data_ts[spatial_idx_name].values)].set_index(spatial_idx_name).to_xarray()
-    
+    ds_catch_props = df_catch_props.set_index(spatial_idx_name).to_xarray()
 
     return join_catch_properties(x_data_ts, ds_catch_props)
 

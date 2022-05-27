@@ -244,13 +244,12 @@ def predict_torch(x_data, model, batch_size):
         data.append(torch.from_numpy(x_data[i]).float())
 
     dataloader = torch.utils.data.DataLoader(data, batch_size=batch_size, shuffle=False, pin_memory=True)
-    model.to(device)
     model.eval()
     predicted = []
     for iter, x in enumerate(dataloader):
         trainx = x.to(device)
         with torch.no_grad():
-            output = model(trainx.to(device)).cpu()
+            output = model(trainx).detach().cpu()
         predicted.append(output)
     predicted = torch.cat(predicted, dim=0)
     return predicted

@@ -130,15 +130,16 @@ def predict(
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     if issubclass(type(model), torch.nn.Module):
         if len(x_data.shape) > 3: #Catch for dealing with different GraphWaveNet vs RGCN output, consider changing to bool argument
-            y_pred = predict_torch(x_data, model, batch_size=5)
-            y_pred=y_pred.transpose(1,3)
+            y_pred = predict_torch(x_data.to(device), model, batch_size=5)
+            y_pred=y_pred.transpose(1,3).detach().cpu()
             pred_ids = np.transpose(pred_ids,(0,3,2,1))
             pred_dates=np.transpose(pred_dates,(0,3,2,1))
         else:
-            y_pred = predict_torch(x_data, model, batch_size=num_segs)
+            y_pred = predict_torch(x_data.to(device), model, batch_size=num_segs).detach().cpu()
     elif issubclass(type(model), tf.keras.Model):
         y_pred = model.predict(x_data, batch_size=num_segs)
     else:

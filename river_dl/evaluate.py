@@ -291,6 +291,7 @@ def combined_metrics(
     pred_tst=None,
     val_sites=None,
     test_sites=None,
+    train_sites=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     group=None,
@@ -354,7 +355,8 @@ def combined_metrics(
                                     id_dict=id_dict,
                                     group=group,
                                     val_sites = val_sites,
-                                    test_sites = test_sites)
+                                    test_sites = test_sites,
+                                    train_sites=train_sites)
         df_all.extend([metrics])
 
     df_all = pd.concat(df_all, axis=0)

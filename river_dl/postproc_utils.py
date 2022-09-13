@@ -165,7 +165,7 @@ def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg
     return df
 
 
-def combine_preds(fileList,weights=None,pred_vars=["temp_c"], outFile = "composite.feather"):
+def combine_preds(fileList,weights=None,pred_vars=None, outFile = "composite.feather"):
     """
     combine multiple model outputs into 1 composite file
     :param fileList: [str] list of model prediction files
@@ -178,6 +178,8 @@ each model (range of 0 - 1). If None, the models are weighted equally
     for i in range(len(fileList)):
         thisFile = fileList[i]
         tempDF = pd.read_feather(thisFile)
+        if not pred_vars:
+            pred_vars = [x for x in tempDF.columns[2:]]
         if weights:
             thisWeight = weights[i]
             if type(thisWeight)==pd.DataFrame:
@@ -187,7 +189,7 @@ each model (range of 0 - 1). If None, the models are weighted equally
         else:
             tempDF['modelWeight']=1.0/len(fileList)
         
-        #
+        #make the composite dataframe
         if thisFile==fileList[0]:
             compositeDF = tempDF.iloc[:,:-1]
             for thisVar in pred_vars:

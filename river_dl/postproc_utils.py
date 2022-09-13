@@ -175,12 +175,13 @@ each model (range of 0 - 1). If None, the models are weighted equally
     :param pred_vars: [str] list of predicted variables
     :param outFile: [str] feather file where the composite predictions should be written
     """
-    for thisFile in fileList:
+    for i in range(len(fileList)):
+        thisFile = fileList[i]
         tempDF = pd.read_feather(thisFile)
         if weights:
-            thisWeight = weights[fileList.index(thisFile)]
+            thisWeight = weights[i]
             if type(thisWeight)==pd.DataFrame:
-                tempDF=tempDF.merge(weightDF)
+                tempDF=tempDF.merge(thisWeight)
             else:
                 tempDF['modelWeight']=float(thisWeight)
         else:

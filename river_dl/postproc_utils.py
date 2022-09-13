@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from matplotlib import pyplot as plt
+from copy import deepcopy
 
 
 def get_var_names(variable):
@@ -162,3 +163,44 @@ def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg
     df_ids = pd.DataFrame(ids, columns=[spatial_idx_name])
     df = pd.concat([df_dates, df_ids, df_preds], axis=1)
     return df
+
+
+def combine_preds(fileList,weights=None,pred_vars=["temp_c"], outFile = "composite.feather"):
+    """
+    combine multiple model outputs into 1 composite file
+    :param fileList: [str] list of model prediction files
+    :param weights: [list] list model weights corresponding to the list of model prediction files. This could be a list of 
+dataframes with spatial_idx_name and / or time_idx_name columns and a modelWeight column or it could be a single value for 
+each model (range of 0 - 1). If None, the models are weighted equally
+    :param pred_vars: [str] list of predicted variables
+    :param outFile: [str] feather file where the composite predictions should be written
+    """
+    for thisFile in fileList:
+        tempDF = pd.read_feather(thisFile)
+        if weights:
+            thisWeight = weights[fileList.index(thisFile)]
+            if type(thisWeight)==pd.DataFrame:
+                tempDF=tempDF.merge(weightDF)
+            else:
+                tempDF['modelWeight']=float(thisWeight)
+        else:
+            tempDF['modelWeight']=1.0/len(fileList)
+        
+        #
+        if thisFile==fileList[0]:
+            compositeDF = tempDF.iloc[:,:-1]
+            for thisVar in pred_vars:
+                compositeDF[thisVar]=compositeDF[thisVar].values*tempDF.modelWeight.values
+            #save the weights for this model to ensure they are 1 across all models    
+            weightCheckDF = deepcopy(tempDF.iloc[:,[0,1,-1]])
+        else:
+            for thisVar in pred_vars:
+                compositeDF[thisVar]=compositeDF[thisVar].values+tempDF[thisVar]*tempDF.modelWeight.values
+            weightCheckDF['modelWeight']=weightCheckDF['modelWeight']+tempDF['modelWeight']
+            
+            
+    #check that all cummulative weights are less than 1.01
+    np.testing.assert_allclose(weightCheckDF.modelWeight, 1, rtol=1e-02, atol=1e-02, equal_nan=True, err_msg='Model weights did not sum to 1', verbose=True)
+    
+    #save the output
+    compositeDF.to_feather(outFile)

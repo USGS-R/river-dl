@@ -204,6 +204,10 @@ each model (range of 0 - 1). If None, the models are weighted equally
             
     #check that all cummulative weights are less than 1.01
     np.testing.assert_allclose(weightCheckDF.modelWeight, 1, rtol=1e-02, atol=1e-02, equal_nan=True, err_msg='Model weights did not sum to 1', verbose=True)
-    
+
+    #drop predicted variables that weren't merged
+    colsToDrop = [x for x in compositeDF.columns[2:] if x not in pred_vars]
+    if len(colsToDrop)>0:
+        compositeDF.drop(columns=colsToDrop,inplace=True)    
     #save the output
     compositeDF.to_feather(outFile)

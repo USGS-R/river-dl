@@ -279,7 +279,7 @@ def prep_annual_signal_data(
     out_file=None,
     air_temp_col = 'seg_tave_air',
     water_temp_pbm_col = 'seg_tave_water',
-    water_temp_obs_col = 'temp_c',
+    water_temp_obs_col = 'mean_temp_c',
     segs = None,
     reach_file = None,
     extraResSegments = None,

@@ -279,7 +279,7 @@ def prep_annual_signal_data(
     out_file=None,
     air_temp_col = 'seg_tave_air',
     water_temp_pbm_col = 'seg_tave_water',
-    water_temp_obs_col = 'temp_c',
+    water_temp_obs_col = 'mean_temp_c',
     segs = None,
     reach_file = None,
     extraResSegments = None,
@@ -600,12 +600,13 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
     
     return Ar_obs, delPhi_obs, Tmean_obs
 
-def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output):
+def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output, temp_var="mean_temp_c"):
     """
     calculates annual temperature signal properties using predicted temperatures
     :param GW_data: file of prepped GW only data
     :param trn_data, tst_data, val_data: [str] files with predicted temperatures from the training, testing, and validation partitions (feather)
     :param trn_output, tst_output, val_output: [str] output files for the calculated metrics for the training, testing, and validation partitions(csv)
+    :param temp_var: [str] name of the temperature variable
     """
     gw_obs = np.load(GW_data)
     
@@ -613,9 +614,9 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
 
-    gw_trn = calc_amp_phi(trn_preds,"temp_c","pred")
-    gw_tst = calc_amp_phi(tst_preds,"temp_c","pred")
-    gw_val = calc_amp_phi(val_preds,"temp_c","pred")
+    gw_trn = calc_amp_phi(trn_preds,temp_var,"pred")
+    gw_tst = calc_amp_phi(tst_preds,temp_var,"pred")
+    gw_val = calc_amp_phi(val_preds,temp_var,"pred")
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)

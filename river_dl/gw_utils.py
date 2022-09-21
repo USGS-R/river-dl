@@ -600,7 +600,7 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
     
     return Ar_obs, delPhi_obs, Tmean_obs
 
-def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output, temp_var):
+def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output, temp_var="mean_temp_c"):
     """
     calculates annual temperature signal properties using predicted temperatures
     :param GW_data: file of prepped GW only data

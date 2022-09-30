@@ -57,7 +57,6 @@ def train_model(
         np.random.seed(seed)
         random.seed(seed)
 
-
     # If keep portion is specified, mask the sequence outside that portion to
     # force the loss function focus on only the keep portion.
     if keep_portion is not None:

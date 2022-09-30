@@ -98,25 +98,12 @@ def train_model(
 
     # train the model
     start_time = datetime.datetime.now()
+    args = x_trn, y_trn, epochs, batch_size, callbacks, validation_data  # x=x_trn, y=y_trn
     if use_cpu:
         with tf.device('/CPU:0'):
-            model.fit(
-                x=x_trn,
-                y=y_trn,
-                epochs=epochs,
-                batch_size=batch_size,
-                callbacks=callbacks,
-                validation_data=validation_data
-            )
+            model.fit(*args)
     else:
-       model.fit(
-           x=x_trn,
-           y=y_trn,
-           epochs=epochs,
-           batch_size=batch_size,
-           callbacks=callbacks,
-           validation_data=validation_data
-    )
+        model.fit(*args)
 
     # write out time
     end_time = datetime.datetime.now()

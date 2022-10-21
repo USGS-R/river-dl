@@ -61,7 +61,6 @@ rule prep_io_data:
                   y_vars_pretrain=config['y_vars_pretrain'],
                   y_vars_finetune=config['y_vars_finetune'],
                   catch_prop_file=None,
-                  exclude_file=None,
                   train_start_date=config['train_start_date'],
                   train_end_date=config['train_end_date'],
                   val_start_date=config['val_start_date'],

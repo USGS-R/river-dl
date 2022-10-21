@@ -165,7 +165,7 @@ def prepped_array_to_df(data_array, dates, ids, col_names, spatial_idx_name='seg
     return df
 
 
-def combine_preds(fileList,weights=None,pred_vars=None, outFile = "composite.feather"):
+def combine_preds(fileList,weights=None,pred_vars=None, outFile = "composite.feather", spatial_idx_name="seg_id_nat", time_idx_name="date"):
     """
     combine multiple model outputs into 1 composite file
     :param fileList: [str] list of model prediction files
@@ -175,11 +175,13 @@ each model (range of 0 - 1). If None, the models are weighted equally
     :param pred_vars: [str] list of predicted variables
     :param outFile: [str] feather file where the composite predictions should be written
     """
+    idx_cols = [spatial_idx_name, time_idx_name]
+
     for i in range(len(fileList)):
         thisFile = fileList[i]
         tempDF = pd.read_feather(thisFile)
         if not pred_vars:
-            pred_vars = [x for x in tempDF.columns[2:]]
+            pred_vars = [x for x in tempDF.columns if x not in idx_cols]
         if weights:
             thisWeight = weights[i]
             if type(thisWeight)==pd.DataFrame:
@@ -206,7 +208,7 @@ each model (range of 0 - 1). If None, the models are weighted equally
     np.testing.assert_allclose(weightCheckDF.modelWeight, 1, rtol=1e-02, atol=1e-02, equal_nan=True, err_msg='Model weights did not sum to 1', verbose=True)
 
     #drop predicted variables that weren't merged
-    colsToDrop = [x for x in compositeDF.columns[2:] if x not in pred_vars]
+    colsToDrop = [x for x in compositeDF.columns if x not in pred_vars and x not in idx_cols]
     if len(colsToDrop)>0:
         compositeDF.drop(columns=colsToDrop,inplace=True)    
     #save the output

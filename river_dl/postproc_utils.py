@@ -197,7 +197,7 @@ each model (range of 0 - 1). If None, the models are weighted equally
             for thisVar in pred_vars:
                 compositeDF[thisVar]=compositeDF[thisVar].values*tempDF.modelWeight.values
             #save the weights for this model to ensure they are 1 across all models    
-            weightCheckDF = deepcopy(tempDF.iloc[:,[0,1,-1]])
+            weightCheckDF = deepcopy(tempDF[[spatial_idx_name, time_idx_name,'modelWeight']])
         else:
             for thisVar in pred_vars:
                 compositeDF[thisVar]=compositeDF[thisVar].values+tempDF[thisVar]*tempDF.modelWeight.values

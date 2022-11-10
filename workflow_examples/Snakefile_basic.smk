@@ -49,7 +49,6 @@ rule prep_io_data:
                   spatial_idx_name='segs_test',
                   time_idx_name='times_test',
                   catch_prop_file=None,
-                  exclude_file=None,
                   train_start_date=config['train_start_date'],
                   train_end_date=config['train_end_date'],
                   val_start_date=config['val_start_date'],

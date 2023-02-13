@@ -297,7 +297,9 @@ def GW_loss_prep(temp_index, data, y_pred, temp_mean, temp_sd, gw_mean, gw_std, 
     y_pred_temp = y_pred_temp * temp_sd + temp_mean
     y_true_temp = y_true_temp * temp_sd + temp_mean
 
+    ####################
     #set temps < 1 to 1
+    # Johnson et al 2021 and Hare et al 2021 set temps < 1 to NA, but fft can't work with missing values. based on a comparison of approaches to making fft friendly datasets (done by JRB in LossFunction_observedData_NegativeTemps.py), this is the best fft friendly analogue to dropping temps < 1
     y_pred_temp[y_pred_temp<1]=1
     y_true_temp[y_true_temp<1]=1
     

@@ -65,7 +65,7 @@ def rmse_logged(y_true, y_pred):
 
 def nse_logged(y_true, y_pred):
     """
-    compute the rmse of the logged data
+    compute the nse of the logged data
     :param y_true: [array-like] observed y_dataset values
     :param y_pred: [array-like] predicted y_dataset values
     :return: [float] the nse of the logged data
@@ -77,16 +77,32 @@ def nse_logged(y_true, y_pred):
 
 def kge_eval(y_true, y_pred):
     y_true, y_pred = filter_nan_preds(y_true, y_pred)
-    r, _ = pearsonr(y_pred, y_true)
-    mean_true = np.mean(y_true)
-    mean_pred = np.mean(y_pred)
-    std_true = np.std(y_true)
-    std_pred = np.std(y_pred)
-    r_component = np.square(r - 1)
-    std_component = np.square((std_pred / std_true) - 1)
-    bias_component = np.square((mean_pred / mean_true) - 1)
-    return 1 - np.sqrt(r_component + std_component + bias_component)
+    #Need to have > 1 observation to compute correlation.
+    #This could be < 2 due to percentile filtering
+    if len(y_true) > 1:
+        r, _ = pearsonr(y_pred, y_true)
+        mean_true = np.mean(y_true)
+        mean_pred = np.mean(y_pred)
+        std_true = np.std(y_true)
+        std_pred = np.std(y_pred)
+        r_component = np.square(r - 1)
+        std_component = np.square((std_pred / std_true) - 1)
+        bias_component = np.square((mean_pred / mean_true) - 1)
+        result = 1 - np.sqrt(r_component + std_component + bias_component)
+    else:
+        result = np.nan
+    return result
 
+def kge_logged(y_true, y_pred):
+    """
+    compute the kge of the logged data
+    :param y_true: [array-like] observed y_dataset values
+    :param y_pred: [array-like] predicted y_dataset values
+    :return: [float] the nse of the logged data
+    """
+    y_true, y_pred = filter_nan_preds(y_true, y_pred)
+    y_true, y_pred = filter_negative_preds(y_true, y_pred)
+    return kge_eval(np.log(y_true), np.log(y_pred))
 
 def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
     """
@@ -136,7 +152,7 @@ def calc_metrics(df):
     pred = df["pred"].values
     obs, pred = filter_nan_preds(obs, pred)
 
-    if len(obs) > 10:
+    if len(obs) > 20:
         metrics = {
             "rmse": rmse_eval(obs, pred),
             "nse": nse_eval(obs, pred),
@@ -162,10 +178,9 @@ def calc_metrics(df):
             ),
             "nse_logged": nse_logged(obs, pred),
             "kge": kge_eval(obs, pred),
-            "rmse_logged": rmse_logged(obs, pred),
-            "nse_top10": percentile_metric(obs, pred, nse_eval, 90, less_than=False),
-            "nse_bot10": percentile_metric(obs, pred, nse_eval, 10, less_than=True),
-            "nse_logged": nse_logged(obs, pred),
+            "kge_logged": kge_logged(obs, pred),
+            "kge_top10": percentile_metric(obs, pred, kge_eval, 90, less_than=False),
+            "kge_bot10": percentile_metric(obs, pred, kge_eval, 10, less_than=True)
         }
 
     else:
@@ -182,10 +197,9 @@ def calc_metrics(df):
             "nse_bot10": np.nan,
             "nse_logged": np.nan,
             "kge": np.nan,
-            "rmse_logged": np.nan,
-            "nse_top10": np.nan,
-            "nse_bot10": np.nan,
-            "nse_logged": np.nan,
+            "kge_logged": np.nan,
+            "kge_top10": np.nan,
+            "kge_bot10": np.nan
         }
     return pd.Series(metrics)
 

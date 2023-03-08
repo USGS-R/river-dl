@@ -633,7 +633,7 @@ def prep_y_data(
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
     :param val_sites: [list of site_ids] sites to retain for validation. These
-    sites will be witheld from training
+    sites will be witheld from training and testing
     :param test_sites: [list of site_ids] sites to retain for testing. These
     sites will be witheld from training and validation
     :param strict_spatial_partition: [bool] when True, the test set does not 
@@ -678,6 +678,7 @@ def prep_y_data(
     # replace validation sites' (and test sites') data with np.nan
     if val_sites:
         y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+        y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(val_sites))
         if strict_spatial_partition:
             y_val = y_val.where(y_val[spatial_idx_name].isin(val_sites))
 

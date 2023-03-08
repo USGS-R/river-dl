@@ -248,19 +248,31 @@ def partition_metrics(
     for data_var, data in var_data.items():
         data.reset_index(inplace=True)
         # mask out validation and test sites from trn partition
-        if val_sites and partition == 'trn':
-            data = data[~data[spatial_idx_name].isin(val_sites)]
-        if test_sites and partition == 'trn':
-            data = data[~data[spatial_idx_name].isin(test_sites)]
-        # mask out test sites from val partition
-        if test_sites and partition=='val':
-            data = data[~data[spatial_idx_name].isin(test_sites)]
-        if train_sites and partition=='val':
-            data = data[~data[spatial_idx_name].isin(train_sites)]
-        if train_sites and partition=='tst':
-            data = data[~data[spatial_idx_name].isin(train_sites)]
-        if val_sites and partition=='tst':
-            data = data[~data[spatial_idx_name].isin(val_sites)]
+        if train_sites and partition == 'trn':
+            # simply use the train sites when specified.
+            data = data[data[spatial_idx_name].isin(train_sites)]
+        else:
+            #check if validation or testing sites are specified
+            if val_sites and partition == 'trn':
+                data = data[~data[spatial_idx_name].isin(val_sites)]
+            if test_sites and partition == 'trn':
+                data = data[~data[spatial_idx_name].isin(test_sites)]
+        # mask out training and test sites from val partition
+        if val_sites and partition == 'val':
+            data = data[data[spatial_idx_name].isin(val_sites)]
+        else:
+            if test_sites and partition=='val':
+                data = data[~data[spatial_idx_name].isin(test_sites)]
+            if train_sites and partition=='val':
+                data = data[~data[spatial_idx_name].isin(train_sites)]
+        # mask out training and validation sites from val partition
+        if test_sites and partition == 'tst':
+            data = data[data[spatial_idx_name].isin(tst_sites)]
+        else:
+            if train_sites and partition=='tst':
+                data = data[~data[spatial_idx_name].isin(train_sites)]
+            if val_sites and partition=='tst':
+                data = data[~data[spatial_idx_name].isin(val_sites)]
 
         if not group:
             metrics = calc_metrics(data)

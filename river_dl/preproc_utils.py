@@ -772,6 +772,8 @@ def prep_all_data(
     log_y_vars=False,
     out_file=None,
     segs=None,
+    earliest_time=None,
+    latest_time=None,
     normalize_y=True,
     trn_offset = 1.0,
     tst_val_offset = 1.0
@@ -782,7 +784,9 @@ def prep_all_data(
     scaled to have a std of 1 and a mean of zero
     :param x_data_file: [str] path to Zarr file with x data. Data should have
     a spatial coordinate and a time coordinate that are specified in the
-    `spatial_idx_name` and `time_idx_name` arguments
+    `spatial_idx_name` and `time_idx_name` arguments. Assumes that all spaces will be used,
+    unless segs is specified. Assumes all times will be used,
+    unless an earliest_time or latest_time is specified.
     :param y_data_file: [str] observations Zarr file. Data should have a spatial
     coordinate and a time coordinate that are specified in the
     spatial_idx_name` and `time_idx_name` arguments
@@ -827,6 +831,8 @@ def prep_all_data(
     :param log_y_vars: [bool] whether or not to take the log of discharge in
     training
     :param segs: [list-like] which segments to prepare the data for
+    :param earliest_time: [str] when specified, filters the x_data to remove earlier times
+    :param latest_time: [str] when specified, filters the x_data to remove later times
     :param normalize_y: [bool] whether or not to normalize the y_dataset values
     :param out_file: [str] file to where the values will be written
     :param trn_offset: [str] value for the training offset
@@ -867,6 +873,14 @@ def prep_all_data(
 
     if segs:
         x_data = x_data.sel({spatial_idx_name: segs})
+    
+    if earliest_time:
+        mask_etime = (x_data[time_idx_name] >= np.datetime64(earliest_time))
+        x_data = x_data.where(mask_etime, drop=True)
+    
+    if latest_time:
+        mask_ltime = (x_data[time_idx_name] <= np.datetime64(latest_time))
+        x_data = x_data.where(mask_ltime, drop=True)
 
     x_data = x_data[x_vars]
 
@@ -874,8 +888,10 @@ def prep_all_data(
         x_data = prep_catch_props(x_data, catch_prop_file, catch_prop_vars, spatial_idx_name)
         #update the list of x_vars
         x_vars = list(x_data.data_vars)
+    
     # make sure we don't have any weird or missing input values
     check_if_finite(x_data)
+    
     x_trn, x_val, x_tst = separate_trn_tst(
         x_data,
         time_idx_name,
@@ -886,7 +902,7 @@ def prep_all_data(
         test_start_date,
         test_end_date,
     )
-
+    
     x_trn_scl, x_std, x_mean = scale(x_trn)
 
     x_scl, _, _ = scale(x_data,std=x_std,mean=x_mean)

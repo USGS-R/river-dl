@@ -596,6 +596,7 @@ def prep_y_data(
     test_end_date=None,
     val_sites=None,
     test_sites=None,
+    strict_spatial_partition=False,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
@@ -635,6 +636,9 @@ def prep_y_data(
     sites will be witheld from training
     :param test_sites: [list of site_ids] sites to retain for testing. These
     sites will be witheld from training and validation
+    :param strict_spatial_partition: [bool] when True, the test set does not 
+    contain any reaches that are used in training or validation, and the
+    validation set does not contain any reaches that are used in training or testing.
     :param seq_len: [int] length of sequences (e.g., 365)
     :param log_vars: [list-like] which variables_to_log (if any) to take log of
     :param exclude_file: [str] path to exclude file
@@ -674,10 +678,14 @@ def prep_y_data(
     # replace validation sites' (and test sites') data with np.nan
     if val_sites:
         y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+        if strict_spatial_partition:
+            y_val = y_val.where(y_val[spatial_idx_name].isin(val_sites))
 
     if test_sites:
         y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
         y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
+        if strict_spatial_partition:
+            y_tst = y_tst.where(y_tst[spatial_idx_name].isin(test_sites))
 
 
     if log_vars:
@@ -757,6 +765,7 @@ def prep_all_data(
     test_end_date=None,
     val_sites=None,
     test_sites=None,
+    strict_spatial_partition=False,
     y_vars_finetune=None,
     y_vars_pretrain=None,
     spatial_idx_name="seg_id_nat",
@@ -806,6 +815,9 @@ def prep_all_data(
     sites will be witheld from training
     :param test_sites: [list of site_ids] sites to retain for testing. These
     sites will be witheld from training and validation
+    :param strict_spatial_partition: [bool] when True, the test set does not 
+    contain any reaches that are used in training or validation, and the
+    validation set does not contain any reaches that are used in training or testing.
     :param spatial_idx_name: [str] name of column that is used for spatial
     index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -1017,6 +1029,7 @@ def prep_all_data(
             test_end_date=test_end_date,
             val_sites=val_sites,
             test_sites=test_sites,
+            strict_spatial_partition=strict_spatial_partition,
             spatial_idx_name=spatial_idx_name,
             time_idx_name=time_idx_name,
             seq_len=seq_len,

@@ -238,7 +238,7 @@ def partition_metrics(
     :param outfile: [str] file where the metrics should be written
     :param val_sites: [list] sites to exclude from training and test metrics
     :param test_sites: [list] sites to exclude from validation and training metrics
-    :param train_sites: [list] sites to exclude from test metrics
+    :param train_sites: [list] sites to exclude from validation and test metrics
     :return: [pd dataframe] the condensed metrics
     """
     var_data = fmt_preds_obs(preds, obs_file, spatial_idx_name,
@@ -255,6 +255,8 @@ def partition_metrics(
         # mask out test sites from val partition
         if test_sites and partition=='val':
             data = data[~data[spatial_idx_name].isin(test_sites)]
+        if train_sites and partition=='val':
+            data = data[~data[spatial_idx_name].isin(train_sites)]
         if train_sites and partition=='tst':
             data = data[~data[spatial_idx_name].isin(train_sites)]
         if val_sites and partition=='tst':

@@ -182,7 +182,6 @@ def calc_metrics(df):
             "kge_top10": percentile_metric(obs, pred, kge_eval, 90, less_than=False),
             "kge_bot10": percentile_metric(obs, pred, kge_eval, 10, less_than=True)
         }
-
     else:
         metrics = {
             "rmse": np.nan,
@@ -246,33 +245,71 @@ def partition_metrics(
     var_metrics_list = []
 
     for data_var, data in var_data.items():
+        #multiindex df
+        data_multiind = data.copy(deep=True)
         data.reset_index(inplace=True)
         # mask out validation and test sites from trn partition
         if train_sites and partition == 'trn':
             # simply use the train sites when specified.
             data = data[data[spatial_idx_name].isin(train_sites)]
+            data_multiind = data_multiind.loc[data_multiind
+                                              .index
+                                              .get_level_values(level=spatial_idx_name)
+                                              .isin(train_sites)]
         else:
             #check if validation or testing sites are specified
             if val_sites and partition == 'trn':
                 data = data[~data[spatial_idx_name].isin(val_sites)]
+                data_multiind = data_multiind.loc[~data_multiind
+                                                  .index
+                                                  .get_level_values(level=spatial_idx_name)
+                                                  .isin(val_sites)]
             if test_sites and partition == 'trn':
                 data = data[~data[spatial_idx_name].isin(test_sites)]
+                data_multiind = data_multiind.loc[~data_multiind
+                                                  .index
+                                                  .get_level_values(level=spatial_idx_name)
+                                                  .isin(test_sites)]
         # mask out training and test sites from val partition
         if val_sites and partition == 'val':
             data = data[data[spatial_idx_name].isin(val_sites)]
+            data_multiind = data_multiind.loc[data_multiind
+                                              .index
+                                              .get_level_values(level=spatial_idx_name)
+                                              .isin(val_sites)]
         else:
             if test_sites and partition=='val':
                 data = data[~data[spatial_idx_name].isin(test_sites)]
+                data_multiind = data_multiind.loc[~data_multiind
+                                                  .index
+                                                  .get_level_values(level=spatial_idx_name)
+                                                  .isin(test_sites)]
             if train_sites and partition=='val':
                 data = data[~data[spatial_idx_name].isin(train_sites)]
+                data_multiind = data_multiind.loc[~data_multiind
+                                                  .index
+                                                  .get_level_values(level=spatial_idx_name)
+                                                  .isin(train_sites)]
         # mask out training and validation sites from val partition
         if test_sites and partition == 'tst':
-            data = data[data[spatial_idx_name].isin(tst_sites)]
+            data = data[data[spatial_idx_name].isin(test_sites)]
+            data_multiind = data_multiind.loc[data_multiind
+                                              .index
+                                              .get_level_values(level=spatial_idx_name)
+                                              .isin(test_sites)]
         else:
             if train_sites and partition=='tst':
                 data = data[~data[spatial_idx_name].isin(train_sites)]
+                data_multiind = data_multiind.loc[~data_multiind
+                                                  .index
+                                                  .get_level_values(level=spatial_idx_name)
+                                                  .isin(train_sites)]
             if val_sites and partition=='tst':
                 data = data[~data[spatial_idx_name].isin(val_sites)]
+                data_multiind = data_multiind.loc[~data_multiind
+                                                  .index
+                                                  .get_level_values(level=spatial_idx_name)
+                                                  .isin(val_sites)]
 
         if not group:
             metrics = calc_metrics(data)
@@ -296,6 +333,54 @@ def partition_metrics(
             .apply(calc_metrics)
             .reset_index()
             )
+        elif group == "year":
+            metrics = (
+            data.groupby(
+            data[time_idx_name].dt.year)
+            .apply(calc_metrics)
+            .reset_index()
+            )
+        elif group == ["seg_id_nat", "year"]:
+            metrics = (
+            data.groupby(
+            [data[time_idx_name].dt.year,
+            spatial_idx_name])
+            .apply(calc_metrics)
+            .reset_index()
+            )
+        elif group == "biweekly":
+            #filter the data to remove nans before computing the sum
+            #so that the same days are being summed in the month.
+            data_calc = (data_multiind.dropna()
+            .groupby(
+            [pd.Grouper(level=time_idx_name, freq='2W'),
+             pd.Grouper(level=spatial_idx_name)])
+            .sum()
+            )
+            metrics = calc_metrics(data_calc)
+            metrics = pd.DataFrame(metrics).T
+        elif group == "monthly":
+            #filter the data to remove nans before computing the sum
+            #so that the same days are being summed in the month.
+            data_calc = (data_multiind.dropna()
+            .groupby(
+            [pd.Grouper(level=time_idx_name, freq='M'),
+             pd.Grouper(level=spatial_idx_name)])
+            .sum()
+            )
+            metrics = calc_metrics(data_calc)
+            metrics = pd.DataFrame(metrics).T
+        elif group == "yearly":
+            #filter the data to remove nans before computing the sum
+            #so that the same days are being summed in the year.
+            data_calc = (data_multiind.dropna()
+            .groupby(
+            [pd.Grouper(level=time_idx_name, freq='Y'),
+             pd.Grouper(level=spatial_idx_name)])
+            .sum()
+            )
+            metrics = calc_metrics(data_calc)
+            metrics = pd.DataFrame(metrics).T
         else:
             raise ValueError("group value not valid")
 
@@ -384,7 +469,7 @@ def combined_metrics(
                                     group=group,
                                     val_sites = val_sites,
                                     test_sites = test_sites,
-                                    train_sites=train_sites)
+                                    train_sites = train_sites)
         df_all.extend([metrics])
 
     df_all = pd.concat(df_all, axis=0)

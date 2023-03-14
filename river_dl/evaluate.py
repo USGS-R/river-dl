@@ -180,7 +180,8 @@ def calc_metrics(df):
             "kge": kge_eval(obs, pred),
             "kge_logged": kge_logged(obs, pred),
             "kge_top10": percentile_metric(obs, pred, kge_eval, 90, less_than=False),
-            "kge_bot10": percentile_metric(obs, pred, kge_eval, 10, less_than=True)
+            "kge_bot10": percentile_metric(obs, pred, kge_eval, 10, less_than=True),
+            "n_obs": len(obs)
         }
     else:
         metrics = {
@@ -198,7 +199,8 @@ def calc_metrics(df):
             "kge": np.nan,
             "kge_logged": np.nan,
             "kge_top10": np.nan,
-            "kge_bot10": np.nan
+            "kge_bot10": np.nan,
+            "n_obs": len(obs)
         }
     return pd.Series(metrics)
 

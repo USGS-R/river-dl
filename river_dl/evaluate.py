@@ -359,6 +359,21 @@ def partition_metrics(
             )
             metrics = calc_metrics(data_calc)
             metrics = pd.DataFrame(metrics).T
+        elif group == ["seg_id_nat", "biweekly"]:
+            #filter the data to remove nans before computing the sum
+            #so that the same days are being summed in the year.
+            data_calc = (data_multiind.dropna()
+            .groupby(
+            [pd.Grouper(level=time_idx_name, freq='2W'),
+             pd.Grouper(level=spatial_idx_name)])
+            .sum()
+            )
+            data_calc = data_calc.reset_index()
+            metrics = (data_calc
+            .groupby(spatial_idx_name)
+            .apply(calc_metrics)
+            .reset_index()
+            )
         elif group == "monthly":
             #filter the data to remove nans before computing the sum
             #so that the same days are being summed in the month.
@@ -370,6 +385,21 @@ def partition_metrics(
             )
             metrics = calc_metrics(data_calc)
             metrics = pd.DataFrame(metrics).T
+        elif group == ["seg_id_nat", "monthly"]:
+            #filter the data to remove nans before computing the sum
+            #so that the same days are being summed in the year.
+            data_calc = (data_multiind.dropna()
+            .groupby(
+            [pd.Grouper(level=time_idx_name, freq='M'),
+             pd.Grouper(level=spatial_idx_name)])
+            .sum()
+            )
+            data_calc = data_calc.reset_index()
+            metrics = (data_calc
+            .groupby(spatial_idx_name)
+            .apply(calc_metrics)
+            .reset_index()
+            )
         elif group == "yearly":
             #filter the data to remove nans before computing the sum
             #so that the same days are being summed in the year.
@@ -381,6 +411,21 @@ def partition_metrics(
             )
             metrics = calc_metrics(data_calc)
             metrics = pd.DataFrame(metrics).T
+        elif group == ["seg_id_nat", "yearly"]:
+            #filter the data to remove nans before computing the sum
+            #so that the same days are being summed in the year.
+            data_calc = (data_multiind.dropna()
+            .groupby(
+            [pd.Grouper(level=time_idx_name, freq='Y'),
+             pd.Grouper(level=spatial_idx_name)])
+            .sum()
+            )
+            data_calc = data_calc.reset_index()
+            metrics = (data_calc
+            .groupby(spatial_idx_name)
+            .apply(calc_metrics)
+            .reset_index()
+            )
         else:
             raise ValueError("group value not valid")
 
@@ -434,7 +479,17 @@ def combined_metrics(
     :param group: [str or list] which group the metrics should be computed for.
     Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
     (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
-    and month), and None (everything is left together)
+    and month), 'year' (year-wise metrics), ['seg_id_nat', 'year'] 
+    (metrics broken out by segment and year), 'biweekly' (metrics for 
+    biweekly timeseries, aggregated by summing data in the original timestep)
+    'monthly' (metrics for monthly timeseries, aggregated by summing data 
+    in the original timestep), 'yearly' (metrics for yearly timeseries, 
+    aggregated by summing data in the original timestep), 
+    ["seg_id_nat", "biweekly"] (metrics for biweekly timeseries broken out 
+    by segment), ["seg_id_nat", "monthly"] (metrics for monthly timeseries broken out 
+    by segment), ["seg_id_nat", "yearly"] (metrics for yearly timeseries 
+    broken out by segment), and None (metrics in the original timestep computed 
+    across all space)
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information

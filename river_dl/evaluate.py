@@ -211,7 +211,10 @@ def partition_metrics(
         partition,
         spatial_idx_name="seg_id_nat",
         time_idx_name="date",
-        group=None,
+        group_spatially=False,
+        group_temporally=False,
+        sum_aggregation=False,
+        site_based=False,
         id_dict=None,
         outfile=None,
         val_sites=None,
@@ -229,10 +232,26 @@ def partition_metrics(
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
-    :param group: [str or list] which group the metrics should be computed for.
-    Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
-    (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
-    and month), and None (everything is left together)
+    :param group_spatially [bool] when True, compute segment-wise metrics.
+    :param group_temporally [False or str] when False, computes metrics for 
+    the native timestep of the data. When a str, the str is passed to pd.Grouper
+    freq to group the data within the specified timestep 
+    (e.g., 'W', 'M', 'Y' for week, month, and year)
+    :param sum_aggregation [bool] Only applies when group_temporally is a string.
+    when sum_aggregation is True, metrics are computed by first summing data 
+    from the native timestep to the group_temporally timestep. Only native timesteps
+    with observations are summed. When False, metrics are computed for the 
+    native timestep of the data within the group_temporally groups (e.g., 
+    for daily data and group_temporally = 'Y', all days with observations
+    in the calendar year are used to compute a metric for that year). Note that
+    for month, 'M', this would normally have groups by year-month. We have forced
+    the groups to the 12 calendar months instead.
+    :param site_based [bool] Only applies when group_spatially is False,
+    group_temporally is a string, and sum_aggregation is True. When
+    site_based is True, the sum is computed for each site to get a 
+    group_temporally timeseries for each site. When False, the
+    sum is computed over all sites to get a group_temporally timeseries 
+    using data from all reaches in each day.
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information
@@ -247,189 +266,146 @@ def partition_metrics(
     var_metrics_list = []
 
     for data_var, data in var_data.items():
-        #multiindex df
-        data_multiind = data.copy(deep=True)
-        data.reset_index(inplace=True)
         # mask out validation and test sites from trn partition
         if train_sites and partition == 'trn':
             # simply use the train sites when specified.
-            data = data[data[spatial_idx_name].isin(train_sites)]
-            data_multiind = data_multiind.loc[data_multiind
-                                              .index
-                                              .get_level_values(level=spatial_idx_name)
-                                              .isin(train_sites)]
+            data = data.loc[data.index
+                            .get_level_values(level=spatial_idx_name)
+                            .isin(train_sites)]
         else:
             #check if validation or testing sites are specified
             if val_sites and partition == 'trn':
-                data = data[~data[spatial_idx_name].isin(val_sites)]
-                data_multiind = data_multiind.loc[~data_multiind
-                                                  .index
-                                                  .get_level_values(level=spatial_idx_name)
-                                                  .isin(val_sites)]
+                data = data.loc[~data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(val_sites)]
             if test_sites and partition == 'trn':
-                data = data[~data[spatial_idx_name].isin(test_sites)]
-                data_multiind = data_multiind.loc[~data_multiind
-                                                  .index
-                                                  .get_level_values(level=spatial_idx_name)
-                                                  .isin(test_sites)]
+                data = data.loc[~data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(test_sites)]
         # mask out training and test sites from val partition
         if val_sites and partition == 'val':
-            data = data[data[spatial_idx_name].isin(val_sites)]
-            data_multiind = data_multiind.loc[data_multiind
-                                              .index
-                                              .get_level_values(level=spatial_idx_name)
-                                              .isin(val_sites)]
+            data = data.loc[data.index
+                            .get_level_values(level=spatial_idx_name)
+                            .isin(val_sites)]
         else:
             if test_sites and partition=='val':
-                data = data[~data[spatial_idx_name].isin(test_sites)]
-                data_multiind = data_multiind.loc[~data_multiind
-                                                  .index
-                                                  .get_level_values(level=spatial_idx_name)
-                                                  .isin(test_sites)]
+                data = data.loc[~data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(test_sites)]
             if train_sites and partition=='val':
-                data = data[~data[spatial_idx_name].isin(train_sites)]
-                data_multiind = data_multiind.loc[~data_multiind
-                                                  .index
-                                                  .get_level_values(level=spatial_idx_name)
-                                                  .isin(train_sites)]
+                data = data.loc[~data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(train_sites)]
         # mask out training and validation sites from val partition
         if test_sites and partition == 'tst':
-            data = data[data[spatial_idx_name].isin(test_sites)]
-            data_multiind = data_multiind.loc[data_multiind
-                                              .index
-                                              .get_level_values(level=spatial_idx_name)
-                                              .isin(test_sites)]
+            data = data.loc[data.index
+                            .get_level_values(level=spatial_idx_name)
+                            .isin(test_sites)]
         else:
             if train_sites and partition=='tst':
-                data = data[~data[spatial_idx_name].isin(train_sites)]
-                data_multiind = data_multiind.loc[~data_multiind
-                                                  .index
-                                                  .get_level_values(level=spatial_idx_name)
-                                                  .isin(train_sites)]
+                data = data.loc[~data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(train_sites)]
             if val_sites and partition=='tst':
-                data = data[~data[spatial_idx_name].isin(val_sites)]
-                data_multiind = data_multiind.loc[~data_multiind
-                                                  .index
-                                                  .get_level_values(level=spatial_idx_name)
-                                                  .isin(val_sites)]
+                data = data.loc[~data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(val_sites)]
 
-        if not group:
+        if not group_spatially and not group_temporally:
             metrics = calc_metrics(data)
             # need to convert to dataframe and transpose so it looks like the
             # others
             metrics = pd.DataFrame(metrics).T
-        elif group == "seg_id_nat":
-            metrics = data.groupby(spatial_idx_name).apply(calc_metrics).reset_index()
-        elif group == "month":
-            metrics = (
-            data.groupby(
-            data[time_idx_name].dt.month)
+        elif group_spatially and not group_temporally:
+            #note: same as data.groupby(level=spatial_idx_name)
+            metrics = (data.groupby(pd.Grouper(level=spatial_idx_name))
             .apply(calc_metrics)
             .reset_index()
             )
-        elif group == ["seg_id_nat", "month"]:
-            metrics = (
-            data.groupby(
-            [data[time_idx_name].dt.month,
-            spatial_idx_name])
-            .apply(calc_metrics)
-            .reset_index()
-            )
-        elif group == "year":
-            metrics = (
-            data.groupby(
-            data[time_idx_name].dt.year)
-            .apply(calc_metrics)
-            .reset_index()
-            )
-        elif group == ["seg_id_nat", "year"]:
-            metrics = (
-            data.groupby(
-            [data[time_idx_name].dt.year,
-            spatial_idx_name])
-            .apply(calc_metrics)
-            .reset_index()
-            )
-        elif group == "biweekly":
-            #filter the data to remove nans before computing the sum
-            #so that the same days are being summed in the month.
-            data_calc = (data_multiind.dropna()
-            .groupby(
-            [pd.Grouper(level=time_idx_name, freq='2W'),
-             pd.Grouper(level=spatial_idx_name)])
-            .sum()
-            )
-            metrics = calc_metrics(data_calc)
-            metrics = pd.DataFrame(metrics).T
-        elif group == ["seg_id_nat", "biweekly"]:
-            #filter the data to remove nans before computing the sum
-            #so that the same days are being summed in the year.
-            data_calc = (data_multiind.dropna()
-            .groupby(
-            [pd.Grouper(level=time_idx_name, freq='2W'),
-             pd.Grouper(level=spatial_idx_name)])
-            .sum()
-            )
-            data_calc = data_calc.reset_index()
-            metrics = (data_calc
-            .groupby(spatial_idx_name)
-            .apply(calc_metrics)
-            .reset_index()
-            )
-        elif group == "monthly":
-            #filter the data to remove nans before computing the sum
-            #so that the same days are being summed in the month.
-            data_calc = (data_multiind.dropna()
-            .groupby(
-            [pd.Grouper(level=time_idx_name, freq='M'),
-             pd.Grouper(level=spatial_idx_name)])
-            .sum()
-            )
-            metrics = calc_metrics(data_calc)
-            metrics = pd.DataFrame(metrics).T
-        elif group == ["seg_id_nat", "monthly"]:
-            #filter the data to remove nans before computing the sum
-            #so that the same days are being summed in the year.
-            data_calc = (data_multiind.dropna()
-            .groupby(
-            [pd.Grouper(level=time_idx_name, freq='M'),
-             pd.Grouper(level=spatial_idx_name)])
-            .sum()
-            )
-            data_calc = data_calc.reset_index()
-            metrics = (data_calc
-            .groupby(spatial_idx_name)
-            .apply(calc_metrics)
-            .reset_index()
-            )
-        elif group == "yearly":
-            #filter the data to remove nans before computing the sum
-            #so that the same days are being summed in the year.
-            data_calc = (data_multiind.dropna()
-            .groupby(
-            [pd.Grouper(level=time_idx_name, freq='Y'),
-             pd.Grouper(level=spatial_idx_name)])
-            .sum()
-            )
-            metrics = calc_metrics(data_calc)
-            metrics = pd.DataFrame(metrics).T
-        elif group == ["seg_id_nat", "yearly"]:
-            #filter the data to remove nans before computing the sum
-            #so that the same days are being summed in the year.
-            data_calc = (data_multiind.dropna()
-            .groupby(
-            [pd.Grouper(level=time_idx_name, freq='Y'),
-             pd.Grouper(level=spatial_idx_name)])
-            .sum()
-            )
-            data_calc = data_calc.reset_index()
-            metrics = (data_calc
-            .groupby(spatial_idx_name)
-            .apply(calc_metrics)
-            .reset_index()
-            )
-        else:
-            raise ValueError("group value not valid")
+        elif not group_spatially and group_temporally:
+            if sum_aggregation:
+                #performance metrics computed at the group_temporally timestep
+                #for some reason, no `.` calculations are allowed after .sum(),
+                #so calc_metrics() is called first.
+                if site_based:
+                    #create a group_temporally timeseries for each observation site
+                    metrics = calc_metrics(data
+                    #filter the data to remove nans before computing the sum
+                    #so that the same days are being summed in the month.
+                    .dropna()
+                    .groupby([pd.Grouper(level=time_idx_name, freq=group_temporally),
+                             pd.Grouper(level=spatial_idx_name)])
+                    .sum()
+                    )
+                else:
+                    #create a group_temporally timeseries using data from all reaches
+                    data_sum = (data
+                    .dropna()
+                    .groupby(pd.Grouper(level=time_idx_name, freq=group_temporally))
+                    .sum()
+                    )
+                    #For some reason, with pd.Grouper the sum is computed as 0
+                    # on days with no observations. Need to remove these days
+                    # before calculating metrics. Get the indicies with 0 obs:
+                    data_count_0 = np.where(data
+                    #filter the data to remove nans before computing the sum
+                    #so that the same days are being summed in the month.
+                    .dropna()
+                    .groupby(pd.Grouper(level=time_idx_name, freq=group_temporally))
+                    .count()
+                    .reset_index()
+                    .obs == 0
+                    )[0]
+                    if len(data_count_0) > 0:
+                        data_sum = data_sum.drop(index=data_sum.index[data_count_0])
+                    metrics = calc_metrics(data_sum)
+                metrics = pd.DataFrame(metrics).T
+            else:
+                if group_temporally != 'M':
+                    #native timestep performance metrics within the group_temporally groups
+                    #This method will report one row per group_temporally group
+                    # examples: year-month would be a group when group_temporally is 'M'
+                    # year is a group when group_temporally is 'Y'
+                    metrics = (data
+                    .groupby(pd.Grouper(level=time_idx_name, freq=group_temporally))
+                    .apply(calc_metrics)
+                    .reset_index()
+                    )
+                else:
+                    #This method reports one row per calendar month (1-12)
+                    metrics = (data.reset_index()
+                    .groupby(data.reset_index()[time_idx_name].dt.month)
+                    .apply(calc_metrics)
+                    .reset_index()
+                    )                
+        elif group_spatially and group_temporally:
+            if sum_aggregation:
+                #performance metrics for each reach computed at the group_temporally timestep
+                data_calc = (data
+                .dropna()
+                .groupby([pd.Grouper(level=time_idx_name, freq=group_temporally),
+                          pd.Grouper(level=spatial_idx_name)])
+                .sum()
+                )
+                #unable to apply any other . functions after .sum().
+                metrics = (data_calc.groupby(pd.Grouper(level=spatial_idx_name))
+                .apply(calc_metrics)
+                .reset_index()
+                )
+            else:
+                if group_temporally != 'M':
+                    metrics = (data
+                    .groupby([pd.Grouper(level=time_idx_name, freq=group_temporally),
+                              pd.Grouper(level=spatial_idx_name)])
+                    .apply(calc_metrics)
+                    .reset_index()
+                    )
+                else:
+                    metrics = (data.reset_index()
+                    .groupby([data.reset_index()[time_idx_name].dt.month, spatial_idx_name])
+                    .apply(calc_metrics)
+                    .reset_index()
+                    ) 
 
         metrics["variable"] = data_var
         metrics["partition"] = partition
@@ -454,7 +430,10 @@ def combined_metrics(
     train_sites=None,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
-    group=None,
+    group_spatially=False,
+    group_temporally=False,
+    sum_aggregation=False,
+    site_based=False,
     id_dict=None,
     outfile=None,
 ):
@@ -478,20 +457,26 @@ def combined_metrics(
         index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
         (usually 'time')
-    :param group: [str or list] which group the metrics should be computed for.
-    Currently only supports 'seg_id_nat' (segment-wise metrics), 'month'
-    (month-wise metrics), ['seg_id_nat', 'month'] (metrics broken out by segment
-    and month), 'year' (year-wise metrics), ['seg_id_nat', 'year'] 
-    (metrics broken out by segment and year), 'biweekly' (metrics for 
-    biweekly timeseries, aggregated by summing data in the original timestep)
-    'monthly' (metrics for monthly timeseries, aggregated by summing data 
-    in the original timestep), 'yearly' (metrics for yearly timeseries, 
-    aggregated by summing data in the original timestep), 
-    ["seg_id_nat", "biweekly"] (metrics for biweekly timeseries broken out 
-    by segment), ["seg_id_nat", "monthly"] (metrics for monthly timeseries broken out 
-    by segment), ["seg_id_nat", "yearly"] (metrics for yearly timeseries 
-    broken out by segment), and None (metrics in the original timestep computed 
-    across all space)
+    :param group_spatially [bool] when True, compute segment-wise metrics.
+    :param group_temporally [False or str] when False, computes metrics for 
+    the native timestep of the data. When a str, the str is passed to pd.Grouper
+    freq to group the data within the specified timestep 
+    (e.g., 'W', 'M', 'Y' for week, month, and year)
+    :param sum_aggregation [bool] Only applies when group_temporally is a string.
+    when sum_aggregation is True, metrics are computed by first summing data 
+    from the native timestep to the group_temporally timestep. Only native timesteps
+    with observations are summed. When False, metrics are computed for the 
+    native timestep of the data within the group_temporally groups (e.g., 
+    for daily data and group_temporally = 'Y', all days with observations
+    in the calendar year are used to compute a metric for that year). Note that
+    for month, 'M', this would normally have groups by year-month. We have forced
+    the groups to the 12 calendar months instead.
+    :param site_based [bool] Only applies when group_spatially is False,
+    group_temporally is a string, and sum_aggregation is True. When
+    site_based is True, the sum is computed for each site to get a 
+    group_temporally timeseries for each site. When False, the
+    sum is computed over all sites to get a group_temporally timeseries 
+    using data from all reaches in each day.
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information
@@ -523,7 +508,10 @@ def combined_metrics(
                                     spatial_idx_name=spatial_idx_name,
                                     time_idx_name=time_idx_name,
                                     id_dict=id_dict,
-                                    group=group,
+                                    group_spatially=group_spatially,
+                                    group_temporally=group_temporally,
+                                    sum_aggregation=sum_aggregation,
+                                    site_based=site_based,
                                     val_sites = val_sites,
                                     test_sites = test_sites,
                                     train_sites = train_sites)

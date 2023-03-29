@@ -152,7 +152,7 @@ def calc_metrics(df):
     pred = df["pred"].values
     obs, pred = filter_nan_preds(obs, pred)
 
-    if len(obs) > 20:
+    if len(obs) > 10:
         metrics = {
             "rmse": rmse_eval(obs, pred),
             "nse": nse_eval(obs, pred),

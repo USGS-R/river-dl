@@ -364,8 +364,8 @@ def partition_metrics(
                 if group_temporally != 'M':
                     #native timestep performance metrics within the group_temporally groups
                     #This method will report one row per group_temporally group
-                    # examples: year-month would be a group when group_temporally is 'M'
-                    # year is a group when group_temporally is 'Y'
+                    # examples: year-month-week would be a group when group_temporally is 'W'
+                    # year would be a group when group_temporally is 'Y'
                     metrics = (data
                     .groupby(pd.Grouper(level=time_idx_name, freq=group_temporally))
                     .apply(calc_metrics)

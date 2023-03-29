@@ -213,7 +213,7 @@ def partition_metrics(
         time_idx_name="date",
         group_spatially=False,
         group_temporally=False,
-        sum_aggregation=False,
+        time_aggregation=False,
         site_based=False,
         id_dict=None,
         outfile=None,
@@ -237,21 +237,21 @@ def partition_metrics(
     the native timestep of the data. When a str, the str is passed to pd.Grouper
     freq to group the data within the specified timestep 
     (e.g., 'W', 'M', 'Y' for week, month, and year)
-    :param sum_aggregation [bool] Only applies when group_temporally is a string.
-    when sum_aggregation is True, metrics are computed by first summing data 
+    :param time_aggregation [bool] Only applies when group_temporally is a string.
+    when time_aggregation is True, metrics are computed by first averaging data 
     from the native timestep to the group_temporally timestep. Only native timesteps
-    with observations are summed. When False, metrics are computed for the 
+    with observations are averaged. When False, metrics are computed for the 
     native timestep of the data within the group_temporally groups (e.g., 
     for daily data and group_temporally = 'Y', all days with observations
     in the calendar year are used to compute a metric for that year). Note that
     for month, 'M', this would normally have groups by year-month. We have forced
     the groups to the 12 calendar months instead.
     :param site_based [bool] Only applies when group_spatially is False,
-    group_temporally is a string, and sum_aggregation is True. When
-    site_based is True, the sum is computed for each site to get a 
+    group_temporally is a string, and time_aggregation is True. When
+    site_based is True, the average is computed for each site to get a 
     group_temporally timeseries for each site. When False, the
-    sum is computed over all sites to get a group_temporally timeseries 
-    using data from all reaches in each day.
+    average is computed over all sites to get a group_temporally timeseries 
+    using data from all reaches.
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information
@@ -323,9 +323,9 @@ def partition_metrics(
             .reset_index()
             )
         elif not group_spatially and group_temporally:
-            if sum_aggregation:
+            if time_aggregation:
                 #performance metrics computed at the group_temporally timestep
-                #for some reason, no `.` calculations are allowed after .sum(),
+                #for some reason, no `.` calculations are allowed after .mean(),
                 #so calc_metrics() is called first.
                 if site_based:
                     #create a group_temporally timeseries for each observation site
@@ -335,14 +335,14 @@ def partition_metrics(
                     .dropna()
                     .groupby([pd.Grouper(level=time_idx_name, freq=group_temporally),
                              pd.Grouper(level=spatial_idx_name)])
-                    .sum()
+                    .mean()
                     )
                 else:
                     #create a group_temporally timeseries using data from all reaches
                     data_sum = (data
                     .dropna()
                     .groupby(pd.Grouper(level=time_idx_name, freq=group_temporally))
-                    .sum()
+                    .mean()
                     )
                     #For some reason, with pd.Grouper the sum is computed as 0
                     # on days with no observations. Need to remove these days
@@ -379,15 +379,15 @@ def partition_metrics(
                     .reset_index()
                     )                
         elif group_spatially and group_temporally:
-            if sum_aggregation:
+            if time_aggregation:
                 #performance metrics for each reach computed at the group_temporally timestep
                 data_calc = (data
                 .dropna()
                 .groupby([pd.Grouper(level=time_idx_name, freq=group_temporally),
                           pd.Grouper(level=spatial_idx_name)])
-                .sum()
+                .mean()
                 )
-                #unable to apply any other . functions after .sum().
+                #unable to apply any other . functions after .mean().
                 metrics = (data_calc.groupby(pd.Grouper(level=spatial_idx_name))
                 .apply(calc_metrics)
                 .reset_index()
@@ -432,7 +432,7 @@ def combined_metrics(
     time_idx_name="date",
     group_spatially=False,
     group_temporally=False,
-    sum_aggregation=False,
+    time_aggregation=False,
     site_based=False,
     id_dict=None,
     outfile=None,
@@ -462,21 +462,21 @@ def combined_metrics(
     the native timestep of the data. When a str, the str is passed to pd.Grouper
     freq to group the data within the specified timestep 
     (e.g., 'W', 'M', 'Y' for week, month, and year)
-    :param sum_aggregation [bool] Only applies when group_temporally is a string.
-    when sum_aggregation is True, metrics are computed by first summing data 
+    :param time_aggregation [bool] Only applies when group_temporally is a string.
+    when time_aggregation is True, metrics are computed by first averaging data 
     from the native timestep to the group_temporally timestep. Only native timesteps
-    with observations are summed. When False, metrics are computed for the 
+    with observations are averaged. When False, metrics are computed for the 
     native timestep of the data within the group_temporally groups (e.g., 
     for daily data and group_temporally = 'Y', all days with observations
     in the calendar year are used to compute a metric for that year). Note that
     for month, 'M', this would normally have groups by year-month. We have forced
     the groups to the 12 calendar months instead.
     :param site_based [bool] Only applies when group_spatially is False,
-    group_temporally is a string, and sum_aggregation is True. When
-    site_based is True, the sum is computed for each site to get a 
+    group_temporally is a string, and time_aggregation is True. When
+    site_based is True, the average is computed for each site to get a 
     group_temporally timeseries for each site. When False, the
-    sum is computed over all sites to get a group_temporally timeseries 
-    using data from all reaches in each day.
+    average is computed over all sites to get a group_temporally timeseries 
+    using data from all reaches.
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information
@@ -510,7 +510,7 @@ def combined_metrics(
                                     id_dict=id_dict,
                                     group_spatially=group_spatially,
                                     group_temporally=group_temporally,
-                                    sum_aggregation=sum_aggregation,
+                                    time_aggregation=time_aggregation,
                                     site_based=site_based,
                                     val_sites = val_sites,
                                     test_sites = test_sites,

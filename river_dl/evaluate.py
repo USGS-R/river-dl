@@ -339,7 +339,7 @@ def partition_metrics(
                     )
                 else:
                     #create a group_temporally timeseries using data from all reaches
-                    data_sum = (data
+                    data_mean = (data
                     .dropna()
                     .groupby(pd.Grouper(level=time_idx_name, freq=group_temporally))
                     .mean()
@@ -357,8 +357,8 @@ def partition_metrics(
                     .obs == 0
                     )[0]
                     if len(data_count_0) > 0:
-                        data_sum = data_sum.drop(index=data_sum.index[data_count_0])
-                    metrics = calc_metrics(data_sum)
+                        data_mean = data_mean.drop(index=data_mean.index[data_count_0])
+                    metrics = calc_metrics(data_mean)
                 metrics = pd.DataFrame(metrics).T
             else:
                 if group_temporally != 'M':

@@ -806,7 +806,8 @@ def prep_all_data(
     latest_time=None,
     normalize_y=True,
     trn_offset = 1.0,
-    tst_val_offset = 1.0
+    tst_val_offset = 1.0,
+    check_pre_partitions=True
 ):
     """
     prepare input and output data for DL model training read in and process
@@ -871,6 +872,8 @@ def prep_all_data(
     :param out_file: [str] file to where the values will be written
     :param trn_offset: [str] value for the training offset
     :param tst_val_offset: [str] value for the testing and validation offset
+    :param check_pre_partitions [bool] when True, pretarining partitions are
+    checked for unique data in each partition.
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             "x_trn": x training data
@@ -1092,8 +1095,9 @@ def prep_all_data(
                 trn_offset = trn_offset,
                 tst_val_offset = tst_val_offset
             )
-            #check that the trn, val, and tst partitions have unique data
-            check_partitions(x_data_dict, y_pre_data, pre = True)
+            if check_pre_partitions:
+                #check that the trn, val, and tst partitions have unique data
+                check_partitions(x_data_dict, y_pre_data, pre = True)
         
     # if there is no observation file, use the pretrain mean and standard dev
     # to do the scaling/centering
@@ -1118,8 +1122,9 @@ def prep_all_data(
             trn_offset = trn_offset,
             tst_val_offset = tst_val_offset
         )
-        #check that the trn, val, and tst partitions have unique data
-        check_partitions(x_data_dict, y_pre_data, pre = True)
+        if check_pre_partitions:
+            #check that the trn, val, and tst partitions have unique data
+            check_partitions(x_data_dict, y_pre_data, pre = True)
     else:
         raise Warning("No y_dataset data was provided")
     

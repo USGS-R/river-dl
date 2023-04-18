@@ -215,11 +215,12 @@ def partition_metrics(
         group_temporally=False,
         time_aggregation=False,
         site_based=False,
-        id_dict=None,
-        outfile=None,
+        explicit_spatial_partition=True,
+        train_sites=None,
         val_sites=None,
         test_sites=None,
-        train_sites=None,
+        id_dict=None,
+        outfile=None
 ):
     """
     calculate metrics for a certain group (or no group at all) for a given
@@ -255,13 +256,18 @@ def partition_metrics(
     to get a group_temporally timeseries using data from all reaches. The observations 
     used in the calculation are each group_temporally timestep with observations 
     (max obs length of n_timesteps).
+    :param explicit_spatial_partition: [bool] when True and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    are removed from the other partitions. When False and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    may appear in other partitions.
+    :param train_sites: [list of site_ids] all sites for the training partition.
+    :param val_sites: [list of site_ids] all sites for the validation partition.
+    :param test_sites: [list of site_ids] all sites for the testing partition.
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information
     :param outfile: [str] file where the metrics should be written
-    :param val_sites: [list] sites to exclude from training and test metrics
-    :param test_sites: [list] sites to exclude from validation and training metrics
-    :param train_sites: [list] sites to exclude from validation and test metrics
     :return: [pd dataframe] the condensed metrics
     """
     var_data = fmt_preds_obs(preds, obs_file, spatial_idx_name,
@@ -269,50 +275,53 @@ def partition_metrics(
     var_metrics_list = []
 
     for data_var, data in var_data.items():
-        # mask out validation and test sites from trn partition
-        if train_sites and partition == 'trn':
-            # simply use the train sites when specified.
-            data = data.loc[data.index
-                            .get_level_values(level=spatial_idx_name)
-                            .isin(train_sites)]
-        else:
-            #check if validation or testing sites are specified
-            if val_sites and partition == 'trn':
-                data = data.loc[~data.index
-                                .get_level_values(level=spatial_idx_name)
-                                .isin(val_sites)]
-            if test_sites and partition == 'trn':
-                data = data.loc[~data.index
-                                .get_level_values(level=spatial_idx_name)
-                                .isin(test_sites)]
-        # mask out training and test sites from val partition
-        if val_sites and partition == 'val':
-            data = data.loc[data.index
-                            .get_level_values(level=spatial_idx_name)
-                            .isin(val_sites)]
-        else:
-            if test_sites and partition=='val':
-                data = data.loc[~data.index
-                                .get_level_values(level=spatial_idx_name)
-                                .isin(test_sites)]
-            if train_sites and partition=='val':
-                data = data.loc[~data.index
+        if partition == 'trn':
+            if train_sites:
+                data = data.loc[data.index
                                 .get_level_values(level=spatial_idx_name)
                                 .isin(train_sites)]
-        # mask out training and validation sites from val partition
-        if test_sites and partition == 'tst':
-            data = data.loc[data.index
-                            .get_level_values(level=spatial_idx_name)
-                            .isin(test_sites)]
-        else:
-            if train_sites and partition=='tst':
-                data = data.loc[~data.index
-                                .get_level_values(level=spatial_idx_name)
-                                .isin(train_sites)]
-            if val_sites and partition=='tst':
-                data = data.loc[~data.index
+            elif explicit_spatial_partition:
+                #remove val and tst sites if specified
+                if val_sites:
+                    data = data.loc[~data.index
+                                    .get_level_values(level=spatial_idx_name)
+                                    .isin(val_sites)]
+                if test_sites:
+                    data = data.loc[~data.index
+                                    .get_level_values(level=spatial_idx_name)
+                                    .isin(test_sites)]
+        
+        if partition == 'val':
+            if val_sites:
+                data = data.loc[data.index
                                 .get_level_values(level=spatial_idx_name)
                                 .isin(val_sites)]
+            elif explicit_spatial_partition:
+                #remove trn and tst sites if specified
+                if train_sites:
+                    data = data.loc[~data.index
+                                    .get_level_values(level=spatial_idx_name)
+                                    .isin(train_sites)]
+                if test_sites:
+                    data = data.loc[~data.index
+                                    .get_level_values(level=spatial_idx_name)
+                                    .isin(test_sites)]
+        
+        if partition == 'tst':
+            if test_sites:
+                data = data.loc[data.index
+                                .get_level_values(level=spatial_idx_name)
+                                .isin(test_sites)]
+            elif explicit_spatial_partition:
+                #remove trn and val sites if specified
+                if train_sites:
+                    data = data.loc[~data.index
+                                    .get_level_values(level=spatial_idx_name)
+                                    .isin(train_sites)]
+                if val_sites:
+                    data = data.loc[~data.index
+                                    .get_level_values(level=spatial_idx_name)
+                                    .isin(val_sites)]
 
         if not group_spatially and not group_temporally:
             metrics = calc_metrics(data)
@@ -428,6 +437,7 @@ def combined_metrics(
     pred_trn=None,
     pred_val=None,
     pred_tst=None,
+    explicit_spatial_partition=True,
     val_sites=None,
     test_sites=None,
     train_sites=None,
@@ -513,14 +523,16 @@ def combined_metrics(
                                     partition=partition,
                                     spatial_idx_name=spatial_idx_name,
                                     time_idx_name=time_idx_name,
-                                    id_dict=id_dict,
                                     group_spatially=group_spatially,
                                     group_temporally=group_temporally,
                                     time_aggregation=time_aggregation,
                                     site_based=site_based,
+                                    explicit_spatial_partition=explicit_spatial_partition,
+                                    train_sites = train_sites,
                                     val_sites = val_sites,
                                     test_sites = test_sites,
-                                    train_sites = train_sites)
+                                    id_dict = id_dict,
+                                    outfile = outfile)
         df_all.extend([metrics])
 
     df_all = pd.concat(df_all, axis=0)

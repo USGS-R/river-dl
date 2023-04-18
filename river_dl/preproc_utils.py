@@ -594,9 +594,10 @@ def prep_y_data(
     val_end_date=None,
     test_start_date=None,
     test_end_date=None,
+    train_sites=None,
     val_sites=None,
     test_sites=None,
-    explicit_spatial_partition=False,
+    explicit_spatial_partition=True,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
@@ -632,15 +633,14 @@ def prep_y_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
-    :param val_sites: [list of site_ids] sites to retain for validation. These
-    sites will be witheld from training and testing
-    :param test_sites: [list of site_ids] sites to retain for testing. These
-    sites will be witheld from training and validation
-    :param explicit_spatial_partition: [bool] when True and val_sites (test_sites)
-    is specified, the validation set (test set) will contain only the val_sites
-    (test_sites). When False and val_sites (test_sites) is specified, 
-    the spatial removal of data from the validation set (test set) will not 
-    remove reaches that are in the training set.
+    :param train_sites: [list of site_ids] all sites for the training partition.
+    :param val_sites: [list of site_ids] all sites for the validation partition.
+    :param test_sites: [list of site_ids] all sites for the testing partition.
+    :param explicit_spatial_partition: [bool] when True and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    are removed from the other partitions. When False and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    may appear in other partitions.
     :param seq_len: [int] length of sequences (e.g., 365)
     :param log_vars: [list-like] which variables_to_log (if any) to take log of
     :param exclude_file: [str] path to exclude file
@@ -677,19 +677,27 @@ def prep_y_data(
     )
 
 
-    # replace validation sites' (and test sites') data with np.nan
+    # replace trn, val and tst sites' data with np.nan
+    if train_sites:
+        y_trn = y_trn.where(y_trn[spatial_idx_name].isin(train_sites))
+        if explicit_spatial_partition:
+            #remove training sites from validation and testing
+            y_val = y_val.where(~y_val[spatial_idx_name].isin(train_sites))
+            y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(train_sites))
+    
     if val_sites:
-        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
-        y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(val_sites))
+        y_val = y_val.where(y_val[spatial_idx_name].isin(val_sites))
         if explicit_spatial_partition:
-            y_val = y_val.where(y_val[spatial_idx_name].isin(val_sites))
-
+            #remove validation sites from training and testing
+            y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+            y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(val_sites))
+    
     if test_sites:
-        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
-        y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
+        y_tst = y_tst.where(y_tst[spatial_idx_name].isin(test_sites))
         if explicit_spatial_partition:
-            y_tst = y_tst.where(y_tst[spatial_idx_name].isin(test_sites))
-
+            #remove test sites from training and validation
+            y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
+            y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
 
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)
@@ -766,9 +774,10 @@ def prep_all_data(
     val_end_date=None,
     test_start_date=None,
     test_end_date=None,
+    train_sites=None,
     val_sites=None,
     test_sites=None,
-    explicit_spatial_partition=False,
+    explicit_spatial_partition=True,
     y_vars_finetune=None,
     y_vars_pretrain=None,
     spatial_idx_name="seg_id_nat",
@@ -814,15 +823,14 @@ def prep_all_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
-    :param val_sites: [list of site_ids] sites to retain for validation. These
-    sites will be witheld from training
-    :param test_sites: [list of site_ids] sites to retain for testing. These
-    sites will be witheld from training and validation
-    :param explicit_spatial_partition: [bool] when True and val_sites (test_sites) 
-    is specified, the validation set (test set) will contain only the val_sites 
-    (test_sites). When False and val_sites (test_sites) is specified, 
-    the spatial removal of data from the validation set (test set) will not 
-    remove reaches that are in the training set.
+    :param train_sites: [list of site_ids] all sites for the training partition.
+    :param val_sites: [list of site_ids] all sites for the validation partition.
+    :param test_sites: [list of site_ids] all sites for the testing partition.
+    :param explicit_spatial_partition: [bool] when True and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    are removed from the other partitions. When False and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    may appear in other partitions.
     :param spatial_idx_name: [str] name of column that is used for spatial
     index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -1032,6 +1040,7 @@ def prep_all_data(
             val_end_date=val_end_date,
             test_start_date=test_start_date,
             test_end_date=test_end_date,
+            train_sites=train_sites,
             val_sites=val_sites,
             test_sites=test_sites,
             explicit_spatial_partition=explicit_spatial_partition,

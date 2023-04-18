@@ -638,9 +638,9 @@ def prep_y_data(
     :param test_sites: [list of site_ids] all sites for the testing partition.
     :param explicit_spatial_partition: [bool] when True and train_sites 
     (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
-    are removed from the other partitions. When False and train_sites 
-    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
-    may appear in other partitions.
+    are removed from the other partitions, unless sites are provided for those 
+    partitions. When False and train_sites (val_sites, test_sites) is specified, 
+    the train_sites (val_sites, tst_sites) may appear in other partitions.
     :param seq_len: [int] length of sequences (e.g., 365)
     :param log_vars: [list-like] which variables_to_log (if any) to take log of
     :param exclude_file: [str] path to exclude file
@@ -681,23 +681,32 @@ def prep_y_data(
     if train_sites:
         y_trn = y_trn.where(y_trn[spatial_idx_name].isin(train_sites))
         if explicit_spatial_partition:
-            #remove training sites from validation and testing
-            y_val = y_val.where(~y_val[spatial_idx_name].isin(train_sites))
-            y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(train_sites))
+            #remove training sites from validation and testing, unless
+            # sites are provided for those partitions
+            if not val_sites:
+                y_val = y_val.where(~y_val[spatial_idx_name].isin(train_sites))
+            if not test_sites:
+                y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(train_sites))
     
     if val_sites:
         y_val = y_val.where(y_val[spatial_idx_name].isin(val_sites))
         if explicit_spatial_partition:
-            #remove validation sites from training and testing
-            y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
-            y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(val_sites))
+            #remove validation sites from training and testing, unless
+            # sites are provided for those partitions
+            if not train_sites:
+                y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+            if not test_sites:
+                y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(val_sites))
     
     if test_sites:
         y_tst = y_tst.where(y_tst[spatial_idx_name].isin(test_sites))
         if explicit_spatial_partition:
-            #remove test sites from training and validation
-            y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
-            y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
+            #remove test sites from training and validation, unless
+            # sites are provided for those partitions
+            if not train_sites:
+                y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
+            if not val_sites:
+                y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
 
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)

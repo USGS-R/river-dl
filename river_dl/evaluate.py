@@ -249,9 +249,12 @@ def partition_metrics(
     :param site_based [bool] Only applies when group_spatially is False,
     group_temporally is a string, and time_aggregation is True. When
     site_based is True, the average is computed for each site to get a 
-    group_temporally timeseries for each site. When False, the
-    average is computed over all sites to get a group_temporally timeseries 
-    using data from all reaches.
+    group_temporally timeseries for each site. The observations used in the 
+    calculation are each group_temporally timestep for each reach with observations 
+    (max obs length of n_segs*n_timesteps). When False, the average is computed over all sites 
+    to get a group_temporally timeseries using data from all reaches. The observations 
+    used in the calculation are each group_temporally timestep with observations 
+    (max obs length of n_timesteps).
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information
@@ -474,9 +477,12 @@ def combined_metrics(
     :param site_based [bool] Only applies when group_spatially is False,
     group_temporally is a string, and time_aggregation is True. When
     site_based is True, the average is computed for each site to get a 
-    group_temporally timeseries for each site. When False, the
-    average is computed over all sites to get a group_temporally timeseries 
-    using data from all reaches.
+    group_temporally timeseries for each site. The observations used in the 
+    calculation are each group_temporally timestep for each reach with observations 
+    (max obs length of n_segs*n_timesteps). When False, the average is computed over all sites 
+    to get a group_temporally timeseries using data from all reaches. The observations 
+    used in the calculation are each group_temporally timestep with observations 
+    (max obs length of n_timesteps).
     :param id_dict: [dict] dictionary of id_dict where dict keys are the id
     names and dict values are the id values. These are added as columns to the
     metrics information

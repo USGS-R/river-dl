@@ -1092,8 +1092,8 @@ def prep_all_data(
                 trn_offset = trn_offset,
                 tst_val_offset = tst_val_offset
             )
-        #check that the trn, val, and tst partitions have unique data
-        check_partitions(x_data_dict, y_pre_data, pre = True)
+            #check that the trn, val, and tst partitions have unique data
+            check_partitions(x_data_dict, y_pre_data, pre = True)
         
     # if there is no observation file, use the pretrain mean and standard dev
     # to do the scaling/centering

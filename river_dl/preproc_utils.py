@@ -5,7 +5,7 @@ import xarray as xr
 import datetime
 import subprocess
 import shutil
-import os
+import sys
 
 
 def saveRunLog(config,code_dir,outFile):
@@ -1018,6 +1018,9 @@ def prep_all_data(
             dist_idx_name=dist_idx_name,
             segs=segs,
         )
+    
+    #check that the trn, val, and tst partitions have unique data
+    check_partitions(x_data_dict)
 
     y_obs_data = {}
     y_pre_data = {}
@@ -1184,3 +1187,32 @@ def read_exclude_segs_file(exclude_file):
     with open(exclude_file, "r") as s:
         d = yaml.safe_load(s)
     return [val for key, val in d.items()]
+
+def check_partitions(data):
+    '''
+    Function to check that trn, val, and tst partitions have unique observation
+    times and site ids
+    
+    :param data: [dict] data dictionary with keys 'ids_<partition>' and 
+    'times_<partition>', where partition = trn, val, and tst.
+    
+    returns 0 when all data have unique times and sites. Otherwise sys.exit
+    is called.
+    '''
+    #Get site ids and times for train, val, test data into a matrix
+    df_trn = pd.DataFrame({'ids': np.reshape(data['ids_trn'], (-1)),
+                           'times': np.reshape(data['times_trn'], (-1))})
+    df_val = pd.DataFrame({'ids': np.reshape(data['ids_val'], (-1)),
+                           'times': np.reshape(data['times_val'], (-1))})
+    df_tst = pd.DataFrame({'ids': np.reshape(data['ids_tst'], (-1)),
+                           'times': np.reshape(data['times_tst'], (-1))})
+    
+    #When the data are aggregated into a single dataframe
+    # there should be no duplicated rows
+    df = pd.concat([df_trn, df_val, df_tst])
+    duplicate_rows = df.duplicated(keep=False)
+    if any(duplicate_rows == True):
+        print(df.loc[duplicate_rows])
+        sys.exit('There are observations within multiple data partitions')
+    else:
+        return(0)

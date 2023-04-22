@@ -132,7 +132,7 @@ def plot_ts_obs_preds(pred_file, obs_file, index_start = 0, index_end=3, outfile
         ax.legend()
         ax.set_title(seg)
     plt.tight_layout()
-    if out_file:
+    if outfile:
         plt.savefig(outfile)
     else:
         plt.show()

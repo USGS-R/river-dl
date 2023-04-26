@@ -208,20 +208,20 @@ def split_into_batches(data_array, seq_len=365, offset=1.0,
     else:
         period = int(offset*seq_len)
     
-    ndays = data_array.shape[1]
-    num_batches = ndays//period
+    nsteps = data_array.shape[1]
+    num_batches = nsteps//period
     if fill_batch:
-        #Check if ndays is an exact multiple of the period.
-        exact_batches = ndays/period
+        #Check if nsteps is an exact multiple of the period.
+        exact_batches = nsteps/period
         if (num_batches != exact_batches):
-            #append days to the data_array
+            #append timesteps to the data_array
             #exact_batches will always be greater than num_batches.
-            #Determine how many days to replicate to get a full batch
-            num_rep_days = int(period - np.floor((exact_batches - num_batches) * seq_len))
+            #Determine how many timesteps to replicate to get a full batch
+            num_rep_steps = int(period - np.floor((exact_batches - num_batches) * seq_len))
             if fill_nan:
                 #fill in with nan values 
                 nan_array = np.empty((data_array.shape[0], 
-                                      num_rep_days, 
+                                      num_rep_steps, 
                                       data_array.shape[2]))
                 nan_array.fill(np.nan)
                 data_array = np.concatenate((data_array, 
@@ -231,17 +231,19 @@ def split_into_batches(data_array, seq_len=365, offset=1.0,
                 #fill in by replicating the previous timesteps in the data_array
                 if fill_time:
                     #data are an np.datetime64 object. These must be unique, so
-                    #cannot be replicated. Add days sequentially
-                    fill_dates_array = data_array[:,(ndays-num_rep_days):ndays,:].copy()
-                    #add num_rep_days to each index
-                    fill_dates_array = fill_dates_array[:,:,:] + np.timedelta64(num_rep_days, 'D')
+                    #cannot be replicated. Add timesteps sequentially
+                    fill_dates_array = data_array[:,(nsteps-num_rep_steps):nsteps,:].copy()
+                    #add num_rep_steps to each index. 
+                    # Sending the smallest possible sample of data_array to the function
+                    time_unit = get_time_unit(data_array[0:2,0:2,0:2])
+                    fill_dates_array = fill_dates_array[:,:,:] + np.timedelta64(num_rep_steps, time_unit)
                     
                     data_array = np.concatenate((data_array, 
                                                  fill_dates_array),
                                                 axis = 1)
                 else:
                     data_array = np.concatenate((data_array, 
-                                                 data_array[:,(ndays-num_rep_days):ndays,:]),
+                                                 data_array[:,(nsteps-num_rep_steps):nsteps,:]),
                                                 axis = 1)
             
             num_batches = num_batches+1
@@ -1391,3 +1393,26 @@ def check_partitions(data, y, pre=False):
         sys.exit('There are observations within multiple data partitions')
     else:
         return(0)
+
+def get_time_unit(data_array):
+    '''
+    Function to get the timestep unit from a numpy.datetime64 array column
+    
+    :param data_array: [np 3D array] the array's second axis must be time
+    in np.datetime64 format with nanoseconds specified (default).
+    
+    returns the unit of the timestep (day, month, etc.)
+    '''
+    time_delta = data_array[0,1,0] - data_array[0,0,0]
+    time_unit = np.datetime_data(time_delta)[0]
+    if time_unit != 'ns':
+        sys.exit('time unit must be provided as YYYY-MM-DDT:HH:MM:SS.000000000 nanoseconds')
+    
+    if time_delta == 86400000000000:
+        time_unit = 'D'
+    elif time_delta == 24000000000:
+        time_unit = 'h'
+    else:
+        sys.exit('time_delta does not correspond to 1 h or D')
+    
+    return(time_unit)

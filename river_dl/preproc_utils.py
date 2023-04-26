@@ -1354,9 +1354,9 @@ def check_partitions(data, y, pre=False):
     times and site ids
     
     :param data: [dict] data dictionary with keys 'ids_<partition>' and 
-    'times_<partition>', where partition = trn, val, and tst.
+    'times_<partition>', where partition = trn, val, and/or tst.
     :param y: [dict] data dictionary with keys 'y_<phase>_<partition>', 
-    where phase is obs or pre, and partition = trn, val, and tst.
+    where phase is obs or pre, and partition = trn, val, and/or tst.
     :param pre: [bool] when True, phase is pre for pretraining. when False,
     phase is obs.
     
@@ -1369,19 +1369,27 @@ def check_partitions(data, y, pre=False):
         phase = 'obs'
     
     #Get site ids and times for train, val, test data into a matrix
-    df_trn = pd.DataFrame({'ids': np.reshape(data['ids_trn'], (-1)),
-                           'times': np.reshape(data['times_trn'], (-1)),
-                           'obs': np.reshape(y['y_'+phase+'_trn'], (-1))})
-    df_val = pd.DataFrame({'ids': np.reshape(data['ids_val'], (-1)),
-                           'times': np.reshape(data['times_val'], (-1)),
-                           'obs': np.reshape(y['y_'+phase+'_val'], (-1))})
-    df_tst = pd.DataFrame({'ids': np.reshape(data['ids_tst'], (-1)),
-                           'times': np.reshape(data['times_tst'], (-1)),
-                           'obs': np.reshape(y['y_'+phase+'_tst'], (-1))})
-    #remove rows with nan observations
-    df_trn.dropna(inplace=True)
-    df_val.dropna(inplace=True)
-    df_tst.dropna(inplace=True)
+    if 'y_'+phase+'_trn' in y.files:
+        df_trn = pd.DataFrame({'ids': np.reshape(data['ids_trn'], (-1)),
+                               'times': np.reshape(data['times_trn'], (-1)),
+                               'obs': np.reshape(y['y_'+phase+'_trn'], (-1))})
+        df_trn.dropna(inplace=True)
+    else:
+        df_trn = None
+    if 'y_'+phase+'_val' in y.files:
+        df_val = pd.DataFrame({'ids': np.reshape(data['ids_val'], (-1)),
+                               'times': np.reshape(data['times_val'], (-1)),
+                               'obs': np.reshape(y['y_'+phase+'_val'], (-1))})
+        df_val.dropna(inplace=True)
+    else:
+        df_val = None
+    if 'y_'+phase+'_tst' in y.files:
+        df_tst = pd.DataFrame({'ids': np.reshape(data['ids_tst'], (-1)),
+                               'times': np.reshape(data['times_tst'], (-1)),
+                               'obs': np.reshape(y['y_'+phase+'_tst'], (-1))})
+        df_tst.dropna(inplace=True)
+    else:
+        df_tst = None
     
     #When the data are aggregated into a single dataframe
     # there should be no duplicated rows

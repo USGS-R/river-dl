@@ -60,7 +60,7 @@ def rmse_logged(y_true, y_pred):
     """
     y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return rmse_eval(np.log(y_true), np.log(y_pred))
+    return rmse_eval(np.log(y_true + 1e-6), np.log(y_pred + 1e-6))
 
 
 def nse_logged(y_true, y_pred):
@@ -72,7 +72,7 @@ def nse_logged(y_true, y_pred):
     """
     y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return nse_eval(np.log(y_true), np.log(y_pred))
+    return nse_eval(np.log(y_true + 1e-6), np.log(y_pred + 1e-6))
 
 
 def kge_eval(y_true, y_pred):
@@ -102,7 +102,7 @@ def kge_logged(y_true, y_pred):
     """
     y_true, y_pred = filter_nan_preds(y_true, y_pred)
     y_true, y_pred = filter_negative_preds(y_true, y_pred)
-    return kge_eval(np.log(y_true), np.log(y_pred))
+    return kge_eval(np.log(y_true + 1e-6), np.log(y_pred + 1e-6))
 
 def filter_by_percentile(y_true, y_pred, percentile, less_than=True):
     """

@@ -1369,21 +1369,21 @@ def check_partitions(data, y, pre=False):
         phase = 'obs'
     
     #Get site ids and times for train, val, test data into a matrix
-    if 'y_'+phase+'_trn' in y.files:
+    if 'y_'+phase+'_trn' in y.keys():
         df_trn = pd.DataFrame({'ids': np.reshape(data['ids_trn'], (-1)),
                                'times': np.reshape(data['times_trn'], (-1)),
                                'obs': np.reshape(y['y_'+phase+'_trn'], (-1))})
         df_trn.dropna(inplace=True)
     else:
         df_trn = None
-    if 'y_'+phase+'_val' in y.files:
+    if 'y_'+phase+'_val' in y.keys():
         df_val = pd.DataFrame({'ids': np.reshape(data['ids_val'], (-1)),
                                'times': np.reshape(data['times_val'], (-1)),
                                'obs': np.reshape(y['y_'+phase+'_val'], (-1))})
         df_val.dropna(inplace=True)
     else:
         df_val = None
-    if 'y_'+phase+'_tst' in y.files:
+    if 'y_'+phase+'_tst' in y.keys():
         df_tst = pd.DataFrame({'ids': np.reshape(data['ids_tst'], (-1)),
                                'times': np.reshape(data['times_tst'], (-1)),
                                'obs': np.reshape(y['y_'+phase+'_tst'], (-1))})

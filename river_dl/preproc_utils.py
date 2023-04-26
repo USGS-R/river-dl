@@ -557,7 +557,6 @@ def convert_batch_reshape(
     :param fill_time: [bool] When True, filled in data are time indices that
     follow in sequence from the previous timesteps. When False, filled in data 
     are replicates of the previous timesteps.
-    When False, filled in data are replicates of the previous timesteps.
     :return: [numpy array] batched and reshaped dataset
     """
     # If there is no dataset (like if a test or validation set is not supplied)

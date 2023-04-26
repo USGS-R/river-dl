@@ -5,7 +5,7 @@ import xarray as xr
 import datetime
 import subprocess
 import shutil
-import os
+import sys
 
 
 def saveRunLog(config,code_dir,outFile):
@@ -498,8 +498,10 @@ def prep_y_data(
     val_end_date=None,
     test_start_date=None,
     test_end_date=None,
+    train_sites=None,
     val_sites=None,
     test_sites=None,
+    explicit_spatial_partition=True,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
     seq_len=365,
@@ -534,10 +536,14 @@ def prep_y_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
-    :param val_sites: [list of site_ids] sites to retain for validation. These
-    sites will be witheld from training
-    :param test_sites: [list of site_ids] sites to retain for testing. These
-    sites will be witheld from training and validation
+    :param train_sites: [list of site_ids] all sites for the training partition.
+    :param val_sites: [list of site_ids] all sites for the validation partition.
+    :param test_sites: [list of site_ids] all sites for the testing partition.
+    :param explicit_spatial_partition: [bool] when True and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    are removed from the other partitions, unless sites are provided for those 
+    partitions. When False and train_sites (val_sites, test_sites) is specified, 
+    the train_sites (val_sites, tst_sites) may appear in other partitions.
     :param seq_len: [int] length of sequences (e.g., 365)
     :param log_vars: [list-like] which variables_to_log (if any) to take log of
     :param normalize_y: [bool] whether or not to normalize the y_dataset values
@@ -573,14 +579,36 @@ def prep_y_data(
     )
 
 
-    # replace validation sites' (and test sites') data with np.nan
+    # replace trn, val and tst sites' data with np.nan
+    if train_sites:
+        y_trn = y_trn.where(y_trn[spatial_idx_name].isin(train_sites))
+        if explicit_spatial_partition:
+            #remove training sites from validation and testing, unless
+            # sites are provided for those partitions
+            if not val_sites:
+                y_val = y_val.where(~y_val[spatial_idx_name].isin(train_sites))
+            if not test_sites:
+                y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(train_sites))
+    
     if val_sites:
-        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
-
+        y_val = y_val.where(y_val[spatial_idx_name].isin(val_sites))
+        if explicit_spatial_partition:
+            #remove validation sites from training and testing, unless
+            # sites are provided for those partitions
+            if not train_sites:
+                y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(val_sites))
+            if not test_sites:
+                y_tst = y_tst.where(~y_tst[spatial_idx_name].isin(val_sites))
+    
     if test_sites:
-        y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
-        y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
-
+        y_tst = y_tst.where(y_tst[spatial_idx_name].isin(test_sites))
+        if explicit_spatial_partition:
+            #remove test sites from training and validation, unless
+            # sites are provided for those partitions
+            if not train_sites:
+                y_trn = y_trn.where(~y_trn[spatial_idx_name].isin(test_sites))
+            if not val_sites:
+                y_val = y_val.where(~y_val[spatial_idx_name].isin(test_sites))
 
     if log_vars:
         y_trn = log_variables(y_trn, log_vars)
@@ -648,8 +676,10 @@ def prep_all_data(
     val_end_date=None,
     test_start_date=None,
     test_end_date=None,
+    train_sites=None,
     val_sites=None,
     test_sites=None,
+    explicit_spatial_partition=True,
     y_vars_finetune=None,
     y_vars_pretrain=None,
     spatial_idx_name="seg_id_nat",
@@ -664,9 +694,12 @@ def prep_all_data(
     log_y_vars=False,
     out_file=None,
     segs=None,
+    earliest_time=None,
+    latest_time=None,
     normalize_y=True,
     trn_offset = 1.0,
-    tst_val_offset = 1.0
+    tst_val_offset = 1.0,
+    check_pre_partitions=True
 ):
     """
     prepare input and output data for DL model training read in and process
@@ -674,7 +707,9 @@ def prep_all_data(
     scaled to have a std of 1 and a mean of zero
     :param x_data_file: [str] path to Zarr file with x data. Data should have
     a spatial coordinate and a time coordinate that are specified in the
-    `spatial_idx_name` and `time_idx_name` arguments
+    `spatial_idx_name` and `time_idx_name` arguments. Assumes that all spaces will be used,
+    unless segs is specified. Assumes all times will be used,
+    unless an earliest_time or latest_time is specified.
     :param y_data_file: [str] observations Zarr file. Data should have a spatial
     coordinate and a time coordinate that are specified in the
     spatial_idx_name` and `time_idx_name` arguments
@@ -690,10 +725,14 @@ def prep_all_data(
     test period (can have multiple discontinuous periods)
     :param test_end_date: [str or list] fmt: "YYYY-MM-DD"; date(s) to end test
     period (can have multiple discontinuous periods)
-    :param val_sites: [list of site_ids] sites to retain for validation. These
-    sites will be witheld from training
-    :param test_sites: [list of site_ids] sites to retain for testing. These
-    sites will be witheld from training and validation
+    :param train_sites: [list of site_ids] all sites for the training partition.
+    :param val_sites: [list of site_ids] all sites for the validation partition.
+    :param test_sites: [list of site_ids] all sites for the testing partition.
+    :param explicit_spatial_partition: [bool] when True and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    are removed from the other partitions. When False and train_sites 
+    (val_sites, test_sites) is specified, the train_sites (val_sites, tst_sites)
+    may appear in other partitions.
     :param spatial_idx_name: [str] name of column that is used for spatial
     index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for temporal index
@@ -718,10 +757,14 @@ def prep_all_data(
     :param log_y_vars: [bool] whether or not to take the log of discharge in
     training
     :param segs: [list-like] which segments to prepare the data for
+    :param earliest_time: [str] when specified, filters the x_data to remove earlier times
+    :param latest_time: [str] when specified, filters the x_data to remove later times
     :param normalize_y: [bool] whether or not to normalize the y_dataset values
     :param out_file: [str] file to where the values will be written
     :param trn_offset: [str] value for the training offset
     :param tst_val_offset: [str] value for the testing and validation offset
+    :param check_pre_partitions [bool] when True, pretarining partitions are
+    checked for unique data in each partition.
     :returns: training and testing data along with the means and standard
     deviations of the training input and output data
             "x_trn": x training data
@@ -758,6 +801,14 @@ def prep_all_data(
 
     if segs:
         x_data = x_data.sel({spatial_idx_name: segs})
+    
+    if earliest_time:
+        mask_etime = (x_data[time_idx_name] >= np.datetime64(earliest_time))
+        x_data = x_data.where(mask_etime, drop=True)
+    
+    if latest_time:
+        mask_ltime = (x_data[time_idx_name] <= np.datetime64(latest_time))
+        x_data = x_data.where(mask_ltime, drop=True)
 
     x_data = x_data[x_vars]
 
@@ -765,8 +816,10 @@ def prep_all_data(
         x_data = prep_catch_props(x_data, catch_prop_file, catch_prop_vars, spatial_idx_name)
         #update the list of x_vars
         x_vars = list(x_data.data_vars)
+    
     # make sure we don't have any weird or missing input values
     check_if_finite(x_data)
+    
     x_trn, x_val, x_tst = separate_trn_tst(
         x_data,
         time_idx_name,
@@ -777,7 +830,7 @@ def prep_all_data(
         test_start_date,
         test_end_date,
     )
-
+    
     x_trn_scl, x_std, x_mean = scale(x_trn)
 
     x_scl, _, _ = scale(x_data,std=x_std,mean=x_mean)
@@ -890,8 +943,10 @@ def prep_all_data(
             val_end_date=val_end_date,
             test_start_date=test_start_date,
             test_end_date=test_end_date,
+            train_sites=train_sites,
             val_sites=val_sites,
             test_sites=test_sites,
+            explicit_spatial_partition=explicit_spatial_partition,
             spatial_idx_name=spatial_idx_name,
             time_idx_name=time_idx_name,
             seq_len=seq_len,
@@ -901,6 +956,10 @@ def prep_all_data(
             trn_offset = trn_offset,
             tst_val_offset = tst_val_offset
         )
+        
+        #check that the trn, val, and tst partitions have unique data
+        check_partitions(x_data_dict, y_obs_data)
+        
         # if there is a y_data_file and a pretrain file, use the observation
         # mean and standard deviation to do the scaling/centering
         if pretrain_file:
@@ -925,6 +984,10 @@ def prep_all_data(
                 trn_offset = trn_offset,
                 tst_val_offset = tst_val_offset
             )
+            if check_pre_partitions:
+                #check that the trn, val, and tst partitions have unique data
+                check_partitions(x_data_dict, y_pre_data, pre = True)
+        
     # if there is no observation file, use the pretrain mean and standard dev
     # to do the scaling/centering
     elif pretrain_file and not y_obs_data:
@@ -947,9 +1010,12 @@ def prep_all_data(
             trn_offset = trn_offset,
             tst_val_offset = tst_val_offset
         )
+        if check_pre_partitions:
+            #check that the trn, val, and tst partitions have unique data
+            check_partitions(x_data_dict, y_pre_data, pre = True)
     else:
         raise Warning("No y_dataset data was provided")
-
+    
     all_data = {**x_data_dict, **y_obs_data, **y_pre_data}
     if out_file:
         np.savez_compressed(out_file, **all_data)
@@ -1006,3 +1072,55 @@ def prep_adj_matrix(infile, dist_type, dist_idx_name, segs=None, out_file=None):
         np.savez_compressed(out_file, dist_matrix=A_hat)
     return A_hat
 
+def check_partitions(data, y, pre=False):
+    '''
+    Function to check that trn, val, and tst partitions have unique observation
+    times and site ids
+    
+    :param data: [dict] data dictionary with keys 'ids_<partition>' and 
+    'times_<partition>', where partition = trn, val, and/or tst.
+    :param y: [dict] data dictionary with keys 'y_<phase>_<partition>', 
+    where phase is obs or pre, and partition = trn, val, and/or tst.
+    :param pre: [bool] when True, phase is pre for pretraining. when False,
+    phase is obs.
+    
+    returns 0 when all data have unique times and sites. Otherwise sys.exit
+    is called.
+    '''
+    if pre:
+        phase = 'pre'
+    else:
+        phase = 'obs'
+    
+    #Get site ids and times for train, val, test data into a matrix
+    if 'y_'+phase+'_trn' in y.keys():
+        df_trn = pd.DataFrame({'ids': np.reshape(data['ids_trn'], (-1)),
+                               'times': np.reshape(data['times_trn'], (-1)),
+                               'obs': np.reshape(y['y_'+phase+'_trn'], (-1))})
+        df_trn.dropna(inplace=True)
+    else:
+        df_trn = None
+    if 'y_'+phase+'_val' in y.keys():
+        df_val = pd.DataFrame({'ids': np.reshape(data['ids_val'], (-1)),
+                               'times': np.reshape(data['times_val'], (-1)),
+                               'obs': np.reshape(y['y_'+phase+'_val'], (-1))})
+        df_val.dropna(inplace=True)
+    else:
+        df_val = None
+    if 'y_'+phase+'_tst' in y.keys():
+        df_tst = pd.DataFrame({'ids': np.reshape(data['ids_tst'], (-1)),
+                               'times': np.reshape(data['times_tst'], (-1)),
+                               'obs': np.reshape(y['y_'+phase+'_tst'], (-1))})
+        df_tst.dropna(inplace=True)
+    else:
+        df_tst = None
+    
+    #When the data are aggregated into a single dataframe
+    # there should be no duplicated rows
+    df = pd.concat([df_trn, df_val, df_tst])
+    duplicate_rows = df.duplicated(keep=False)
+    if any(duplicate_rows == True):
+        print(df.loc[duplicate_rows])
+        sys.exit('There are observations within multiple data partitions')
+    else:
+        return(0)

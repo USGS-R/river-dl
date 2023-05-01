@@ -467,7 +467,39 @@ def convert_batch_reshape(
     # just return None
     if not dataset:
         return None
-
+    
+    if fill_batch:
+        continuous_start_inds = []
+        #Check if there are gaps in the timeseries as a result of using a
+        # discontinuous partition.
+        #identify all gaps greater than the 1st timestep
+        time_diff = np.diff(dataset[time_idx_name])
+        timestep_1 = time_diff[0]
+        if any(time_diff != timestep_1):
+            #fill those gaps based on the sequence length.
+            gap_timesteps = np.delete(np.unique(time_diff),
+                                      np.where(np.unique(time_diff) == timestep_1))
+            for t in gap_timesteps:
+                #using [0] to return an array
+                gap_ind = np.where(time_diff == t)[0]
+                #there can be multiple gaps of the same length
+                for i in gap_ind:
+                    #determine if the gap is longer than the sequence length
+                    date_before_gap = dataset[time_idx_name][i].values
+                    next_date = dataset[time_idx_name][i+1].values
+                    #gap length in the same unit as the timestep
+                    gap_length = int((next_date - date_before_gap)/timestep_1)
+                    if gap_length < seq_len:
+                        #I originally had this as a sys.exit, but did not want
+                        # to force this condition.
+                        print("The gap between this partition's continuous time periods is less than the sequence length")
+                    
+                    #get the start date indices. These are used to split the
+                    # dataset before creating batches
+                    continuous_start_inds.append(i+1)
+            
+            continuous_start_inds = np.sort(continuous_start_inds)
+    
     # convert xr.dataset to numpy array
     dataset = dataset.transpose(spatial_idx_name, time_idx_name)
 
@@ -483,9 +515,36 @@ def convert_batch_reshape(
 
     # batch the data
     # after [nbatch, nseg, seq_len, nfeat]
-    batched = split_into_batches(arr, seq_len=seq_len, offset=offset,
-                                 fill_batch=fill_batch, fill_nan=fill_nan,
-                                 fill_time=fill_time)
+    if fill_batch:
+        if len(continuous_start_inds) != 0:
+            #using a discontinuous partition. create a set of batches for each
+            # continuous period in this partion and join
+            for g in range(len(continuous_start_inds)+1):
+                if g == 0:
+                    arr_g = arr[:,0:(continuous_start_inds[g]-1),:].copy()
+                    
+                    batched = split_into_batches(arr_g, seq_len=seq_len, offset=offset,
+                                                 fill_batch=fill_batch, fill_nan=fill_nan,
+                                                 fill_time=fill_time)
+                    
+                else:
+                    if g == len(continuous_start_inds):
+                        arr_g = arr[:,continuous_start_inds[g-1]:arr.shape[1],:].copy()
+                    else:
+                        arr_g = arr[:,continuous_start_inds[g-1]:(continuous_start_inds[g]-1),:].copy()
+                        
+                    batched_g = split_into_batches(arr_g, seq_len=seq_len, offset=offset,
+                                                   fill_batch=fill_batch, fill_nan=fill_nan,
+                                                   fill_time=fill_time)
+                    batched = np.append(batched, batched_g, axis = 0)
+        else:
+            batched = split_into_batches(arr, seq_len=seq_len, offset=offset,
+                                         fill_batch=fill_batch, fill_nan=fill_nan,
+                                         fill_time=fill_time)
+    else:
+        batched = split_into_batches(arr, seq_len=seq_len, offset=offset,
+                                     fill_batch=fill_batch, fill_nan=fill_nan,
+                                     fill_time=fill_time)
 
     # reshape data
     # after [nbatch * nseg, seq_len, nfeat]

@@ -175,7 +175,8 @@ def predict(
         raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
     
     #set to nan the data that were added to fill batches
-    y_pred[pad_mask] = np.nan
+    if pad_mask:
+        y_pred[pad_mask] = np.nan
     
     # keep only specified part of predictions
     if keep_last_portion>1:

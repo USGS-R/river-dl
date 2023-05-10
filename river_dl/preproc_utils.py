@@ -181,7 +181,8 @@ def separate_trn_tst(
 
 
 def split_into_batches(data_array, seq_len=365, offset=1.0,
-                       fill_batch=True, fill_nan=False, fill_time=False):
+                       fill_batch=True, fill_nan=False, fill_time=False,
+                       fill_pad=False):
     """
     split training data into batches with size of seq_len
     :param data_array: [numpy array] array of training data with dims [nseg,
@@ -200,6 +201,9 @@ def split_into_batches(data_array, seq_len=365, offset=1.0,
     :param fill_time: [bool] When True, filled in data are time indices that
     follow in sequence from the previous timesteps. When False, filled in data 
     are replicates of the previous timesteps.
+    :param fill_pad: [bool] When True, the returned data are bool indicating
+    True when it is padded and False otherwise. When False, filled in data 
+    are based on other fill_ rules.
     :return: [numpy array] batched data with dims [nbatches, nseg, seq_len
     (batch_size), nfeat]
     """
@@ -227,6 +231,21 @@ def split_into_batches(data_array, seq_len=365, offset=1.0,
                 data_array = np.concatenate((data_array, 
                                              nan_array), 
                                             axis = 1)
+            elif fill_pad:
+                #fill in with True for padded values and False otherwise
+                False_array = np.empty((data_array.shape[0], 
+                                      data_array.shape[1], 
+                                      data_array.shape[2]),
+                                      dtype=bool)
+                True_array = np.empty((data_array.shape[0], 
+                                      num_rep_steps, 
+                                      data_array.shape[2]),
+                                      dtype=bool)
+                False_array.fill(False)
+                True_array.fill(True)
+                data_array = np.concatenate((False_array, 
+                                             True_array), 
+                                            axis = 1)
             else:
                 #fill in by replicating the previous timesteps in the data_array
                 if fill_time:
@@ -247,6 +266,25 @@ def split_into_batches(data_array, seq_len=365, offset=1.0,
                                                 axis = 1)
             
             num_batches = num_batches+1
+        
+        elif fill_pad:
+            #return array of False - no padded data
+            False_array = np.empty((data_array.shape[0], 
+                                  data_array.shape[1], 
+                                  data_array.shape[2]),
+                                  dtype=bool)
+            False_array.fill(False)
+            data_array = False_array
+            
+    elif fill_pad:
+        #return array of False - no padded data
+        False_array = np.empty((data_array.shape[0], 
+                              data_array.shape[1], 
+                              data_array.shape[2]),
+                              dtype=bool)
+        False_array.fill(False)
+        data_array = False_array
+        
                 
     combined=[]
     for i in range(num_batches+1):
@@ -439,7 +477,8 @@ def convert_batch_reshape(
     offset=1.0,
     fill_batch=True, 
     fill_nan=False,
-    fill_time=False
+    fill_time=False,
+    fill_pad=False
 ):
     """
     convert xarray dataset into numpy array, swap the axes, batch the array and
@@ -461,6 +500,9 @@ def convert_batch_reshape(
     :param fill_time: [bool] When True, filled in data are time indices that
     follow in sequence from the previous timesteps. When False, filled in data 
     are replicates of the previous timesteps.
+    :param fill_pad: [bool] When True, the returned data are bool indicating
+    True when it is padded and False otherwise. When False, filled in data 
+    are based on other fill_ rules.
     :return: [numpy array] batched and reshaped dataset
     """
     # If there is no dataset (like if a test or validation set is not supplied)
@@ -521,30 +563,30 @@ def convert_batch_reshape(
             # continuous period in this partion and join
             for g in range(len(continuous_start_inds)+1):
                 if g == 0:
-                    arr_g = arr[:,0:(continuous_start_inds[g]-1),:].copy()
+                    arr_g = arr[:,0:continuous_start_inds[g],:].copy()
                     
                     batched = split_into_batches(arr_g, seq_len=seq_len, offset=offset,
                                                  fill_batch=fill_batch, fill_nan=fill_nan,
-                                                 fill_time=fill_time)
+                                                 fill_time=fill_time, fill_pad=fill_pad)
                     
                 else:
                     if g == len(continuous_start_inds):
                         arr_g = arr[:,continuous_start_inds[g-1]:arr.shape[1],:].copy()
                     else:
-                        arr_g = arr[:,continuous_start_inds[g-1]:(continuous_start_inds[g]-1),:].copy()
+                        arr_g = arr[:,continuous_start_inds[g-1]:continuous_start_inds[g],:].copy()
                         
                     batched_g = split_into_batches(arr_g, seq_len=seq_len, offset=offset,
                                                    fill_batch=fill_batch, fill_nan=fill_nan,
-                                                   fill_time=fill_time)
+                                                   fill_time=fill_time, fill_pad=fill_pad)
                     batched = np.append(batched, batched_g, axis = 0)
         else:
             batched = split_into_batches(arr, seq_len=seq_len, offset=offset,
                                          fill_batch=fill_batch, fill_nan=fill_nan,
-                                         fill_time=fill_time)
+                                         fill_time=fill_time, fill_pad=fill_pad)
     else:
         batched = split_into_batches(arr, seq_len=seq_len, offset=offset,
                                      fill_batch=fill_batch, fill_nan=fill_nan,
-                                     fill_time=fill_time)
+                                     fill_time=fill_time, fill_pad=fill_pad)
 
     # reshape data
     # after [nbatch * nseg, seq_len, nfeat]
@@ -561,7 +603,8 @@ def coord_as_reshaped_array(
     offset=1.0,
     fill_batch=True, 
     fill_nan=False,
-    fill_time=False
+    fill_time=False,
+    fill_pad=False
 ):
     """
     convert an xarray coordinate to an xarray data array and reshape that array
@@ -584,6 +627,9 @@ def coord_as_reshaped_array(
     :param fill_time: [bool] When True, filled in data are time indices that
     follow in sequence from the previous timesteps. When False, filled in data 
     are replicates of the previous timesteps.
+    :param fill_pad: [bool] When True, the returned data are bool indicating
+    True when it is padded and False otherwise. When False, filled in data 
+    are based on other fill_ rules.
     :return:
     """
     # If there is no dataset (like if a test or validation set is not supplied)
@@ -605,7 +651,8 @@ def coord_as_reshaped_array(
         offset=offset,
         fill_batch=fill_batch, 
         fill_nan=fill_nan,
-        fill_time=fill_time
+        fill_time=fill_time,
+        fill_pad=fill_pad
     )
     return reshaped_np_arr
 
@@ -934,10 +981,13 @@ def prep_all_data(
             "x_cols": x column names
             "ids_trn": segment ids of the training data
             "times_trn": dates of the training data
+            "padded_trn": bool with True for padded times
             "ids_val": segment ids of the validation data
             "times_val": dates of the validation data
+            "padded_val": times_val with True for padded times
             "ids_tst": segment ids of the test data
             "times_tst": dates of the test data
+            "padded_tst": times_tst with True for padded times
             'y_pre_trn': y_dataset pretrain data for train set
             'y_obs_trn': y_dataset observations for train set
             "y_pre_wgts": y_dataset weights for pretrain data
@@ -1009,11 +1059,13 @@ def prep_all_data(
     x_data_dict = {
         "x_pre_full": convert_batch_reshape(
             x_scl,spatial_idx_name, time_idx_name, seq_len=seq_len,
-            offset=trn_offset, fill_batch=fill_batch, fill_nan=False, fill_time=False
+            offset=trn_offset, fill_batch=fill_batch, fill_nan=False, fill_time=False,
+            fill_pad=False
         ),
         "x_trn": convert_batch_reshape(
             x_trn_scl, spatial_idx_name, time_idx_name, seq_len=seq_len,
-            offset=trn_offset, fill_batch=fill_batch, fill_nan=False, fill_time=False
+            offset=trn_offset, fill_batch=fill_batch, fill_nan=False, fill_time=False,
+            fill_pad=False
         ),
         "x_val": convert_batch_reshape(
             x_val_scl,
@@ -1023,7 +1075,8 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=False
+            fill_time=False,
+            fill_pad=False
         ),
         "x_tst": convert_batch_reshape(
             x_tst_scl,
@@ -1033,7 +1086,8 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=False
+            fill_time=False,
+            fill_pad=False
         ),
         "x_std": x_std.to_array().values,
         "x_mean": x_mean.to_array().values,
@@ -1047,7 +1101,8 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=False
+            fill_time=False,
+            fill_pad=False
         ),
         "times_trn": coord_as_reshaped_array(
             x_trn,
@@ -1058,7 +1113,20 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=True
+            fill_time=True,
+            fill_pad=False
+        ),
+        "padded_trn": coord_as_reshaped_array(
+            x_trn,
+            spatial_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=trn_offset,
+            seq_len=seq_len, 
+            fill_batch=fill_batch, 
+            fill_nan=False, 
+            fill_time=False,
+            fill_pad=True
         ),
         "ids_val": coord_as_reshaped_array(
             x_val,
@@ -1069,7 +1137,8 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=False
+            fill_time=False,
+            fill_pad=False
         ),
         "times_val": coord_as_reshaped_array(
             x_val,
@@ -1080,7 +1149,20 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=True
+            fill_time=True,
+            fill_pad=False
+        ),
+        "padded_val": coord_as_reshaped_array(
+            x_val,
+            spatial_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=tst_val_offset,
+            seq_len=seq_len, 
+            fill_batch=fill_batch, 
+            fill_nan=False, 
+            fill_time=False,
+            fill_pad=True
         ),
         "ids_tst": coord_as_reshaped_array(
             x_tst,
@@ -1091,7 +1173,8 @@ def prep_all_data(
             seq_len=seq_len, 
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=False
+            fill_time=False,
+            fill_pad=False
         ),
         "times_tst": coord_as_reshaped_array(
             x_tst,
@@ -1102,8 +1185,21 @@ def prep_all_data(
             seq_len=seq_len,
             fill_batch=fill_batch, 
             fill_nan=False, 
-            fill_time=True
+            fill_time=True,
+            fill_pad=False
         ),
+        "padded_tst": coord_as_reshaped_array(
+            x_tst,
+            spatial_idx_name,
+            spatial_idx_name,
+            time_idx_name,
+            offset=tst_val_offset,
+            seq_len=seq_len,
+            fill_batch=fill_batch, 
+            fill_nan=False, 
+            fill_time=False,
+            fill_pad=True
+        )
     }
     if distfile:
         x_data_dict["dist_matrix"] = prep_adj_matrix(

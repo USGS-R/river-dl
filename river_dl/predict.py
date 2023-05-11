@@ -59,6 +59,9 @@ def predict_from_io_data(
     tst_val_offset = 1.0,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
+    trn_latest_time=None,
+    val_latest_time=None,
+    tst_latest_time=None
 ):
     """
     make predictions from trained model
@@ -70,14 +73,34 @@ def predict_from_io_data(
     prep
     :param trn_offset: [str] value for the training offset
     :param tst_val_offset: [str] value for the testing and validation offset
+    :param trn_latest_time: [str] when specified, the training partition preds will
+    be trimmed to use trn_latest_time as the last date
+    :param val_latest_time: [str] when specified, the validation partition preds will
+    be trimmed to use val_latest_time as the last date
+    :param tst_latest_time: [str] when specified, the test partition preds will
+    be trimmed to use tst_latest_time as the last date
     :return: [pd dataframe] predictions
     """
     io_data = get_data_if_file(io_data)
     if partition == "trn":
         keep_portion = trn_offset
-    else:
+        if trn_latest_time:
+            latest_time = trn_latest_time
+        else:
+            latest_time = None
+    elif partition == "val":
         keep_portion = tst_val_offset
-
+        if val_latest_time:
+            latest_time = val_latest_time
+        else:
+            latest_time = None
+    elif partition == "tst":
+        keep_portion = tst_val_offset
+        if tst_latest_time:
+            latest_time = tst_latest_time
+        else:
+            latest_time = None
+    
     preds = predict(
         model,
         io_data[f"x_{partition}"],
@@ -91,6 +114,8 @@ def predict_from_io_data(
         log_vars=log_vars,
         spatial_idx_name=spatial_idx_name,
         time_idx_name=time_idx_name,
+        latest_time=latest_time,
+        pad_mask=io_data[f"padded_{partition}"]
     )
     return preds
 
@@ -108,6 +133,8 @@ def predict(
     log_vars=False,
     spatial_idx_name="seg_id_nat",
     time_idx_name="date",
+    latest_time=None,
+    pad_mask=None
 ):
     """
     use trained model to make predictions
@@ -126,7 +153,10 @@ def predict(
     :param y_vars:[np array] the variable names of the y_dataset data
     :param outfile: [str] the file where the output data should be stored
     :param log_vars: [list-like] which variables_to_log (if any) were logged in data
-    prep
+    :param latest_time: [str] when provided, the latest time that should be included
+    in the returned dataframe
+    :param pad_mask: [np array] bool array with True for padded data and False
+    otherwise
     :return: out predictions
     """
     num_segs = len(np.unique(pred_ids))
@@ -143,6 +173,11 @@ def predict(
         y_pred = model.predict(x_data, batch_size=num_segs)
     else:
         raise TypeError("Model must be a torch.nn.Module or tf.Keras.Model")
+    
+    #set to nan the data that were added to fill batches
+    if pad_mask is not None:
+        y_pred[pad_mask] = np.nan
+    
     # keep only specified part of predictions
     if keep_last_portion>1:
         frac_seq_len = int(keep_last_portion)
@@ -154,8 +189,19 @@ def predict(
     pred_dates = pred_dates[:, -frac_seq_len:,...]
 
     y_pred_pp = prepped_array_to_df(y_pred, pred_dates, pred_ids, y_vars, spatial_idx_name, time_idx_name)
-
-    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, log_vars,)
+    
+    y_pred_pp = unscale_output(y_pred_pp, y_stds, y_means, y_vars, log_vars)
+    
+    #remove data that were added to fill batches
+    y_pred_pp.dropna(inplace=True)
+    y_pred_pp = y_pred_pp.reset_index().drop(columns='index')
+    
+    #Cut off the end times if specified
+    if latest_time:
+        y_pred_pp = (y_pred_pp.drop(y_pred_pp[y_pred_pp[time_idx_name] > np.datetime64(latest_time)].index)
+                     .reset_index()
+                     .drop(columns='index')
+                     )
 
     if outfile:
         y_pred_pp.to_feather(outfile)

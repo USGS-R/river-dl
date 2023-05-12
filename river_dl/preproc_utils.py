@@ -391,7 +391,7 @@ def reduce_training_data_random(
     df = ds.to_dataframe()
     idx = pd.IndexSlice
     df_trn = df.loc[idx[train_start_date:train_end_date, :], :]
-    if np.any(segs):
+    if segs is not None:
         df_trn = df_trn.loc[idx[:, segs], :]
     non_null = df_trn.dropna()
     reduce_idx = non_null.sample(frac=reduce_amount).index
@@ -457,7 +457,7 @@ def reduce_training_data_continuous(
     idx = pd.IndexSlice
     df_red = df.copy()
     df_red = df_red.loc[idx[train_start:train_end, :]]
-    if np.any(segs):
+    if segs is not None:
         df_red = df_red.loc[idx[:, segs], :]
     df_red = filter_reduce_dates(
         df_red, reduce_start, reduce_end, reduce_between
@@ -1008,7 +1008,7 @@ def prep_all_data(
     x_data = xr.open_zarr(x_data_file,consolidated=False)
     x_data = x_data.sortby([spatial_idx_name, time_idx_name])
 
-    if np.any(segs):
+    if segs is not None:
         x_data = x_data.sel({spatial_idx_name: segs})
     
     if earliest_time:
@@ -1315,7 +1315,7 @@ def sort_dist_matrix(mat, row_col_names, segs=None):
     if segs is not None:
         row_col_names = row_col_names.astype(type(segs[0]))
     df = pd.DataFrame(mat, columns=row_col_names, index=row_col_names)
-    if np.any(segs):
+    if segs is not None:
         df = df[segs]
         df = df.loc[segs]
     df = df.sort_index(axis=0)

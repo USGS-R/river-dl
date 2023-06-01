@@ -105,7 +105,7 @@ def amp_phi (Date, temp, isWater=False, r_thresh=0.8, tempType="obs"):
     return amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean
 
 
-def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water_temp_obs_col="seg_tave_water",air_temp_col = 'seg_tave_air', reservoirSegs = []):
+def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water_temp_obs_col="seg_tave_water",air_temp_col = 'seg_tave_air', reservoirSegs = [], spatial_idx_name='seg_id_nat', time_idx_name='date'):
     """
     calculate the annual signal properties (phase and amplitude) for temperature times series
     :param thisData: [xr dataset] with time series data of air and water temp for each segment
@@ -113,6 +113,8 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
     :param reservoirSegs: [] array of segment numbers in / near reservoirs
+    :param spatial_idx_name: [str] name of columns that is used for spatial index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for time index (e.g., 'date')
     :returns: data frame with phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio for each segment, "low" and "high" values are the minimum and maximum 
     property values calculated with coefficient values within the 95th percent confidence interval
@@ -140,25 +142,25 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     water_phi_high_pbm = []
    
     #get the phase and amplitude for air and water temps for each segment
-    for i in range(len(thisData['seg_id_nat'])):
-        thisSeg = thisData['seg_id_nat'][i].data
-        waterDF = pd.DataFrame({'date':thisData['date'].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
+    for i in range(len(thisData[spatial_idx_name])):
+        thisSeg = thisData[spatial_idx_name][i].data
+        waterDF = pd.DataFrame({time_idx_name:thisData[time_idx_name].values,'tave_water':thisData[water_temp_obs_col][:,i].values})
         #require temps > 1 and <60 C for signal analysis
         waterDF.loc[(waterDF.tave_water<1),"tave_water"]=1
         waterDF.dropna(inplace=True)
-        waterDF['waterYear']=waterDF['date'].dt.year 
-        waterDF.loc[waterDF['date'].dt.month>=10,"waterYear"]= waterDF.loc[waterDF['date'].dt.month>=10,'date'].dt.year+1
+        waterDF['waterYear']=waterDF[time_idx_name].dt.year 
+        waterDF.loc[waterDF[time_idx_name].dt.month>=10,"waterYear"]= waterDF.loc[waterDF[time_idx_name].dt.month>=10,time_idx_name].dt.year+1
         waterSum = waterDF.loc[~waterDF.tave_water.isnull(),['waterYear','tave_water']].groupby('waterYear',as_index=False).count()
         waterSum=waterSum[waterSum.tave_water>=300]
         waterDF = waterDF[waterDF.waterYear.isin(waterSum.waterYear)]
 
 
         thisData = thisData.assign_coords(
-    waterYear=('date', [x.year if x.month < 10 else (x.year+1) for x in pd.Series(thisData['date'].values) ]))
+    waterYear=(time_idx_name, [x.year if x.month < 10 else (x.year+1) for x in pd.Series(thisData[time_idx_name].values) ]))
         
         
         if waterSum.shape[0]>0 and thisSeg not in reservoirSegs:
-            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[air_temp_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=False)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData[time_idx_name].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[air_temp_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=False)
             air_amp.append(amp)
             air_amp_low.append(amp_low)
             air_amp_high.append(amp_high)
@@ -167,7 +169,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
             air_phi_high.append(phi_high)
 
             #get the process-based model (pbm) water temp properties
-            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[water_temp_pbm_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=True)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData[time_idx_name].values[thisData.waterYear.isin(waterSum.waterYear)],thisData[water_temp_pbm_col][:,i].values[thisData.waterYear.isin(waterSum.waterYear)],isWater=True)
             water_amp_pbm.append(amp)
             water_amp_low_pbm.append(amp_low)
             water_amp_high_pbm.append(amp_high)
@@ -195,11 +197,11 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
                     #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
                     #    waterDF = waterDF.loc[waterDF.bin==maxBin]
 
-            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(waterDF.date.values,waterDF.tave_water.values,isWater=True)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(waterDF[time_idx_name].values,waterDF.tave_water.values,isWater=True)
             meanTemp = Tmean
 
         else:
-            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData['date'].values,thisData[air_temp_col][:,i].values,isWater=False)
+            amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData[time_idx_name].values,thisData[air_temp_col][:,i].values,isWater=False)
             air_amp.append(amp)
             air_amp_low.append(amp_low)
             air_amp_high.append(amp_high)
@@ -262,7 +264,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     Ar_pbm = [water_amp_pbm[x]/air_amp[x] for x in range(len(water_amp_pbm))]
     delPhi_pbm = [(air_phi[x]-water_phi_pbm[x])*365/(2*math.pi) for x in range(len(water_amp_pbm))]
     
-    tempDF = pd.DataFrame({'seg_id_nat':thisData['seg_id_nat'].values, 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_pbm':water_amp_pbm,'water_phi_pbm':water_phi_pbm,'Ar_pbm':Ar_pbm,'delPhi_pbm':delPhi_pbm,'Tmean_obs':water_mean_obs, 'Tmean_pbm':water_mean_pbm})
+    tempDF = pd.DataFrame({spatial_idx_name:thisData[spatial_idx_name].values, 'air_amp':air_amp,'air_phi':air_phi,'water_amp_obs':water_amp_obs,'water_phi_obs':water_phi_obs,'Ar_obs':Ar_obs,'delPhi_obs':delPhi_obs,'Ar_low_obs':Ar_low_obs, 'Ar_high_obs':Ar_high_obs,'delPhi_low_obs':delPhi_low_obs,'delPhi_high_obs':delPhi_high_obs,'water_amp_pbm':water_amp_pbm,'water_phi_pbm':water_phi_pbm,'Ar_pbm':Ar_pbm,'delPhi_pbm':delPhi_pbm,'Tmean_obs':water_mean_obs, 'Tmean_pbm':water_mean_pbm})
     
     return tempDF
 
@@ -282,6 +284,8 @@ def prep_annual_signal_data(
     water_temp_obs_col = 'mean_temp_c',
     segs = None,
     reach_file = None,
+    spatial_idx_name = 'seg_id_nat',
+    time_idx_name = 'date',
     extraResSegments = None,
     gw_loss_type = 'fft',
     trn_offset = 1,
@@ -302,6 +306,9 @@ def prep_annual_signal_data(
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
     :param reach_file: str with the file of reach attributes
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for time index (e.g., 'date')
     :param gw_loss_type: str with the gw loss method (fft or linalg)
     :param trn_offset: [float] value for the training offset
     :param tst_val_offset: [float] value for the testing and validation offset
@@ -316,22 +323,26 @@ def prep_annual_signal_data(
     ds_pre = xr.open_zarr(pretrain_file)
     
     if segs:
-        ds_pre = ds_pre.loc[dict(seg_id_nat=segs)]
+        ds_pre = ds_pre.loc[{spatial_idx_name:segs}]
 
     #read in the observed temperature data and join to the SNTemp data
-    obs = [ds_pre.sortby(["seg_id_nat","date"])]
+    obs = [ds_pre.sortby([spatial_idx_name,time_idx_name])]
     tempFile = xr.open_zarr(obs_temper_file)
-    tempFile['seg_id_nat']=tempFile['seg_id_nat'].astype(int)
+    tempFile[spatial_idx_name]=tempFile[spatial_idx_name].astype(int)
     obs.append(tempFile)
     
     #using an outer join keeps all data, but requires the assumption that the air temp properties from PRMS (WY1981 - 2016) were valid for WY 2017-2020
     obs=xr.merge(obs,join="left")
-    obs=obs[[air_temp_col,water_temp_pbm_col,water_temp_obs_col]]
-    obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
+    colList = [air_temp_col, water_temp_obs_col]
+    if water_temp_pbm_col:
+        colList.append(water_temp_pbm_col)
+    obs=obs[colList]
+    if water_temp_pbm_col:
+        obs = obs.rename({water_temp_pbm_col: "seg_tave_water_pbm"})
     obs = obs.rename({water_temp_obs_col: "seg_tave_water"})
     if reach_file:
         reachDF = pd.read_csv(reach_file)
-        reservoirSegs = reachDF.seg_id_nat.loc[reachDF.reach_class.isin(['contains_reservoir','downstream of reservoir (1)','downstream of reservoir (2)','reservoir_inlet_reach','reservoir_outlet_reach','within_reservoir'])].values
+        reservoirSegs = reachDF.loc[reachDF.reach_class.isin(['contains_reservoir','downstream of reservoir (1)','downstream of reservoir (2)','reservoir_inlet_reach','reservoir_outlet_reach','within_reservoir']),spatial_idx_name].values
         #seg_id_nat isn't included in the reservoir csv as of 1/6/2022
         if extraResSegments:
             reservoirSegs = np.append(reservoirSegs,extraResSegments)
@@ -340,7 +351,7 @@ def prep_annual_signal_data(
         reservoirSegs = []
 
     #split into testing and training
-    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, 'date',train_start_date,
+    obs_trn, obs_val, obs_tst = separate_trn_tst(obs, time_idx_name,train_start_date,
         train_end_date,
         val_start_date,
         val_end_date,
@@ -348,9 +359,9 @@ def prep_annual_signal_data(
         test_end_date)
 
     #get the annual signal properties for the training, validation, and testing data
-    GW_trn = annual_temp_stats(obs_trn, reservoirSegs=reservoirSegs)
-    GW_tst = annual_temp_stats(obs_tst, reservoirSegs=reservoirSegs)
-    GW_val = annual_temp_stats(obs_val, reservoirSegs=reservoirSegs)
+    GW_trn = annual_temp_stats(obs_trn, reservoirSegs=reservoirSegs,spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
+    GW_tst = annual_temp_stats(obs_tst, reservoirSegs=reservoirSegs,spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
+    GW_val = annual_temp_stats(obs_val, reservoirSegs=reservoirSegs,spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
 
     
     #scale the Ar_obs & delPhi_obs
@@ -371,7 +382,7 @@ def prep_annual_signal_data(
 
     
     #add the GW data to the y_dataset dataset
-    preppedData = np.load(io_data_file)
+    preppedData = np.load(io_data_file, allow_pickle=True)
     data = {k:v for  k, v in preppedData.items() if not k.startswith("GW")}
 
     temp_index = np.where(data['y_obs_vars']==water_temp_obs_col)[0]
@@ -380,9 +391,9 @@ def prep_annual_signal_data(
     num_task = len(data['y_obs_vars'])
     temp_air_index = np.where(data['x_vars']=='seg_tave_air')[0]
     
-    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel(date=slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=trn_offset,metric_method=metric_method)
-    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel(date=slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method)
-    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel(date=slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method)
+    data['GW_trn_reshape']=make_GW_dataset(GW_trn_scale,obs_trn.sel({time_idx_name:slice(np.min(np.unique(preppedData['times_trn'])), np.max(np.unique(preppedData['times_trn'])))}),gwVarList,data['times_trn'],data['ids_trn'], data['x_trn'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_trn'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=trn_offset,metric_method=metric_method, spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
+    data['GW_tst_reshape']=make_GW_dataset(GW_tst_scale,obs_tst.sel({time_idx_name:slice(np.min(np.unique(preppedData['times_tst'])), np.max(np.unique(preppedData['times_tst'])))}),gwVarList,data['times_tst'],data['ids_tst'], data['x_tst'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_tst'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method, spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
+    data['GW_val_reshape']=make_GW_dataset(GW_val_scale,obs_val.sel({time_idx_name:slice(np.min(np.unique(preppedData['times_val'])), np.max(np.unique(preppedData['times_val'])))}),gwVarList,data['times_val'],data['ids_val'], data['x_val'][:,:,temp_air_index]*data['x_std'][temp_air_index] +data['x_mean'][temp_air_index], data['y_obs_val'],temp_index, temp_mean, temp_sd, gw_mean=np.nanmean(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), gw_std=np.nanstd(GW_trn[['Ar_obs','delPhi_obs','Tmean_obs']],axis=0), num_task = num_task, offset=tst_val_offset,metric_method=metric_method, spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
 
     data['GW_tst']=GW_tst
     data['GW_trn']=GW_trn
@@ -404,22 +415,25 @@ def prep_annual_signal_data(
     #data2['GW_cols']=GW_trn.columns.values.astype('str')
     #np.savez_compressed(out_file2, **data2)
 
-def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="pred"):
+def calc_amp_phi(thisData, water_temp_pred_col = "temp_c", tempType="pred",spatial_idx_name='seg_id_nat',time_idx_name='date'):
     """
     compiles temperature signal properties for predicted temperatures
     :param thisData: [dataset] dataset of predicted temperatures
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for time index (e.g., 'date')
     :returns: dataframe with signal properties by segment
     """
-    segList = np.unique(thisData['seg_id_nat'])
+    segList = np.unique(thisData[spatial_idx_name])
     water_amp_preds = []
     water_phi_preds = []
     water_mean_preds = []
     for thisSeg in segList:
-        amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData.loc[thisData.seg_id_nat==thisSeg,"date"].values,thisData.loc[thisData.seg_id_nat==thisSeg,water_temp_pred_col],isWater=True, tempType = tempType)
+        amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(thisData.loc[thisData[spatial_idx_name]==thisSeg,time_idx_name].values,thisData.loc[thisData[spatial_idx_name]==thisSeg,water_temp_pred_col],isWater=True, tempType = tempType)
         water_amp_preds.append(amp)
         water_phi_preds.append(phi)
         water_mean_preds.append(Tmean)
-    return pd.DataFrame({'seg_id_nat':segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds, 'Tmean_pred':water_mean_preds})
+    return pd.DataFrame({spatial_idx_name:segList,'water_amp_pred':water_amp_preds,'water_phi_pred':water_phi_preds, 'Tmean_pred':water_mean_preds})
 
 def make_decimal_date(date, ref_date = "1980-10-01"):
     """
@@ -454,7 +468,7 @@ def merge_pred_obs(gw_obs,obs_col,pred):
     return obsDF
 
 
-def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, offset=1,metric_method='batch'):
+def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, temp_index, temp_mean, temp_sd, gw_mean, gw_std, num_task, offset=1,metric_method='batch',spatial_idx_name='seg_id_nat',time_idx_name="date"):
 
     """
     prepares a GW-relevant dataset for the GW loss function that can be combined with y_true
@@ -473,26 +487,29 @@ def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, 
     :param num_task: number of y variables
     :param offset: [float] offset for the dataset
     :param metric_method: [str] annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches) 
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat'
+    :param time_idx_name: [str] name of column that is used for time index (e.g., 'date')
     :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
     """
     #make a dataframe with all combinations of segment and date and then join the annual temperature signal properties dataframe to it
-    prod = pd.DataFrame(product(np.unique(GW_data.seg_id_nat),x_data['date'].values),columns=['seg_id_nat','date'])
+    prod = pd.DataFrame(product(np.unique(GW_data[spatial_idx_name]),x_data[time_idx_name].values),columns=[spatial_idx_name,time_idx_name])
 
     prod = prod.merge(GW_data)
     
     #convert the date to decimal years 
-    prod['dec_date']=make_decimal_date(prod.date)
+    prod['dec_date']=make_decimal_date(prod[time_idx_name])
     
     #precalculate sin(wt) and cos(wt) for the regression
     prod['sin_wt']=[math.sin(2*math.pi*x) for x in prod['dec_date']]
     prod['cos_wt']=[math.cos(2*math.pi*x) for x in prod['dec_date']]
     
     #reshape the resulting dataset
-    obs2 = [x_data.sortby(["seg_id_nat", "date"])]
-    obs2.append(prod.set_index(['date','seg_id_nat']).to_xarray())
+    obs2 = [x_data.sortby([spatial_idx_name,time_idx_name])]
+    obs2.append(prod.set_index([time_idx_name,spatial_idx_name]).to_xarray())
     GW_ds = xr.merge(obs2, join="left")
     GW_ds = GW_ds[varList]
-    GW_Arr = convert_batch_reshape(GW_ds, offset=offset)
+    GW_Arr = convert_batch_reshape(GW_ds, offset=offset, spatial_idx_name = spatial_idx_name, time_idx_name = time_idx_name)
     
     if metric_method!='static':
         data = np.concatenate([temp_data, GW_Arr, air_data], axis=2)
@@ -600,13 +617,17 @@ def lm_gw_utils(temp_index, dates, data, y_pred, temp_mean, temp_sd, gw_mean, gw
     
     return Ar_obs, delPhi_obs, Tmean_obs
 
-def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output, temp_var="mean_temp_c"):
+def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_output,val_output, temp_var="mean_temp_c", spatial_idx_name='seg_id_nat',time_idx_name='date'):
     """
     calculates annual temperature signal properties using predicted temperatures
     :param GW_data: file of prepped GW only data
     :param trn_data, tst_data, val_data: [str] files with predicted temperatures from the training, testing, and validation partitions (feather)
     :param trn_output, tst_output, val_output: [str] output files for the calculated metrics for the training, testing, and validation partitions(csv)
     :param temp_var: [str] name of the temperature variable
+    :param spatial_idx_name: [str] name of column that is used for spatial
+    index (e.g., 'seg_id_nat')
+    :param time_idx_name: [str] name of column that is used for temporal index
+    (usually 'time')
     """
     gw_obs = np.load(GW_data)
     
@@ -614,9 +635,9 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     tst_preds = pd.read_feather(tst_data)
     val_preds = pd.read_feather(val_data)
 
-    gw_trn = calc_amp_phi(trn_preds,temp_var,"pred")
-    gw_tst = calc_amp_phi(tst_preds,temp_var,"pred")
-    gw_val = calc_amp_phi(val_preds,temp_var,"pred")
+    gw_trn = calc_amp_phi(trn_preds,temp_var,"pred",spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
+    gw_tst = calc_amp_phi(tst_preds,temp_var,"pred",spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
+    gw_val = calc_amp_phi(val_preds,temp_var,"pred",spatial_idx_name=spatial_idx_name, time_idx_name=time_idx_name)
     
     gw_stats_trn = merge_pred_obs(gw_obs,'GW_trn',gw_trn)
     gw_stats_tst = merge_pred_obs(gw_obs,'GW_tst',gw_tst)
@@ -626,12 +647,14 @@ def calc_pred_ann_temp(GW_data,trn_data,tst_data, val_data,trn_output, tst_outpu
     gw_stats_tst.to_csv(tst_output)
     gw_stats_val.to_csv(val_output)
     
-def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name = "SNTemp"):
+def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name = "SNTemp", spatial_idx_name='seg_id_nat'):
     """
     summarizeds GW metrics across all data partitions and creates summary figures
     :param trnFile,tstFile,valFile: [str] input files for the calculated metrics for the training, testing, and validation partitions(csv)
     :param outFile: output file for the summarized metrics (csv)
     :param figFile1, figFile2: output files for the summary scatterplot and boxplot figures
+    :param spatial_idx_name: [str] name of column that is used for spatial
+        index (e.g., 'seg_id_nat')
     """
     trnDF = pd.read_csv(trnFile)
     tstDF = pd.read_csv(tstFile)
@@ -693,7 +716,7 @@ def calc_gw_metrics(trnFile,tstFile,valFile,outFile,figFile1, figFile2, pbm_name
                     ax.scatter(x=thisData.loc[thisData.group==thisGroup,'{}_obs'.format(thisMetric)],y=thisData.loc[thisData.group==thisGroup,'{}_pred'.format(thisMetric)],label="RGCN - %s"%thisGroup,color=thisColor)
                 
 #                ax.scatter(x=thisData['{}_obs'.format(thisMetric)],y_dataset=thisData['{}_sntemp'.format(thisMetric)],label="SNTEMP",color="red")
-                for i, label in enumerate(thisData.seg_id_nat):
+                for i, label in enumerate(thisData[spatial_idx_name]):
                     ax.annotate(int(label), (thisData['{}_obs'.format(thisMetric)][i],thisData['{}_pred'.format(thisMetric)][i]))
                 if thisFig==1:
                           ax.legend()

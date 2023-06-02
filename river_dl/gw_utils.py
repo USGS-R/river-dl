@@ -488,7 +488,7 @@ def make_GW_dataset (GW_data,x_data,varList,dates, id_data,air_data, temp_data, 
     :param offset: [float] offset for the dataset
     :param metric_method: [str] annual metric calculation method, either 'static' (uses all years in the partition, no temporal changes), 'batch' (calculated for each batch with sufficient data, other batches on those reaches use the averages of the batch calculations),'high_data_batches' (only calculated for batches with sufficient data),'low_data_years' (calculated only for batches with low data based on the averages of the high-data batches for those reaches) 
     :param spatial_idx_name: [str] name of column that is used for spatial
-        index (e.g., 'seg_id_nat'
+        index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for time index (e.g., 'date')
     :returns: GW dataset that is reshaped to match the shape of the first 2 dimensions of the y_true dataset
     """

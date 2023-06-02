@@ -188,13 +188,13 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
                     ### old code that may be used again for adding additional data requirements for the temp signal analysis
                     #get the longest set of temp records with no gaps >49 days
                     #dateDiff = [0]
-                    #dateDiff.extend([int((waterDF.date.iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
+                    #dateDiff.extend([int((waterDF[time_idx_name].iloc[x]-waterDF.date.iloc[x-1])/np.timedelta64(1, 'D')) for x in range(1,waterDF.shape[0])])
                     #waterDF['dateDiff']=dateDiff
                     #if max(dateDiff)>31:
-                    #    waterDF['bin']=pd.cut(waterDF.date,bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF.date))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF.date==np.nanmax(waterDF.date))].values, include_lowest=True, labels=False)
-                    #    waterSum = waterDF[['date','bin']].groupby('bin',as_index=False).count()
+                    #    waterDF['bin']=pd.cut(waterDF[time_idx_name],bins=waterDF.date.loc[(waterDF.date==np.nanmin(waterDF[time_idx_name]))|(waterDF.dateDiff>50) | (waterDF.dateDiff==0)|(waterDF[time_idx_name]==np.nanmax(waterDF[time_idx_name]))].values, include_lowest=True, labels=False)
+                    #    waterSum = waterDF[[time_idx_name,'bin']].groupby('bin',as_index=False).count()
                     #    #keep the longest series
-                    #    maxBin = waterSum.bin[waterSum.date==np.max(waterSum.date)].values[0]
+                    #    maxBin = waterSum.bin[waterSum[time_idx_name]==np.max(waterSum[time_idx_name])].values[0]
                     #    waterDF = waterDF.loc[waterDF.bin==maxBin]
 
             amp, phi, amp_low, amp_high, phi_low, phi_high, Tmean = amp_phi(waterDF[time_idx_name].values,waterDF.tave_water.values,isWater=True)

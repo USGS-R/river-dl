@@ -1,3 +1,6 @@
+Active development moved to [https://code.usgs.gov/wma/wp/river-dl](https://code.usgs.gov/wma/wp/river-dl)
+
+
 # Deep Graph Convolutional Neural Network for Predicting Environmental Variables on River Networks
 This repository contains code for predicting environmental variables on river networks.  The models included are all either
 temporally or spatiotemporally aware and incorporate information from the river network. The original intent of 

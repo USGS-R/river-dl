@@ -113,7 +113,7 @@ def annual_temp_stats(thisData, water_temp_pbm_col = 'seg_tave_water_pbm', water
     :param water_temp_obs_col: str with the column name of the observed water temperatures in degrees C
     :param air_temp_col: str with the column name of the air temperatures in degrees C
     :param reservoirSegs: [] array of segment numbers in / near reservoirs
-    :param spatial_idx_name: [str] name of columns that is used for spatial index (e.g., 'seg_id_nat')
+    :param spatial_idx_name: [str] name of column that is used for spatial index (e.g., 'seg_id_nat')
     :param time_idx_name: [str] name of column that is used for time index (e.g., 'date')
     :returns: data frame with phase and amplitude of air and observed water temp, along with the
     phase shift and amplitude ratio for each segment, "low" and "high" values are the minimum and maximum 

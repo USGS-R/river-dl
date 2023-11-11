@@ -9,3 +9,4 @@ output*/
 .ipynb_checkpoints*
 *.slurm
 *.out
+.Rproj.user
